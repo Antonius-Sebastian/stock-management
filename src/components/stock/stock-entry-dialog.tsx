@@ -1,0 +1,324 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { format } from "date-fns"
+import { CalendarIcon } from "lucide-react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+
+const createFormSchema = (items: Item[], type: "IN" | "OUT") => z.object({
+  itemId: z.string().min(1, "Please select an item"),
+  quantity: z.coerce.number({
+    required_error: "Quantity is required",
+    invalid_type_error: "Quantity must be a number",
+  }).refine((val) => !isNaN(val) && val > 0, "Quantity must be greater than zero"),
+  date: z.date({
+    required_error: "Please select a date",
+  }),
+  description: z.string().optional(),
+}).refine((data) => {
+  if (type === "OUT") {
+    const selectedItem = items.find(item => item.id === data.itemId);
+    if (selectedItem && 'currentStock' in selectedItem) {
+      return data.quantity <= (selectedItem as Item & {currentStock: number}).currentStock;
+    }
+  }
+  return true;
+}, {
+  message: "Quantity cannot exceed available stock",
+  path: ["quantity"],
+})
+
+interface StockEntryDialogProps {
+  type: "IN" | "OUT"
+  itemType: "raw-material" | "finished-good"
+  onSuccess: () => void
+  children: React.ReactNode
+}
+
+interface Item {
+  id: string
+  name: string
+  kode?: string
+  sku?: string
+  currentStock?: number
+}
+
+type FormData = z.infer<ReturnType<typeof createFormSchema>>
+
+export function StockEntryDialog({
+  type,
+  itemType,
+  onSuccess,
+  children,
+}: StockEntryDialogProps) {
+  const [open, setOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [items, setItems] = useState<Item[]>([])
+
+  const formSchema = createFormSchema(items, type)
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      itemId: "",
+      quantity: "" as unknown as number,
+      date: new Date(),
+      description: "",
+    },
+    mode: "onSubmit",
+  })
+
+  const fetchItems = async () => {
+    try {
+      const endpoint = itemType === "raw-material" ? "/api/raw-materials" : "/api/finished-goods"
+      const response = await fetch(endpoint)
+      if (!response.ok) {
+        throw new Error("Failed to fetch items")
+      }
+      const data = await response.json()
+      setItems(data)
+    } catch (error) {
+      console.error("Error fetching items:", error)
+      toast.error("Failed to load items. Please try again.")
+    }
+  }
+
+  useEffect(() => {
+    if (open) {
+      fetchItems()
+    }
+  }, [open, itemType])
+
+  async function onSubmit(data: FormData) {
+    setIsLoading(true)
+    try {
+      const stockMovementData = {
+        type,
+        quantity: data.quantity,
+        date: data.date.toISOString(),
+        description: data.description,
+        ...(itemType === "raw-material"
+          ? { rawMaterialId: data.itemId }
+          : { finishedGoodId: data.itemId }),
+      }
+
+      const response = await fetch("/api/stock-movements", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(stockMovementData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        throw new Error(errorData.error || "Failed to create stock movement")
+      }
+
+      const actionType = type === "IN" ? "incoming" : "outgoing"
+      const itemTypeLabel = itemType === "raw-material" ? "raw material" : "finished good"
+
+      toast.success(`Successfully recorded ${actionType} stock for ${itemTypeLabel}`)
+      form.reset()
+      setOpen(false)
+      onSuccess()
+    } catch (error) {
+      console.error("Error creating stock movement:", error)
+      const message = error instanceof Error ? error.message : "Failed to create stock movement"
+      toast.error(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getTitle = () => {
+    const action = type === "IN" ? "Input Stok Masuk" : "Input Stok Keluar"
+    const itemTypeLabel = itemType === "raw-material" ? "Raw Material" : "Finished Good"
+    return `${action} - ${itemTypeLabel}`
+  }
+
+  const getDescription = () => {
+    const action = type === "IN" ? "incoming" : "outgoing"
+    const itemTypeLabel = itemType === "raw-material" ? "raw material" : "finished good"
+    return `Record ${action} stock for ${itemTypeLabel}`
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {children}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{getTitle()}</DialogTitle>
+          <DialogDescription>
+            {getDescription()}
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="itemId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {itemType === "raw-material" ? "Raw Material" : "Finished Good"}
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={`Select ${itemType === "raw-material" ? "raw material" : "finished good"}`} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {items.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {itemType === "raw-material"
+                            ? `${item.kode} - ${item.name}`
+                            : item.name
+                          }
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="quantity"
+              render={({ field }) => {
+                const selectedItemId = form.watch("itemId");
+                const selectedItem = items.find(item => item.id === selectedItemId);
+                const availableStock = selectedItem?.currentStock || 0;
+
+                return (
+                  <FormItem>
+                    <FormLabel>Quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Enter quantity"
+                        {...field}
+                      />
+                    </FormControl>
+                    {type === "OUT" && selectedItem && (
+                      <p className="text-xs text-muted-foreground">
+                        Available: {availableStock.toLocaleString()}
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter description"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Recording..." : "Record"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
+}

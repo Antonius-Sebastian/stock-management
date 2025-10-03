@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") 
+}
+
+model RawMaterial {
+  id          String   @id @default(cuid())
+  kode        String   @unique
+  name        String
+  currentStock Float   @default(0)
+  moq         Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  stockMovements StockMovement[]
+  batchUsages    BatchUsage[]
+
+  @@map("raw_materials")
+}
+
+model FinishedGood {
+  id          String   @id @default(cuid())
+  name        String
+  currentStock Float   @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  stockMovements StockMovement[]
+  batches        Batch[]
+
+  @@map("finished_goods")
+}
+
+model StockMovement {
+  id          String            @id @default(cuid())
+  type        StockMovementType
+  quantity    Float
+  date        DateTime
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  rawMaterialId  String?
+  rawMaterial    RawMaterial?  @relation(fields: [rawMaterialId], references: [id])
+  finishedGoodId String?
+  finishedGood   FinishedGood? @relation(fields: [finishedGoodId], references: [id])
+  batchId        String?
+  batch          Batch?        @relation(fields: [batchId], references: [id])
+
+  @@map("stock_movements")
+}
+
+model Batch {
+  id               String        @id @default(cuid())
+  code             String        @unique
+  date             DateTime
+  description      String?
+  finishedGoodId   String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  finishedGood     FinishedGood  @relation(fields: [finishedGoodId], references: [id])
+  stockMovements   StockMovement[]
+  batchUsages      BatchUsage[]
+
+  @@map("batches")
+}
+
+model BatchUsage {
+  id            String  @id @default(cuid())
+  quantity      Float
+  batchId       String
+  rawMaterialId String
+
+  // Relations
+  batch         Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id])
+
+  @@map("batch_usages")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+}

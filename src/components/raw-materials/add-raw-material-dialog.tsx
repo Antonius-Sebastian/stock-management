@@ -1,0 +1,181 @@
+"use client"
+
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Plus } from "lucide-react"
+
+const formSchema = z.object({
+  kode: z.string().min(1, "Code is required"),
+  name: z.string().min(1, "Name is required"),
+  currentStock: z.coerce.number().min(0, "Stock cannot be negative"),
+  moq: z.coerce.number().min(1, "MOQ must be at least 1"),
+})
+
+type FormData = z.infer<typeof formSchema>
+
+interface AddRawMaterialDialogProps {
+  onSuccess: () => void
+}
+
+export function AddRawMaterialDialog({ onSuccess }: AddRawMaterialDialogProps) {
+  const [open, setOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      kode: "",
+      name: "",
+      currentStock: 0,
+      moq: 1,
+    },
+  })
+
+  async function onSubmit(data: FormData) {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/raw-materials", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        throw new Error(errorData.error || "Failed to create raw material")
+      }
+
+      toast.success("Raw material created successfully")
+      form.reset()
+      setOpen(false)
+      onSuccess()
+    } catch (error) {
+      console.error("Error creating raw material:", error)
+      const message = error instanceof Error ? error.message : "Failed to create raw material"
+      toast.error(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Raw Material
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Add Raw Material</DialogTitle>
+          <DialogDescription>
+            Add a new raw material to the inventory system.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="kode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Code</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Material code" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Material name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="currentStock"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Current Stock</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="moq"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>MOQ (Minimum Order Quantity)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="1"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Creating..." : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
+}

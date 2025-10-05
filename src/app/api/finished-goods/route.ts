@@ -1,28 +1,72 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
+import { auth } from '@/auth'
+import { successResponse, ErrorResponses } from '@/lib/api-response'
 
 const createFinishedGoodSchema = z.object({
   name: z.string().min(1, 'Name is required'),
 })
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const finishedGoods = await prisma.finishedGood.findMany({
-      orderBy: { createdAt: 'desc' },
+    const session = await auth()
+    if (!session) {
+      return ErrorResponses.unauthorized()
+    }
+
+    // Parse pagination parameters (optional - defaults to all)
+    const { searchParams } = new URL(request.url)
+    const pageParam = searchParams.get('page')
+    const limitParam = searchParams.get('limit')
+
+    // If no pagination params, return all (backward compatible)
+    if (!pageParam && !limitParam) {
+      const finishedGoods = await prisma.finishedGood.findMany({
+        orderBy: { createdAt: 'desc' },
+      })
+      return successResponse(finishedGoods)
+    }
+
+    // Pagination mode
+    const page = Math.max(1, parseInt(pageParam || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam || '50')))
+    const skip = (page - 1) * limit
+
+    // Get total count and paginated data in parallel
+    const [finishedGoods, total] = await Promise.all([
+      prisma.finishedGood.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.finishedGood.count(),
+    ])
+
+    // Return data with pagination metadata
+    return successResponse({
+      data: finishedGoods,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + finishedGoods.length < total,
+      },
     })
-    return NextResponse.json(finishedGoods)
   } catch (error) {
     console.error('Error fetching finished goods:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch finished goods' },
-      { status: 500 }
-    )
+    return ErrorResponses.internalError()
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session) {
+      return ErrorResponses.unauthorized()
+    }
+
     const body = await request.json()
     const validatedData = createFinishedGoodSchema.parse(body)
 
@@ -31,10 +75,7 @@ export async function POST(request: NextRequest) {
       where: { name: validatedData.name },
     })
     if (existingProduct) {
-      return NextResponse.json(
-        { error: `Product "${validatedData.name}" already exists` },
-        { status: 400 }
-      )
+      return ErrorResponses.badRequest(`Product "${validatedData.name}" already exists`)
     }
 
     const finishedGood = await prisma.finishedGood.create({
@@ -44,28 +85,19 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(finishedGood, { status: 201 })
+    return successResponse(finishedGood, 201)
   } catch (error) {
     console.error('Error creating finished good:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]
-      return NextResponse.json(
-        { error: firstError.message || 'Validation failed' },
-        { status: 400 }
-      )
+      return ErrorResponses.badRequest(firstError.message || 'Validation failed')
     }
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return ErrorResponses.badRequest(error.message)
     }
 
-    return NextResponse.json(
-      { error: 'Failed to create finished good' },
-      { status: 500 }
-    )
+    return ErrorResponses.internalError()
   }
 }

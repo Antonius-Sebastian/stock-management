@@ -10,7 +10,7 @@ const createRawMaterialSchema = z.object({
   moq: z.number().min(1, 'MOQ must be at least 1'),
 })
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Authentication required (all roles can view)
     const session = await auth()
@@ -18,10 +18,45 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const rawMaterials = await prisma.rawMaterial.findMany({
-      orderBy: { createdAt: 'desc' },
+    // Parse pagination parameters (optional - defaults to all)
+    const { searchParams } = new URL(request.url)
+    const pageParam = searchParams.get('page')
+    const limitParam = searchParams.get('limit')
+
+    // If no pagination params, return all (backward compatible)
+    if (!pageParam && !limitParam) {
+      const rawMaterials = await prisma.rawMaterial.findMany({
+        orderBy: { createdAt: 'desc' },
+      })
+      return NextResponse.json(rawMaterials)
+    }
+
+    // Pagination mode
+    const page = Math.max(1, parseInt(pageParam || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam || '50')))
+    const skip = (page - 1) * limit
+
+    // Get total count and paginated data in parallel
+    const [rawMaterials, total] = await Promise.all([
+      prisma.rawMaterial.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.rawMaterial.count(),
+    ])
+
+    // Return data with pagination metadata
+    return NextResponse.json({
+      data: rawMaterials,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + rawMaterials.length < total,
+      },
     })
-    return NextResponse.json(rawMaterials)
   } catch (error) {
     console.error('Error fetching raw materials:', error)
     return NextResponse.json(

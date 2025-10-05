@@ -15,7 +15,7 @@ const createBatchSchema = z.object({
   })).min(1, 'At least one raw material is required'),
 })
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Authentication required (all roles can view)
     const session = await auth()
@@ -23,18 +23,75 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const batches = await prisma.batch.findMany({
-      include: {
-        finishedGood: true,
-        batchUsages: {
-          include: {
-            rawMaterial: true,
+    // Parse pagination parameters (optional - defaults to all)
+    const { searchParams } = new URL(request.url)
+    const pageParam = searchParams.get('page')
+    const limitParam = searchParams.get('limit')
+
+    const batchSelect = {
+      id: true,
+      code: true,
+      date: true,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+      finishedGood: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      batchUsages: {
+        select: {
+          id: true,
+          quantity: true,
+          rawMaterial: {
+            select: {
+              id: true,
+              kode: true,
+              name: true,
+            },
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+    }
+
+    // If no pagination params, return all (backward compatible)
+    if (!pageParam && !limitParam) {
+      const batches = await prisma.batch.findMany({
+        select: batchSelect,
+        orderBy: { createdAt: 'desc' },
+      })
+      return NextResponse.json(batches)
+    }
+
+    // Pagination mode
+    const page = Math.max(1, parseInt(pageParam || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam || '50')))
+    const skip = (page - 1) * limit
+
+    // Get total count and paginated data in parallel
+    const [batches, total] = await Promise.all([
+      prisma.batch.findMany({
+        skip,
+        take: limit,
+        select: batchSelect,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.batch.count(),
+    ])
+
+    // Return data with pagination metadata
+    return NextResponse.json({
+      data: batches,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + batches.length < total,
+      },
     })
-    return NextResponse.json(batches)
   } catch (error) {
     console.error('Error fetching batches:', error)
     return NextResponse.json(
@@ -62,6 +119,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = createBatchSchema.parse(body)
 
+    // Check for duplicate materials in the batch
+    const materialIds = validatedData.materials.map(m => m.rawMaterialId)
+    const uniqueMaterialIds = new Set(materialIds)
+    if (materialIds.length !== uniqueMaterialIds.size) {
+      return NextResponse.json(
+        { error: 'Duplicate materials found in batch. Each material can only be used once per batch.' },
+        { status: 400 }
+      )
+    }
+
     // Check for duplicate batch code
     const existingBatch = await prisma.batch.findFirst({
       where: { code: validatedData.code },
@@ -76,14 +143,20 @@ export async function POST(request: NextRequest) {
     // Start a transaction to create batch, batch usages, and stock movements
     const result = await prisma.$transaction(async (tx) => {
       // Verify all raw materials exist and have sufficient stock
+      // Use raw query with FOR UPDATE to lock rows and prevent race conditions
       for (const material of validatedData.materials) {
-        const rawMaterial = await tx.rawMaterial.findUnique({
-          where: { id: material.rawMaterialId },
-        })
+        const rawMaterials = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+          SELECT id, name, "currentStock"
+          FROM raw_materials
+          WHERE id = ${material.rawMaterialId}
+          FOR UPDATE
+        `
 
-        if (!rawMaterial) {
+        if (rawMaterials.length === 0) {
           throw new Error(`Raw material not found`)
         }
+
+        const rawMaterial = rawMaterials[0]
 
         if (rawMaterial.currentStock < material.quantity) {
           throw new Error(`Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${material.quantity}`)

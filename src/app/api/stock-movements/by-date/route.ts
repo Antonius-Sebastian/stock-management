@@ -37,11 +37,11 @@ export async function DELETE(request: NextRequest) {
     const validatedQuery = deleteByDateSchema.parse(query)
     const queryDate = new Date(validatedQuery.date)
 
-    // Get start and end of day
+    // Get start and end of day (using UTC to avoid timezone issues)
     const startOfDay = new Date(queryDate)
-    startOfDay.setHours(0, 0, 0, 0)
+    startOfDay.setUTCHours(0, 0, 0, 0)
     const endOfDay = new Date(queryDate)
-    endOfDay.setHours(23, 59, 59, 999)
+    endOfDay.setUTCHours(23, 59, 59, 999)
 
     // Delete movements and update stock in a transaction
     await prisma.$transaction(async (tx) => {
@@ -163,11 +163,11 @@ export async function PUT(request: NextRequest) {
     const validatedData = updateByDateSchema.parse(body)
     const queryDate = new Date(validatedData.date)
 
-    // Get start and end of day
+    // Get start and end of day (using UTC to avoid timezone issues)
     const startOfDay = new Date(queryDate)
-    startOfDay.setHours(0, 0, 0, 0)
+    startOfDay.setUTCHours(0, 0, 0, 0)
     const endOfDay = new Date(queryDate)
-    endOfDay.setHours(23, 59, 59, 999)
+    endOfDay.setUTCHours(23, 59, 59, 999)
 
     // Update/replace movements in a transaction
     const result = await prisma.$transaction(async (tx) => {

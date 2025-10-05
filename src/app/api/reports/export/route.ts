@@ -433,10 +433,19 @@ export async function GET(request: NextRequest) {
       }
 
       // Set column widths
-      worksheet.getColumn(1).width = 12; // Kode
-      worksheet.getColumn(2).width = 35; // Nama (wider for better readability)
+      worksheet.getColumn(1).width = 15; // Kode
+      worksheet.getColumn(2).width = 40; // Nama (wider to prevent overflow)
       for (let day = 1; day <= maxDay; day++) {
-        worksheet.getColumn(day + 2).width = 11; // Day columns (fit 1,000,000 with separator)
+        worksheet.getColumn(day + 2).width = 12; // Day columns (fit 1,000,000 with separator)
+      }
+
+      // Enable text wrapping for Nama column to prevent overflow
+      for (let i = 7; i <= worksheet.rowCount; i++) {
+        const namaCell = worksheet.getCell(i, 2);
+        namaCell.alignment = {
+          ...namaCell.alignment,
+          wrapText: true, // Enable text wrapping
+        };
       }
 
       // Freeze first two columns and header rows

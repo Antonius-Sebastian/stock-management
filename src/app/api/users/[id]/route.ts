@@ -199,6 +199,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Prevent self-deletion
+    if (existingUser.id === session.user.id) {
+      return NextResponse.json(
+        { error: 'Cannot delete your own account' },
+        { status: 400 }
+      )
+    }
+
     // Prevent deleting the last admin
     if (existingUser.role === 'ADMIN') {
       const adminCount = await prisma.user.count({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { auth } from '@/auth'
+import { z } from 'zod'
 
 export async function GET(
   request: NextRequest,
@@ -15,9 +16,12 @@ export async function GET(
 
     const { id } = await params
 
+    // Validate ID format to prevent SQL injection
+    const validatedId = z.string().cuid().parse(id)
+
     // Fetch the raw material
     const material = await prisma.rawMaterial.findUnique({
-      where: { id },
+      where: { id: validatedId },
       select: {
         id: true,
         kode: true,
@@ -37,7 +41,7 @@ export async function GET(
     // Fetch all stock movements for this material
     const movements = await prisma.stockMovement.findMany({
       where: {
-        rawMaterialId: id,
+        rawMaterialId: validatedId,
       },
       include: {
         batch: {

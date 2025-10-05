@@ -117,25 +117,38 @@ export function StockEntryDialog({
     mode: "onSubmit",
   })
 
-  const fetchItems = async () => {
+  const fetchItems = async (signal?: AbortSignal) => {
     try {
       const endpoint = actualItemType === "raw-material" ? "/api/raw-materials" : "/api/finished-goods"
-      const response = await fetch(endpoint)
+      const response = await fetch(endpoint, { signal })
       if (!response.ok) {
         throw new Error("Failed to fetch items")
       }
       const data = await response.json()
       setItems(data)
     } catch (error) {
+      // Ignore abort errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        return
+      }
       console.error("Error fetching items:", error)
       toast.error("Failed to load items. Please try again.")
     }
   }
 
   useEffect(() => {
+    // Create AbortController for cleanup
+    const controller = new AbortController()
+
     if (open) {
-      fetchItems()
+      fetchItems(controller.signal)
     }
+
+    // Cleanup function to abort fetch on unmount or dependency change
+    return () => {
+      controller.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, actualItemType])
 
   // Update form when entityId changes

@@ -61,6 +61,11 @@ model StockMovement {
   batchId        String?
   batch          Batch?        @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
+  // Performance indexes for common queries
+  @@index([date])  // For date-based filtering in reports
+  @@index([rawMaterialId, date])  // For material movement history
+  @@index([finishedGoodId, date])  // For finished good movement history
+  @@index([type, date])  // For filtering by movement type
   @@map("stock_movements")
 }
 
@@ -78,6 +83,9 @@ model Batch {
   stockMovements   StockMovement[]
   batchUsages      BatchUsage[]
 
+  // Performance indexes for common queries
+  @@index([date])  // For date-based filtering
+  @@index([finishedGoodId])  // For product-based filtering
   @@map("batches")
 }
 

@@ -42,6 +42,21 @@ export async function PUT(
       )
     }
 
+    // Check for duplicate name (excluding current product)
+    const duplicateProduct = await prisma.finishedGood.findFirst({
+      where: {
+        name: validatedData.name,
+        id: { not: id },
+      },
+    })
+
+    if (duplicateProduct) {
+      return NextResponse.json(
+        { error: `Product "${validatedData.name}" already exists` },
+        { status: 400 }
+      )
+    }
+
     const updatedProduct = await prisma.finishedGood.update({
       where: { id },
       data: validatedData,

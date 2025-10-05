@@ -9,6 +9,8 @@ const updateBatchSchema = z.object({
   date: z.string().datetime(),
   description: z.string().optional(),
   finishedGoodId: z.string().min(1, 'Finished good is required'),
+  // Note: Material usage cannot be updated after batch creation
+  // to maintain data integrity. Delete and recreate the batch instead.
 })
 
 export async function GET(

@@ -219,11 +219,28 @@ None (initial release)
 
 ## [Unreleased]
 
+### Documentation Corrections (October 5, 2025)
+
+**Updated documentation to reflect actual implementation status:**
+- Corrected `ISSUES_TO_FIX.md` - Marked User Management UI and RBAC as complete
+- Corrected `KNOWN_ISSUES.md` - Moved User Management UI and RBAC to resolved issues
+- Updated `STATUS.md` - Added User Management UI, RBAC, and cross-linking to completed features
+
+**Key Findings:**
+- User Management UI was already fully implemented at `/users` with full CRUD operations
+- RBAC enforcement was already fully implemented both server-side and client-side
+- Cross-linking between batches and materials was already implemented
+- Previous documentation incorrectly stated these features were missing
+
+**No code changes required** - All features were already working, only documentation was outdated.
+
+---
+
 ### Planned for Phase 1 (Post-MVP)
 
 #### High Priority
-- [ ] User management UI pages
-- [ ] Role-based access control (RBAC) enforcement
+- [x] ~~User management UI pages~~ ✅ Already implemented
+- [x] ~~Role-based access control (RBAC) enforcement~~ ✅ Already implemented
 - [ ] Clone Batch feature
 - [ ] Dashboard with analytics
 

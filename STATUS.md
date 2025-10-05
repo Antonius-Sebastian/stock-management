@@ -52,7 +52,9 @@
 | Movement History Tracking | ✅ Complete | Complete audit trail |
 | Running Balance Calculation | ✅ Complete | Accurate from 0 baseline |
 | Authentication System | ✅ Complete | NextAuth with JWT sessions |
-| User Management | ✅ Complete | API ready, UI pending |
+| User Management UI | ✅ Complete | Full CRUD at `/users` |
+| RBAC Enforcement | ✅ Complete | Server & client-side |
+| Cross-linking | ✅ Complete | Clickable batch codes & material names |
 
 ---
 

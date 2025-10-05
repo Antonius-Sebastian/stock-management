@@ -141,87 +141,6 @@ useEffect(() => {
 
 ## 🔵 Design Limitations (By Design)
 
-### No User Management UI
-
-**Status:** API Ready, UI Not Implemented
-**Priority:** Low (MVP)
-
-#### Description
-
-User management endpoints exist at `/api/users`, but there's no UI for:
-- Creating new users
-- Editing user details
-- Deleting users
-- Managing roles
-
-#### Workaround
-
-Use API directly via curl or Postman:
-
-```bash
-# List all users
-curl -X GET http://localhost:3000/api/users \
-  -H "Cookie: authjs.session-token=YOUR_TOKEN"
-
-# Create new user
-curl -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -H "Cookie: authjs.session-token=YOUR_TOKEN" \
-  -d '{
-    "username": "newuser",
-    "password": "password123",
-    "name": "New User",
-    "role": "OFFICE"
-  }'
-```
-
-#### Future Enhancement
-
-Planned for post-MVP Phase 1:
-- User management page at `/users`
-- Table with list of users
-- Add/Edit/Delete dialogs
-- Role management UI
-
----
-
-### No Role-Based Access Control (RBAC)
-
-**Status:** Roles Stored, Not Enforced
-**Priority:** Medium (Post-MVP)
-
-#### Description
-
-The system has three user roles:
-- `ADMIN` - Full access (intended)
-- `FACTORY` - Factory staff access (intended)
-- `OFFICE` - Office staff access (intended)
-
-However, **all authenticated users can access all features** regardless of role.
-
-#### Impact
-
-Any logged-in user can:
-- Create/edit/delete materials
-- Create/edit/delete batches
-- View reports
-- Manage stock
-
-#### Workaround
-
-**Current (MVP):**
-- Trust-based access control
-- Only create accounts for users who should have full access
-- Use username conventions to identify role (e.g., "admin-john", "factory-maria")
-
-**Future Implementation:**
-```typescript
-// Example future implementation
-if (session.user.role !== 'ADMIN') {
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-}
-```
-
 ---
 
 ### No Finished Good Auto-Update from Batch
@@ -399,6 +318,43 @@ Stock can no longer be modified via edit dialog.
 **Details:** `QA_FIXES_APPLIED.md`
 
 StockMovements are now deleted when batch is deleted.
+
+---
+
+### ~~User Management UI Missing~~ ✅ IMPLEMENTED
+
+**Implemented:** October 5, 2025
+
+Full user management UI now available at `/users` with:
+- User list table with search and sorting
+- Add user dialog
+- Edit user dialog (name, role, active status)
+- Only visible to ADMIN users (RBAC enforced)
+
+**Location:** `src/app/users/page.tsx` and `src/components/users/*`
+
+---
+
+### ~~RBAC Not Enforced~~ ✅ IMPLEMENTED
+
+**Implemented:** October 5, 2025
+
+Role-Based Access Control now fully enforced:
+
+**Server-side:** All API endpoints check permissions and return 403 if unauthorized
+- Raw materials: ADMIN/OFFICE only
+- Finished goods: ADMIN/OFFICE only
+- Batches: Create/Edit (ADMIN/FACTORY), Delete (ADMIN only)
+- Users: ADMIN only
+
+**Client-side:** UI elements hidden based on role
+- Sidebar navigation filtered by role
+- Action buttons (Edit/Delete) shown only if permitted
+- Forms disabled for unauthorized users
+
+**Helper functions:** `src/lib/rbac.ts` with full permission matrix
+
+**Verification:** Login as different roles to see different access levels
 
 ---
 

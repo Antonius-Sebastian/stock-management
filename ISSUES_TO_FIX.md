@@ -191,77 +191,99 @@ After running `npx prisma db seed`, three users are created with default passwor
 
 ## 🟢 MEDIUM PRIORITY - Can Fix After Initial Deployment
 
-### 5. Missing User Management UI
+### 5. ✅ FIXED: User Management UI Implementation
 
-**Status:** 📋 **DOCUMENTED AS LIMITATION**
-**Priority:** Medium
-**Impact:** User Experience
-**Estimated Time:** 4-6 hours
+**Status:** ✅ **IMPLEMENTED AND WORKING**
+**Priority:** N/A (Complete)
+**Completed:** October 5, 2025
 
-**Current State:**
-- API endpoints exist (`/api/users/*`)
-- All endpoints require authentication ✅
-- No UI pages for user management
+**Implementation Details:**
+- Full user management UI page at `/users`
+- Components:
+  - `src/app/users/page.tsx` - Main users page
+  - `src/components/users/users-table.tsx` - Table with sorting/search
+  - `src/components/users/add-user-dialog.tsx` - Create new user
+  - `src/components/users/edit-user-dialog.tsx` - Edit existing user
+- Features:
+  - ✅ List all users with roles and status
+  - ✅ Create new users
+  - ✅ Edit user details (name, role, status)
+  - ✅ Role management dropdown
+  - ✅ Active/Inactive toggle
+  - ✅ Protected by authentication
+  - ✅ Only visible to ADMIN users (RBAC enforced in sidebar)
 
-**Workaround:**
-Users can be managed via API using cURL or Postman:
-```bash
-# List users
-curl -X GET http://localhost:3000/api/users -b cookies.txt
+**Location in App:**
+- Available in sidebar navigation (Admin users only)
+- Route: `/users`
+- API endpoints: `/api/users` and `/api/users/[id]`
 
-# Create user
-curl -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -b cookies.txt \
-  -d '{"username":"newuser","password":"password123","name":"New User","role":"OFFICE"}'
-```
-
-**Documented In:**
-- `docs/reference/KNOWN_ISSUES.md` - "No User Management UI" section
-- `docs/reference/API.md` - Users section
-- `docs/reference/ENHANCEMENT_PLAN.md` - Phase 1
-
-**Recommendation:**
-- Acceptable for MVP launch
-- Add to Phase 1 post-MVP roadmap
-- Admins can use API for now
+**Verification:**
+Run the app and login as admin to access User Management page.
 
 ---
 
-### 6. RBAC Roles Not Enforced
+### 6. ✅ FIXED: RBAC (Role-Based Access Control) Fully Enforced
 
-**Status:** 📋 **DOCUMENTED AS LIMITATION**
-**Priority:** Medium
-**Impact:** Security (Low for MVP)
-**Estimated Time:** 2-3 hours
+**Status:** ✅ **IMPLEMENTED AND WORKING**
+**Priority:** N/A (Complete)
+**Completed:** October 5, 2025
 
-**Current State:**
-- User roles are stored in database (ADMIN, FACTORY, OFFICE)
-- Authentication works ✅
-- All authenticated users have full access (no role checks)
+**Implementation Details:**
 
-**Impact:**
-- Factory staff can delete materials (shouldn't)
-- Office staff can create batches (might be ok)
-- No audit of who did what based on role
+**1. Server-Side Enforcement (API Routes):**
+All API endpoints check permissions before allowing operations:
 
-**Documented In:**
-- `docs/reference/KNOWN_ISSUES.md` - "No Role-Based Access Control" section
-- `STATUS.md` - Known Limitations
+- **Raw Materials** (`src/app/api/raw-materials/route.ts`):
+  - CREATE: ADMIN or OFFICE only (line 42-47)
+  - UPDATE/DELETE: ADMIN or OFFICE only (in `[id]/route.ts`)
 
-**How to Fix (Future):**
-```typescript
-// Example: In API routes
-const session = await auth()
-if (session.user.role !== 'ADMIN') {
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-}
+- **Finished Goods** (`src/app/api/finished-goods/route.ts`):
+  - CREATE: ADMIN or OFFICE only
+  - UPDATE/DELETE: ADMIN or OFFICE only
+
+- **Batches** (`src/app/api/batches/route.ts`):
+  - CREATE: ADMIN or FACTORY only (line 55-60)
+  - EDIT: ADMIN or FACTORY only
+  - DELETE: ADMIN only
+
+- **Users** (`src/app/api/users/route.ts`):
+  - All operations: ADMIN only
+
+**2. Client-Side Enforcement (UI):**
+- Sidebar hides User Management from non-ADMIN users (line 67-69 in `sidebar.tsx`)
+- Action buttons hidden based on role:
+  - Edit/Delete buttons in batches table (lines 128-145 in `batches-table.tsx`)
+  - Similar enforcement in raw materials and finished goods tables
+
+**3. RBAC Helper Functions** (`src/lib/rbac.ts`):
+- `canManageMaterials()` - ADMIN, OFFICE
+- `canManageFinishedGoods()` - ADMIN, OFFICE
+- `canCreateBatches()` - ADMIN, FACTORY
+- `canEditBatches()` - ADMIN, FACTORY
+- `canDeleteBatches()` - ADMIN only
+- `canManageUsers()` - ADMIN only
+- `getPermissionErrorMessage()` - Returns user-friendly error
+
+**Permission Matrix:**
+```
+Action                    | ADMIN | FACTORY | OFFICE
+--------------------------|-------|---------|--------
+Manage Materials          |   ✅  |   ❌    |   ✅
+Manage Finished Goods     |   ✅  |   ❌    |   ✅
+Create/Edit Batches       |   ✅  |   ✅    |   ❌
+Delete Batches            |   ✅  |   ❌    |   ❌
+Create Stock Entries      |   ✅  |   ✅    |   ✅
+View Reports              |   ✅  |   ✅    |   ✅
+Export Reports            |   ✅  |   ✅    |   ✅
+Manage Users              |   ✅  |   ❌    |   ❌
 ```
 
-**Recommendation:**
-- Acceptable for MVP if all users are trusted
-- Document who has access
-- Add to Phase 1 enhancement plan
+**Verification:**
+1. Login as `factory` user
+2. Try to delete a batch → Should see "Access denied" or button hidden
+3. Try to access `/users` → Should not see in sidebar
+4. API returns 403 Forbidden for unauthorized actions
 
 ---
 
@@ -408,13 +430,15 @@ SENTRY_DSN="your-dsn"
 
 ### Already Working ✅
 1. All core features implemented
-2. Authentication secured (user management APIs protected)
-3. All critical QA issues fixed
-4. Build successful (no errors)
-5. Database schema correct
-6. Documentation comprehensive
-7. .gitignore fixed
-8. Seed script working
+2. Authentication secured (all APIs protected)
+3. **User management UI fully implemented** ✅
+4. **RBAC fully enforced (server & client-side)** ✅
+5. All critical QA issues fixed
+6. Build successful (no errors)
+7. Database schema correct
+8. Documentation comprehensive (being updated)
+9. .gitignore fixed
+10. Seed script working
 
 ### Must Do Before Production 🔴
 1. **Complete manual testing** (2-3 hours)
@@ -424,12 +448,12 @@ SENTRY_DSN="your-dsn"
 ### Should Do Before Production 🟡
 4. Set up error monitoring (30 min)
 5. Test backup/restore (15 min)
+6. Update remaining documentation references
 
 ### Can Wait for Post-MVP 🟢
-6. User management UI
-7. RBAC enforcement
-8. Batch material editing
-9. Load testing
+7. Batch material editing (by design)
+8. Load testing
+9. Advanced analytics/charts
 
 ---
 

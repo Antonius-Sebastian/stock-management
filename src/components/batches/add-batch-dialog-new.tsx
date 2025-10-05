@@ -198,7 +198,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
         <DialogHeader>
           <DialogTitle>Catat Pemakaian Baru</DialogTitle>
           <DialogDescription>
-            Record a new production batch with multiple raw materials and optional finished good output.
+            Record a new production batch with multiple raw materials and finished good output.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -294,14 +294,45 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {rawMaterials.map((material) => (
-                                <SelectItem key={material.id} value={material.id}>
-                                  {material.kode} - {material.name}
-                                  <span className="text-muted-foreground ml-2">
-                                    (Stock: {material.currentStock.toLocaleString()})
-                                  </span>
-                                </SelectItem>
-                              ))}
+                              {rawMaterials.filter(m => m.currentStock > 0).length === 0 ? (
+                                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                  No raw materials with stock available
+                                </div>
+                              ) : (
+                                <>
+                                  {rawMaterials
+                                    .filter(m => m.currentStock > 0)
+                                    .map((material) => (
+                                      <SelectItem key={material.id} value={material.id}>
+                                        {material.kode} - {material.name}
+                                        <span className="text-green-600 ml-2 font-medium">
+                                          (Stock: {material.currentStock.toLocaleString()})
+                                        </span>
+                                      </SelectItem>
+                                    ))}
+                                  {rawMaterials.filter(m => m.currentStock === 0).length > 0 && (
+                                    <>
+                                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-t">
+                                        Out of Stock
+                                      </div>
+                                      {rawMaterials
+                                        .filter(m => m.currentStock === 0)
+                                        .map((material) => (
+                                          <SelectItem
+                                            key={material.id}
+                                            value={material.id}
+                                            disabled
+                                          >
+                                            {material.kode} - {material.name}
+                                            <span className="text-destructive ml-2">
+                                              (Out of Stock)
+                                            </span>
+                                          </SelectItem>
+                                        ))}
+                                    </>
+                                  )}
+                                </>
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

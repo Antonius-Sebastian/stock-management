@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react"
 import { Batch, BatchUsage, RawMaterial, FinishedGood } from "@prisma/client"
 import { toast } from "sonner"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BatchesTable } from "@/components/batches/batches-table"
 import { AddBatchDialog } from "@/components/batches/add-batch-dialog-new"
+import { EditBatchDialog } from "@/components/batches/edit-batch-dialog"
+import { BatchDetailDialog } from "@/components/batches/batch-detail-dialog"
+import { canCreateBatches } from "@/lib/rbac"
 
 type BatchWithUsage = Batch & {
   finishedGood?: FinishedGood | null
@@ -15,8 +19,13 @@ type BatchWithUsage = Batch & {
 }
 
 export default function BatchesPage() {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
   const [batches, setBatches] = useState<BatchWithUsage[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [selectedBatch, setSelectedBatch] = useState<BatchWithUsage | null>(null)
 
   const fetchBatches = async () => {
     try {
@@ -42,6 +51,40 @@ export default function BatchesPage() {
     fetchBatches()
   }
 
+  const handleView = (batch: BatchWithUsage) => {
+    setSelectedBatch(batch)
+    setDetailDialogOpen(true)
+  }
+
+  const handleEdit = (batch: BatchWithUsage) => {
+    setSelectedBatch(batch)
+    setEditDialogOpen(true)
+  }
+
+  const handleDelete = async (batch: BatchWithUsage) => {
+    if (!confirm(`Are you sure you want to delete batch "${batch.code}"? This will restore the stock of raw materials used. This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/batches/${batch.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        throw new Error(errorData.error || "Failed to delete batch")
+      }
+
+      toast.success("Batch deleted successfully and stock restored")
+      fetchBatches()
+    } catch (error) {
+      console.error("Error deleting batch:", error)
+      const message = error instanceof Error ? error.message : "Failed to delete batch"
+      toast.error(message)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -59,7 +102,9 @@ export default function BatchesPage() {
             Track raw material consumption for production batches
           </p>
         </div>
-        <AddBatchDialog onSuccess={handleSuccess} />
+        {canCreateBatches(userRole) && (
+          <AddBatchDialog onSuccess={handleSuccess} />
+        )}
       </div>
 
       <Card>
@@ -70,9 +115,28 @@ export default function BatchesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <BatchesTable data={batches} />
+          <BatchesTable
+            data={batches}
+            onView={handleView}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            userRole={userRole}
+          />
         </CardContent>
       </Card>
+
+      <BatchDetailDialog
+        batch={selectedBatch}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+      />
+
+      <EditBatchDialog
+        batch={selectedBatch}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={handleSuccess}
+      />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
+import { auth } from '@/auth'
+import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 
 const createBatchSchema = z.object({
   code: z.string().min(1, 'Batch code is required'),
@@ -15,6 +17,12 @@ const createBatchSchema = z.object({
 
 export async function GET() {
   try {
+    // Authentication required (all roles can view)
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const batches = await prisma.batch.findMany({
       include: {
         finishedGood: true,
@@ -38,6 +46,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Authentication and authorization required (ADMIN or FACTORY only)
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!canCreateBatches(session.user.role)) {
+      return NextResponse.json(
+        { error: getPermissionErrorMessage('create batches', session.user.role) },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const validatedData = createBatchSchema.parse(body)
 

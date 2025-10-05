@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
     }
 
     const finishedGood = await prisma.finishedGood.create({
-      data: validatedData,
+      data: {
+        ...validatedData,
+        currentStock: 0, // Always start with 0 stock
+      },
     })
 
     return NextResponse.json(finishedGood, { status: 201 })

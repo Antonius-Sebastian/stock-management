@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Download } from "lucide-react"
 import { StockReportTable } from "@/components/reports/stock-report-table"
 
 interface StockReportData {
@@ -63,6 +65,7 @@ export default function ReportsPage() {
   const [month, setMonth] = useState("10")
   const [reportData, setReportData] = useState<StockReportResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const fetchReport = async () => {
     setIsLoading(true)
@@ -100,6 +103,45 @@ export default function ReportsPage() {
     return `${typeLabel} - ${dataTypeLabel} - ${monthLabel} ${year}`
   }
 
+  const handleExport = async () => {
+    setIsExporting(true)
+    try {
+      const params = new URLSearchParams({
+        year,
+        month,
+        type: reportType,
+      })
+
+      const response = await fetch(`/api/reports/export?${params}`)
+      if (!response.ok) {
+        throw new Error("Failed to export report")
+      }
+
+      // Get the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get("Content-Disposition")
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+      const filename = filenameMatch ? filenameMatch[1] : "report.xlsx"
+
+      // Download the file
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast.success("Report exported successfully")
+    } catch (error) {
+      console.error("Error exporting report:", error)
+      toast.error("Failed to export report. Please try again.")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -109,32 +151,39 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      <div className="flex gap-4 items-center">
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-[100px]">
-            <SelectValue placeholder="Year" />
-          </SelectTrigger>
-          <SelectContent>
-            {YEARS.map((y) => (
-              <SelectItem key={y} value={y}>
-                {y}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex gap-4 items-center justify-between">
+        <div className="flex gap-4 items-center">
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {YEARS.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Month" />
-          </SelectTrigger>
-          <SelectContent>
-            {MONTHS.map((m) => (
-              <SelectItem key={m.value} value={m.value}>
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={month} onValueChange={setMonth}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button onClick={handleExport} variant="outline" disabled={isExporting}>
+          <Download className="mr-2 h-4 w-4" />
+          {isExporting ? "Exporting..." : "Export to Excel"}
+        </Button>
       </div>
 
       <Card>
@@ -169,8 +218,12 @@ export default function ReportsPage() {
                   ) : reportData ? (
                     <StockReportTable
                       data={reportData.data}
-                      daysInMonth={reportData.meta.daysInMonth}
                       currentDay={reportData.meta.currentDay}
+                      dataType={dataType}
+                      itemType={reportType === 'raw-materials' ? 'raw-material' : 'finished-good'}
+                      year={parseInt(year)}
+                      month={parseInt(month)}
+                      onRefresh={fetchReport}
                     />
                   ) : (
                     <div className="flex items-center justify-center h-64">

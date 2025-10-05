@@ -29,7 +29,6 @@ import { Plus } from "lucide-react"
 const formSchema = z.object({
   kode: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
-  currentStock: z.coerce.number().min(0, "Stock cannot be negative"),
   moq: z.coerce.number().min(1, "MOQ must be at least 1"),
 })
 
@@ -48,7 +47,6 @@ export function AddRawMaterialDialog({ onSuccess }: AddRawMaterialDialogProps) {
     defaultValues: {
       kode: "",
       name: "",
-      currentStock: 0,
       moq: 1,
     },
   })
@@ -120,24 +118,6 @@ export function AddRawMaterialDialog({ onSuccess }: AddRawMaterialDialogProps) {
                   <FormLabel>Name</FormLabel>
                   <FormControl>
                     <Input placeholder="Material name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="currentStock"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Current Stock</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0"
-                      {...field}
-                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
+import { auth } from '@/auth'
+import { canManageMaterials, getPermissionErrorMessage } from '@/lib/rbac'
 
 const createRawMaterialSchema = z.object({
   kode: z.string().min(1, 'Code is required'),
   name: z.string().min(1, 'Name is required'),
-  currentStock: z.number().min(0, 'Stock cannot be negative'),
   moq: z.number().min(1, 'MOQ must be at least 1'),
 })
 
 export async function GET() {
   try {
+    // Authentication required (all roles can view)
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const rawMaterials = await prisma.rawMaterial.findMany({
       orderBy: { createdAt: 'desc' },
     })
@@ -26,6 +33,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Authentication and authorization required (ADMIN or OFFICE only)
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!canManageMaterials(session.user.role)) {
+      return NextResponse.json(
+        { error: getPermissionErrorMessage('create raw materials', session.user.role) },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const validatedData = createRawMaterialSchema.parse(body)
 
@@ -41,7 +61,10 @@ export async function POST(request: NextRequest) {
     }
 
     const rawMaterial = await prisma.rawMaterial.create({
-      data: validatedData,
+      data: {
+        ...validatedData,
+        currentStock: 0, // Always start with 0 stock
+      },
     })
 
     return NextResponse.json(rawMaterial, { status: 201 })

@@ -3,16 +3,23 @@
 import { useEffect, useState } from "react"
 import { FinishedGood } from "@prisma/client"
 import { toast } from "sonner"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FinishedGoodsTable } from "@/components/finished-goods/finished-goods-table"
 import { AddFinishedGoodDialog } from "@/components/finished-goods/add-finished-good-dialog"
+import { EditFinishedGoodDialog } from "@/components/finished-goods/edit-finished-good-dialog"
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown } from "lucide-react"
+import { canManageFinishedGoods } from "@/lib/rbac"
 
 export default function FinishedGoodsPage() {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(null)
 
   const fetchFinishedGoods = async () => {
     try {
@@ -36,6 +43,35 @@ export default function FinishedGoodsPage() {
 
   const handleSuccess = () => {
     fetchFinishedGoods()
+  }
+
+  const handleEdit = (product: FinishedGood) => {
+    setSelectedProduct(product)
+    setEditDialogOpen(true)
+  }
+
+  const handleDelete = async (product: FinishedGood) => {
+    if (!confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/finished-goods/${product.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        throw new Error(errorData.error || "Failed to delete finished good")
+      }
+
+      toast.success("Finished good deleted successfully")
+      fetchFinishedGoods()
+    } catch (error) {
+      console.error("Error deleting finished good:", error)
+      const message = error instanceof Error ? error.message : "Failed to delete finished good"
+      toast.error(message)
+    }
   }
 
   if (isLoading) {
@@ -76,7 +112,9 @@ export default function FinishedGoodsPage() {
               Input Stok Keluar
             </Button>
           </StockEntryDialog>
-          <AddFinishedGoodDialog onSuccess={handleSuccess} />
+          {canManageFinishedGoods(userRole) && (
+            <AddFinishedGoodDialog onSuccess={handleSuccess} />
+          )}
         </div>
       </div>
 
@@ -88,9 +126,22 @@ export default function FinishedGoodsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <FinishedGoodsTable data={finishedGoods} />
+          <FinishedGoodsTable
+            data={finishedGoods}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onRefresh={handleSuccess}
+            userRole={userRole}
+          />
         </CardContent>
       </Card>
+
+      <EditFinishedGoodDialog
+        product={selectedProduct}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={handleSuccess}
+      />
     </div>
   )
 }

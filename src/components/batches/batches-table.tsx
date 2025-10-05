@@ -4,8 +4,17 @@ import { ColumnDef } from "@tanstack/react-table"
 import { Batch, BatchUsage, RawMaterial, FinishedGood } from "@prisma/client"
 import { DataTable } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { format } from "date-fns"
+import { canEditBatches, canDeleteBatches } from "@/lib/rbac"
 
 type BatchWithUsage = Batch & {
   finishedGood?: FinishedGood | null
@@ -14,7 +23,16 @@ type BatchWithUsage = Batch & {
   })[]
 }
 
-const columns: ColumnDef<BatchWithUsage>[] = [
+interface BatchesTableProps {
+  data: BatchWithUsage[]
+  onView?: (batch: BatchWithUsage) => void
+  onEdit?: (batch: BatchWithUsage) => void
+  onDelete?: (batch: BatchWithUsage) => void
+  userRole?: string
+}
+
+export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: BatchesTableProps) {
+  const columns: ColumnDef<BatchWithUsage>[] = [
   {
     accessorKey: "code",
     header: ({ column }) => {
@@ -86,13 +104,52 @@ const columns: ColumnDef<BatchWithUsage>[] = [
       return description || "-"
     },
   },
+  {
+    id: "actions",
+    header: "Actions",
+    cell: ({ row }) => {
+      const batch = row.original
+
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onView?.(batch)}>
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </DropdownMenuItem>
+            {canEditBatches(userRole) && (
+              <DropdownMenuItem onClick={() => onEdit?.(batch)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+            )}
+            {canDeleteBatches(userRole) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDelete?.(batch)}
+                  className="text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    },
+  },
 ]
 
-interface BatchesTableProps {
-  data: BatchWithUsage[]
-}
-
-export function BatchesTable({ data }: BatchesTableProps) {
   return (
     <DataTable
       columns={columns}

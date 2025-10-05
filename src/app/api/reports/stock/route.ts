@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { auth } from "@/auth";
+import { canViewReports, getPermissionErrorMessage } from "@/lib/rbac";
 
 const stockReportSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2030),
@@ -11,6 +13,19 @@ const stockReportSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    // Authentication and authorization required (all authenticated users can view reports)
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!canViewReports(session.user.role)) {
+      return NextResponse.json(
+        { error: getPermissionErrorMessage("view reports", session.user.role) },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const query = {
       year: searchParams.get("year"),
@@ -140,7 +155,7 @@ export async function GET(request: NextRequest) {
       return { itemData, hasMovements: movementsInMonth.length > 0 };
     });
 
-    // Filter out items with no movements in the selected month
+    // Filter to show only items with movements in the selected month
     const filteredReportData = reportData
       .filter(item => item.hasMovements)
       .map(item => item.itemData);

@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
-const createFormSchema = (items: Item[], type: "IN" | "OUT") => z.object({
+const createFormSchema = (items: Item[], type: "in" | "out" | "IN" | "OUT") => z.object({
   itemId: z.string().min(1, "Please select an item"),
   quantity: z.coerce.number({
     required_error: "Quantity is required",
@@ -48,7 +48,8 @@ const createFormSchema = (items: Item[], type: "IN" | "OUT") => z.object({
   }),
   description: z.string().optional(),
 }).refine((data) => {
-  if (type === "OUT") {
+  const normalizedType = typeof type === 'string' ? type.toUpperCase() : type;
+  if (normalizedType === "OUT") {
     const selectedItem = items.find(item => item.id === data.itemId);
     if (selectedItem && 'currentStock' in selectedItem) {
       return data.quantity <= (selectedItem as Item & {currentStock: number}).currentStock;
@@ -61,10 +62,15 @@ const createFormSchema = (items: Item[], type: "IN" | "OUT") => z.object({
 })
 
 interface StockEntryDialogProps {
-  type: "IN" | "OUT"
-  itemType: "raw-material" | "finished-good"
+  type: "in" | "out" | "IN" | "OUT"
+  itemType?: "raw-material" | "finished-good"
+  entityType?: "raw-material" | "finished-good"
+  entityId?: string
+  entityName?: string
   onSuccess: () => void
-  children: React.ReactNode
+  children?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 interface Item {
@@ -80,18 +86,30 @@ type FormData = z.infer<ReturnType<typeof createFormSchema>>
 export function StockEntryDialog({
   type,
   itemType,
+  entityType,
+  entityId,
+  entityName,
   onSuccess,
   children,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: StockEntryDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [items, setItems] = useState<Item[]>([])
+
+  // Use controlled or uncontrolled state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = controlledOnOpenChange !== undefined ? controlledOnOpenChange : setInternalOpen
+
+  // Determine the actual item type to use
+  const actualItemType = entityType || itemType || "raw-material"
 
   const formSchema = createFormSchema(items, type)
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      itemId: "",
+      itemId: entityId || "",
       quantity: "" as unknown as number,
       date: new Date(),
       description: "",
@@ -101,7 +119,7 @@ export function StockEntryDialog({
 
   const fetchItems = async () => {
     try {
-      const endpoint = itemType === "raw-material" ? "/api/raw-materials" : "/api/finished-goods"
+      const endpoint = actualItemType === "raw-material" ? "/api/raw-materials" : "/api/finished-goods"
       const response = await fetch(endpoint)
       if (!response.ok) {
         throw new Error("Failed to fetch items")
@@ -118,17 +136,25 @@ export function StockEntryDialog({
     if (open) {
       fetchItems()
     }
-  }, [open, itemType])
+  }, [open, actualItemType])
+
+  // Update form when entityId changes
+  useEffect(() => {
+    if (entityId && open) {
+      form.setValue("itemId", entityId)
+    }
+  }, [entityId, open, form])
 
   async function onSubmit(data: FormData) {
     setIsLoading(true)
     try {
+      const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
       const stockMovementData = {
-        type,
+        type: normalizedType,
         quantity: data.quantity,
         date: data.date.toISOString(),
         description: data.description,
-        ...(itemType === "raw-material"
+        ...(actualItemType === "raw-material"
           ? { rawMaterialId: data.itemId }
           : { finishedGoodId: data.itemId }),
       }
@@ -146,8 +172,8 @@ export function StockEntryDialog({
         throw new Error(errorData.error || "Failed to create stock movement")
       }
 
-      const actionType = type === "IN" ? "incoming" : "outgoing"
-      const itemTypeLabel = itemType === "raw-material" ? "raw material" : "finished good"
+      const actionType = normalizedType === "IN" ? "incoming" : "outgoing"
+      const itemTypeLabel = actualItemType === "raw-material" ? "raw material" : "finished good"
 
       toast.success(`Successfully recorded ${actionType} stock for ${itemTypeLabel}`)
       form.reset()
@@ -163,22 +189,29 @@ export function StockEntryDialog({
   }
 
   const getTitle = () => {
-    const action = type === "IN" ? "Input Stok Masuk" : "Input Stok Keluar"
-    const itemTypeLabel = itemType === "raw-material" ? "Raw Material" : "Finished Good"
+    const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
+    const action = normalizedType === "IN" ? "Input Stok Masuk" : "Input Stok Keluar"
+    const itemTypeLabel = actualItemType === "raw-material" ? "Raw Material" : "Finished Good"
+    if (entityName) {
+      return `${action} - ${entityName}`
+    }
     return `${action} - ${itemTypeLabel}`
   }
 
   const getDescription = () => {
-    const action = type === "IN" ? "incoming" : "outgoing"
-    const itemTypeLabel = itemType === "raw-material" ? "raw material" : "finished good"
+    const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
+    const action = normalizedType === "IN" ? "incoming" : "outgoing"
+    const itemTypeLabel = actualItemType === "raw-material" ? "raw material" : "finished good"
     return `Record ${action} stock for ${itemTypeLabel}`
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{getTitle()}</DialogTitle>
@@ -188,35 +221,37 @@ export function StockEntryDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="itemId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    {itemType === "raw-material" ? "Raw Material" : "Finished Good"}
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={`Select ${itemType === "raw-material" ? "raw material" : "finished good"}`} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {items.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {itemType === "raw-material"
-                            ? `${item.kode} - ${item.name}`
-                            : item.name
-                          }
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!entityId && (
+              <FormField
+                control={form.control}
+                name="itemId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {actualItemType === "raw-material" ? "Raw Material" : "Finished Good"}
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={`Select ${actualItemType === "raw-material" ? "raw material" : "finished good"}`} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {items.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {actualItemType === "raw-material"
+                              ? `${item.kode} - ${item.name}`
+                              : item.name
+                            }
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="quantity"
@@ -224,6 +259,7 @@ export function StockEntryDialog({
                 const selectedItemId = form.watch("itemId");
                 const selectedItem = items.find(item => item.id === selectedItemId);
                 const availableStock = selectedItem?.currentStock || 0;
+                const normalizedType = typeof type === 'string' ? type.toUpperCase() : type;
 
                 return (
                   <FormItem>
@@ -237,7 +273,7 @@ export function StockEntryDialog({
                         {...field}
                       />
                     </FormControl>
-                    {type === "OUT" && selectedItem && (
+                    {normalizedType === "OUT" && selectedItem && (
                       <p className="text-xs text-muted-foreground">
                         Available: {availableStock.toLocaleString()}
                       </p>

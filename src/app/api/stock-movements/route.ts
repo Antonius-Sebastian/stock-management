@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
+import { auth } from '@/auth'
+import { canCreateStockEntries, getPermissionErrorMessage } from '@/lib/rbac'
 
 const createStockMovementSchema = z.object({
   type: z.enum(['IN', 'OUT']),
@@ -14,8 +16,83 @@ const createStockMovementSchema = z.object({
   { message: "Either rawMaterialId or finishedGoodId must be provided" }
 )
 
+const queryStockMovementSchema = z.object({
+  itemId: z.string().min(1),
+  date: z.string(),
+  itemType: z.enum(['raw-material', 'finished-good']),
+})
+
+export async function GET(request: NextRequest) {
+  try {
+    // Authentication required (all roles can view)
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const query = {
+      itemId: searchParams.get('itemId'),
+      date: searchParams.get('date'),
+      itemType: searchParams.get('itemType'),
+    }
+
+    const validatedQuery = queryStockMovementSchema.parse(query)
+    const queryDate = new Date(validatedQuery.date)
+
+    // Get start and end of day
+    const startOfDay = new Date(queryDate)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(queryDate)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    // Query movements for this item on this day
+    const movements = await prisma.stockMovement.findMany({
+      where: {
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+        ...(validatedQuery.itemType === 'raw-material'
+          ? { rawMaterialId: validatedQuery.itemId }
+          : { finishedGoodId: validatedQuery.itemId }),
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    return NextResponse.json(movements)
+  } catch (error) {
+    console.error('Error querying stock movements:', error)
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid query parameters', details: error.errors },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to query stock movements' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Authentication and authorization required (all authenticated users can create stock entries)
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!canCreateStockEntries(session.user.role)) {
+      return NextResponse.json(
+        { error: getPermissionErrorMessage('create stock entries', session.user.role) },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const validatedData = createStockMovementSchema.parse(body)
 

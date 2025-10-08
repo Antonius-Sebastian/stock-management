@@ -11,7 +11,7 @@ import { EditFinishedGoodDialog } from "@/components/finished-goods/edit-finishe
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown } from "lucide-react"
-import { canManageFinishedGoods } from "@/lib/rbac"
+import { canManageFinishedGoods, canCreateStockMovement } from "@/lib/rbac"
 
 export default function FinishedGoodsPage() {
   const { data: session } = useSession()
@@ -28,10 +28,12 @@ export default function FinishedGoodsPage() {
         throw new Error("Failed to fetch finished goods")
       }
       const data = await response.json()
-      setFinishedGoods(data)
+      // Handle both array response and paginated response
+      const goods = Array.isArray(data) ? data : (data.data || [])
+      setFinishedGoods(goods)
     } catch (error) {
       console.error("Error fetching finished goods:", error)
-      toast.error("Failed to load finished goods. Please refresh the page.")
+      toast.error("Gagal memuat produk jadi. Silakan refresh halaman.")
     } finally {
       setIsLoading(false)
     }
@@ -51,7 +53,7 @@ export default function FinishedGoodsPage() {
   }
 
   const handleDelete = async (product: FinishedGood) => {
-    if (!confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus "${product.name}"? Tindakan ini tidak dapat dibatalkan.`)) {
       return
     }
 
@@ -62,14 +64,14 @@ export default function FinishedGoodsPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Failed to delete finished good")
+        throw new Error(errorData.error || "Gagal menghapus produk jadi")
       }
 
-      toast.success("Finished good deleted successfully")
+      toast.success("Produk jadi berhasil dihapus")
       fetchFinishedGoods()
     } catch (error) {
       console.error("Error deleting finished good:", error)
-      const message = error instanceof Error ? error.message : "Failed to delete finished good"
+      const message = error instanceof Error ? error.message : "Gagal menghapus produk jadi"
       toast.error(message)
     }
   }
@@ -77,41 +79,45 @@ export default function FinishedGoodsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading...</div>
+        <div className="text-lg">Memuat...</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Finished Goods</h1>
-          <p className="text-muted-foreground">
-            Manage your finished goods inventory
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Produk Jadi</h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
+            Kelola inventori produk jadi Anda
           </p>
         </div>
         <div className="flex gap-2">
-          <StockEntryDialog
-            type="IN"
-            itemType="finished-good"
-            onSuccess={handleSuccess}
-          >
-            <Button variant="outline">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Input Stok Masuk
-            </Button>
-          </StockEntryDialog>
-          <StockEntryDialog
-            type="OUT"
-            itemType="finished-good"
-            onSuccess={handleSuccess}
-          >
-            <Button variant="outline">
-              <TrendingDown className="mr-2 h-4 w-4" />
-              Input Stok Keluar
-            </Button>
-          </StockEntryDialog>
+          {canCreateStockMovement(userRole, 'finished-good', 'IN') && (
+            <StockEntryDialog
+              type="IN"
+              itemType="finished-good"
+              onSuccess={handleSuccess}
+            >
+              <Button variant="outline">
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Input Stok Masuk
+              </Button>
+            </StockEntryDialog>
+          )}
+          {canCreateStockMovement(userRole, 'finished-good', 'OUT') && (
+            <StockEntryDialog
+              type="OUT"
+              itemType="finished-good"
+              onSuccess={handleSuccess}
+            >
+              <Button variant="outline">
+                <TrendingDown className="mr-2 h-4 w-4" />
+                Input Stok Keluar
+              </Button>
+            </StockEntryDialog>
+          )}
           {canManageFinishedGoods(userRole) && (
             <AddFinishedGoodDialog onSuccess={handleSuccess} />
           )}
@@ -120,9 +126,9 @@ export default function FinishedGoodsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Finished Goods Inventory</CardTitle>
+          <CardTitle>Inventori Produk Jadi</CardTitle>
           <CardDescription>
-            View and manage all finished goods products
+            Lihat dan kelola semua produk jadi
           </CardDescription>
         </CardHeader>
         <CardContent>

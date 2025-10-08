@@ -34,10 +34,12 @@ export default function BatchesPage() {
         throw new Error("Failed to fetch batches")
       }
       const data = await response.json()
-      setBatches(data)
+      // Handle both array response and paginated response
+      const batches = Array.isArray(data) ? data : (data.data || [])
+      setBatches(batches)
     } catch (error) {
       console.error("Error fetching batches:", error)
-      toast.error("Failed to load batches. Please refresh the page.")
+      toast.error("Gagal memuat batches. Silakan refresh halaman.")
     } finally {
       setIsLoading(false)
     }
@@ -62,7 +64,7 @@ export default function BatchesPage() {
   }
 
   const handleDelete = async (batch: BatchWithUsage) => {
-    if (!confirm(`Are you sure you want to delete batch "${batch.code}"? This will restore the stock of raw materials used. This action cannot be undone.`)) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus batch "${batch.code}"? Stok bahan baku yang digunakan akan dikembalikan. Tindakan ini tidak dapat dibatalkan.`)) {
       return
     }
 
@@ -73,14 +75,14 @@ export default function BatchesPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Failed to delete batch")
+        throw new Error(errorData.error || "Gagal menghapus batch")
       }
 
-      toast.success("Batch deleted successfully and stock restored")
+      toast.success("Batch berhasil dihapus dan stok dikembalikan")
       fetchBatches()
     } catch (error) {
       console.error("Error deleting batch:", error)
-      const message = error instanceof Error ? error.message : "Failed to delete batch"
+      const message = error instanceof Error ? error.message : "Gagal menghapus batch"
       toast.error(message)
     }
   }
@@ -88,18 +90,18 @@ export default function BatchesPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading...</div>
+        <div className="text-lg">Memuat...</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Batch Usage</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Pemakaian Batch</h1>
           <p className="text-muted-foreground">
-            Track raw material consumption for production batches
+            Lacak konsumsi bahan baku untuk batch produksi
           </p>
         </div>
         {canCreateBatches(userRole) && (
@@ -109,9 +111,9 @@ export default function BatchesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Production Batches</CardTitle>
+          <CardTitle>Batch Produksi</CardTitle>
           <CardDescription>
-            History of raw material usage for production batches
+            Riwayat pemakaian bahan baku untuk batch produksi
           </CardDescription>
         </CardHeader>
         <CardContent>

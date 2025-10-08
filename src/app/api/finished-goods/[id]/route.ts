@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
-import { canManageFinishedGoods, getPermissionErrorMessage } from '@/lib/rbac'
+import { canManageFinishedGoods, canDeleteFinishedGoods, getPermissionErrorMessage } from '@/lib/rbac'
+import { logger } from '@/lib/logger'
 
 const updateFinishedGoodSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -64,7 +65,7 @@ export async function PUT(
 
     return NextResponse.json(updatedProduct)
   } catch (error) {
-    console.error('Error updating finished good:', error)
+    logger.error('Error updating finished good:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]
@@ -93,13 +94,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authentication and authorization required (ADMIN or OFFICE only)
+    // Authentication and authorization required (ADMIN only)
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!canManageFinishedGoods(session.user.role)) {
+    if (!canDeleteFinishedGoods(session.user.role)) {
       return NextResponse.json(
         { error: getPermissionErrorMessage('delete finished goods', session.user.role) },
         { status: 403 }
@@ -142,7 +143,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Finished good deleted successfully' })
   } catch (error) {
-    console.error('Error deleting finished good:', error)
+    logger.error('Error deleting finished good:', error)
 
     if (error instanceof Error) {
       return NextResponse.json(

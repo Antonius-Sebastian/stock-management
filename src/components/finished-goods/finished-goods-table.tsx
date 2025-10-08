@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
-import { canManageFinishedGoods } from "@/lib/rbac"
+import { canManageFinishedGoods, canDeleteFinishedGoods, canCreateStockMovement } from "@/lib/rbac"
 
 interface FinishedGoodsTableProps {
   data: FinishedGood[]
@@ -57,7 +57,7 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Product Name
+          Nama Produk
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       )
@@ -71,7 +71,7 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Current Stock
+          Stok Saat Ini
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       )
@@ -83,36 +83,52 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
   },
   {
     id: "actions",
-    header: "Actions",
+    header: "Aksi",
     cell: ({ row }) => {
       const product = row.original
+
+      // Check if user has any permissions
+      const hasEditPermission = canManageFinishedGoods(userRole)
+      const hasStockInPermission = canCreateStockMovement(userRole, 'finished-good', 'IN')
+      const hasStockOutPermission = canCreateStockMovement(userRole, 'finished-good', 'OUT')
+      const hasDeletePermission = canDeleteFinishedGoods(userRole)
+      const hasAnyPermission = hasEditPermission || hasStockInPermission || hasStockOutPermission || hasDeletePermission
+
+      // Don't show action button if no permissions
+      if (!hasAnyPermission) {
+        return null
+      }
 
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
+              <span className="sr-only">Buka menu</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuLabel>Aksi</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {canManageFinishedGoods(userRole) && (
+            {hasEditPermission && (
               <DropdownMenuItem onClick={() => onEdit?.(product)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => handleStockIn(product)}>
-              <ArrowDownCircle className="mr-2 h-4 w-4" />
-              Input Stock In
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleStockOut(product)}>
-              <ArrowUpCircle className="mr-2 h-4 w-4" />
-              Input Stock Out
-            </DropdownMenuItem>
-            {canManageFinishedGoods(userRole) && (
+            {hasStockInPermission && (
+              <DropdownMenuItem onClick={() => handleStockIn(product)}>
+                <ArrowDownCircle className="mr-2 h-4 w-4" />
+                Input Stok Masuk
+              </DropdownMenuItem>
+            )}
+            {hasStockOutPermission && (
+              <DropdownMenuItem onClick={() => handleStockOut(product)}>
+                <ArrowUpCircle className="mr-2 h-4 w-4" />
+                Input Stok Keluar
+              </DropdownMenuItem>
+            )}
+            {hasDeletePermission && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -120,7 +136,7 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
                   className="text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  Hapus
                 </DropdownMenuItem>
               </>
             )}
@@ -137,8 +153,9 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
         columns={columns}
         data={data}
         searchKey="name"
-        searchPlaceholder="Search products..."
-        emptyMessage="No finished goods yet. Click 'Add Finished Good' to get started!"
+        searchPlaceholder="Cari produk..."
+        emptyMessage="Belum ada produk jadi. Klik 'Tambah Produk Jadi' untuk memulai!"
+        tableId="finished-goods"
       />
 
       {selectedProduct && (

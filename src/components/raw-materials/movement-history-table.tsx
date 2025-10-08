@@ -33,7 +33,7 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Date
+            Tanggal
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
@@ -45,12 +45,12 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
     },
     {
       accessorKey: "type",
-      header: "Type",
+      header: "Tipe",
       cell: ({ row }) => {
         const type = row.getValue("type") as "IN" | "OUT"
         return (
           <Badge variant={type === "IN" ? "default" : "destructive"}>
-            {type === "IN" ? "Stock In" : "Stock Out"}
+            {type === "IN" ? "Stok Masuk" : "Stok Keluar"}
           </Badge>
         )
       },
@@ -63,7 +63,7 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Quantity
+            Jumlah
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
@@ -81,7 +81,7 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
     },
     {
       accessorKey: "description",
-      header: "Description",
+      header: "Deskripsi",
       cell: ({ row }) => {
         const description = row.getValue("description") as string | null
         return description || <span className="text-muted-foreground">-</span>
@@ -114,7 +114,7 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
               variant="ghost"
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             >
-              Running Balance
+              Saldo Berjalan
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -136,8 +136,9 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
       columns={columns}
       data={movements}
       searchKey="description"
-      searchPlaceholder="Search by description..."
-      emptyMessage="No stock movements recorded yet."
+      searchPlaceholder="Cari berdasarkan deskripsi..."
+      emptyMessage="Belum ada pergerakan stok yang tercatat."
+      tableId="movement-history"
     />
   )
 }

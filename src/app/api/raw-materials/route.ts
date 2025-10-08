@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
+import { logger } from '@/lib/logger'
 import { canManageMaterials, getPermissionErrorMessage } from '@/lib/rbac'
 
 const createRawMaterialSchema = z.object({
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error fetching raw materials:', error)
+    logger.error('Error fetching raw materials:', error)
     return NextResponse.json(
       { error: 'Failed to fetch raw materials' },
       { status: 500 }
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(rawMaterial, { status: 201 })
   } catch (error) {
-    console.error('Error creating raw material:', error)
+    logger.error('Error creating raw material:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]

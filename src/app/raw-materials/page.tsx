@@ -10,8 +10,8 @@ import { AddRawMaterialDialog } from "@/components/raw-materials/add-raw-materia
 import { EditRawMaterialDialog } from "@/components/raw-materials/edit-raw-material-dialog"
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, TrendingDown } from "lucide-react"
-import { canManageMaterials } from "@/lib/rbac"
+import { TrendingUp } from "lucide-react"
+import { canManageMaterials, canCreateStockMovement } from "@/lib/rbac"
 
 export default function RawMaterialsPage() {
   const { data: session } = useSession()
@@ -28,10 +28,12 @@ export default function RawMaterialsPage() {
         throw new Error("Failed to fetch raw materials")
       }
       const data = await response.json()
-      setRawMaterials(data)
+      // Handle both array response and paginated response
+      const materials = Array.isArray(data) ? data : (data.data || [])
+      setRawMaterials(materials)
     } catch (error) {
       console.error("Error fetching raw materials:", error)
-      toast.error("Failed to load raw materials. Please refresh the page.")
+      toast.error("Gagal memuat bahan baku. Silakan refresh halaman.")
     } finally {
       setIsLoading(false)
     }
@@ -51,7 +53,7 @@ export default function RawMaterialsPage() {
   }
 
   const handleDelete = async (material: RawMaterial) => {
-    if (!confirm(`Are you sure you want to delete "${material.name}"? This action cannot be undone.`)) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus "${material.name}"? Tindakan ini tidak dapat dibatalkan.`)) {
       return
     }
 
@@ -62,14 +64,14 @@ export default function RawMaterialsPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Failed to delete raw material")
+        throw new Error(errorData.error || "Gagal menghapus bahan baku")
       }
 
-      toast.success("Raw material deleted successfully")
+      toast.success("Bahan baku berhasil dihapus")
       fetchRawMaterials()
     } catch (error) {
       console.error("Error deleting raw material:", error)
-      const message = error instanceof Error ? error.message : "Failed to delete raw material"
+      const message = error instanceof Error ? error.message : "Gagal menghapus bahan baku"
       toast.error(message)
     }
   }
@@ -77,41 +79,33 @@ export default function RawMaterialsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading...</div>
+        <div className="text-lg">Memuat...</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Raw Materials</h1>
-          <p className="text-muted-foreground">
-            Manage your raw material inventory
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Bahan Baku</h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
+            Kelola inventori bahan baku Anda
           </p>
         </div>
         <div className="flex gap-2">
-          <StockEntryDialog
-            type="IN"
-            itemType="raw-material"
-            onSuccess={handleSuccess}
-          >
-            <Button variant="outline">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Input Stok Masuk
-            </Button>
-          </StockEntryDialog>
-          <StockEntryDialog
-            type="OUT"
-            itemType="raw-material"
-            onSuccess={handleSuccess}
-          >
-            <Button variant="outline">
-              <TrendingDown className="mr-2 h-4 w-4" />
-              Input Stok Keluar
-            </Button>
-          </StockEntryDialog>
+          {canCreateStockMovement(userRole, 'raw-material', 'IN') && (
+            <StockEntryDialog
+              type="IN"
+              itemType="raw-material"
+              onSuccess={handleSuccess}
+            >
+              <Button variant="outline">
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Input Stok Masuk
+              </Button>
+            </StockEntryDialog>
+          )}
           {canManageMaterials(userRole) && (
             <AddRawMaterialDialog onSuccess={handleSuccess} />
           )}
@@ -120,9 +114,9 @@ export default function RawMaterialsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Raw Materials Inventory</CardTitle>
+          <CardTitle>Inventori Bahan Baku</CardTitle>
           <CardDescription>
-            View and manage all raw materials with stock level indicators
+            Lihat dan kelola semua bahan baku dengan indikator level stok
           </CardDescription>
         </CardHeader>
         <CardContent>

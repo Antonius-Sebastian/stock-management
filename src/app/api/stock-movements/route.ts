@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
-import { canCreateStockEntries, getPermissionErrorMessage } from '@/lib/rbac'
+import { canCreateStockMovement, getPermissionErrorMessage } from '@/lib/rbac'
+import { logger } from '@/lib/logger'
 
 const createStockMovementSchema = z.object({
   type: z.enum(['IN', 'OUT']),
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(movements)
   } catch (error) {
-    console.error('Error querying stock movements:', error)
+    logger.error('Error querying stock movements:', error)
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -80,47 +81,72 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentication and authorization required (all authenticated users can create stock entries)
+    // Authentication required
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!canCreateStockEntries(session.user.role)) {
+    const body = await request.json()
+    const validatedData = createStockMovementSchema.parse(body)
+
+    // Determine item type for permission check
+    const itemType = validatedData.rawMaterialId ? 'raw-material' : 'finished-good'
+
+    // Check granular permission based on item type and movement type
+    if (!canCreateStockMovement(session.user.role, itemType, validatedData.type)) {
+      const restriction = itemType === 'raw-material' && validatedData.type === 'OUT'
+        ? 'Raw material OUT movements can only be created by ADMIN (normally created via batch production)'
+        : getPermissionErrorMessage(`create ${validatedData.type} movements for ${itemType}s`, session.user.role)
+
       return NextResponse.json(
-        { error: getPermissionErrorMessage('create stock entries', session.user.role) },
+        { error: restriction },
         { status: 403 }
       )
     }
 
-    const body = await request.json()
-    const validatedData = createStockMovementSchema.parse(body)
-
     // Start a transaction to update both stock movement and current stock
     const result = await prisma.$transaction(async (tx) => {
       // Check if stock will go negative for OUT movements
+      // Use SELECT FOR UPDATE to lock rows and prevent race conditions
       if (validatedData.type === 'OUT') {
         if (validatedData.rawMaterialId) {
-          const rawMaterial = await tx.rawMaterial.findUnique({
-            where: { id: validatedData.rawMaterialId },
-          })
-          if (!rawMaterial) {
+          // Lock the row with FOR UPDATE
+          const rawMaterials = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+            SELECT id, name, "currentStock"
+            FROM raw_materials
+            WHERE id = ${validatedData.rawMaterialId}
+            FOR UPDATE
+          `
+
+          if (rawMaterials.length === 0) {
             throw new Error('Raw material not found')
           }
+
+          const rawMaterial = rawMaterials[0]
+
           if (rawMaterial.currentStock < validatedData.quantity) {
-            throw new Error(`Insufficient stock. Available: ${rawMaterial.currentStock}, Requested: ${validatedData.quantity}`)
+            throw new Error(`Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Requested: ${validatedData.quantity}`)
           }
         }
 
         if (validatedData.finishedGoodId) {
-          const finishedGood = await tx.finishedGood.findUnique({
-            where: { id: validatedData.finishedGoodId },
-          })
-          if (!finishedGood) {
+          // Lock the row with FOR UPDATE
+          const finishedGoods = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+            SELECT id, name, "currentStock"
+            FROM finished_goods
+            WHERE id = ${validatedData.finishedGoodId}
+            FOR UPDATE
+          `
+
+          if (finishedGoods.length === 0) {
             throw new Error('Finished good not found')
           }
+
+          const finishedGood = finishedGoods[0]
+
           if (finishedGood.currentStock < validatedData.quantity) {
-            throw new Error(`Insufficient stock. Available: ${finishedGood.currentStock}, Requested: ${validatedData.quantity}`)
+            throw new Error(`Insufficient stock for ${finishedGood.name}. Available: ${finishedGood.currentStock}, Requested: ${validatedData.quantity}`)
           }
         }
       }
@@ -162,7 +188,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
-    console.error('Error creating stock movement:', error)
+    logger.error('Error creating stock movement:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]

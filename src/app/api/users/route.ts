@@ -4,6 +4,8 @@ import { z } from 'zod'
 import * as bcrypt from 'bcryptjs'
 import { auth } from '@/auth'
 import { canManageUsers, getPermissionErrorMessage } from '@/lib/rbac'
+import { logger } from '@/lib/logger'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
 
 const createUserSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -49,11 +51,30 @@ export async function GET() {
 
     return NextResponse.json(users)
   } catch (error) {
-    console.error('Error fetching users:', error)
+    logger.error('Error fetching users:', error)
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
   }
 }
 
+/**
+ * POST /api/users
+ *
+ * Create a new user
+ *
+ * @param request - NextRequest with user data in body
+ * @returns Created user (password excluded)
+ *
+ * @remarks
+ * - Requires ADMIN role
+ * - Validates password complexity (8+ chars, uppercase, lowercase, number)
+ * - Hashes password with bcrypt
+ * - Prevents duplicate usernames
+ * - Logs audit trail
+ *
+ * @throws 401 - Unauthorized (not logged in)
+ * @throws 403 - Forbidden (not ADMIN)
+ * @throws 400 - Validation error or duplicate username
+ */
 export async function POST(request: NextRequest) {
   try {
     // Authentication and authorization required (ADMIN only)
@@ -122,9 +143,21 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Audit log
+    await AuditHelpers.userCreated(
+      user.id,
+      user.username,
+      {
+        id: session.user.id,
+        name: session.user.name || session.user.username,
+        role: session.user.role,
+      },
+      getIpAddress(request.headers)
+    )
+
     return NextResponse.json(user)
   } catch (error) {
-    console.error('Error creating user:', error)
+    logger.error('Error creating user:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]

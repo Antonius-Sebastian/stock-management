@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { auth } from '@/auth'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
@@ -87,7 +88,7 @@ export async function GET(
       movements: movementsWithBalance,
     })
   } catch (error) {
-    console.error('Error fetching material movements:', error)
+    logger.error('Error fetching material movements:', error)
     return NextResponse.json(
       { error: 'Failed to fetch material movements' },
       { status: 500 }

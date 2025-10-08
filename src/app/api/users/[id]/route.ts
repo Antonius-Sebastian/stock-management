@@ -4,11 +4,18 @@ import { z } from 'zod'
 import * as bcrypt from 'bcryptjs'
 import { auth } from '@/auth'
 import { canManageUsers, getPermissionErrorMessage } from '@/lib/rbac'
+import { logger } from '@/lib/logger'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
 
 const updateUserSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters').optional(),
   email: z.string().email('Invalid email').optional().nullable(),
-  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .optional(),
   name: z.string().min(1, 'Name is required').optional(),
   role: z.enum(['ADMIN', 'FACTORY', 'OFFICE']).optional(),
   isActive: z.boolean().optional(),
@@ -53,7 +60,7 @@ export async function GET(
 
     return NextResponse.json(user)
   } catch (error) {
-    console.error('Error fetching user:', error)
+    logger.error('Error fetching user:', error)
     return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 })
   }
 }
@@ -152,7 +159,7 @@ export async function PUT(
 
     return NextResponse.json(user)
   } catch (error) {
-    console.error('Error updating user:', error)
+    logger.error('Error updating user:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]
@@ -226,9 +233,21 @@ export async function DELETE(
       where: { id },
     })
 
+    // Audit log
+    await AuditHelpers.userDeleted(
+      existingUser.id,
+      existingUser.username,
+      {
+        id: session.user.id,
+        name: session.user.name || session.user.username,
+        role: session.user.role,
+      },
+      getIpAddress(request.headers)
+    )
+
     return NextResponse.json({ message: 'User deleted successfully' })
   } catch (error) {
-    console.error('Error deleting user:', error)
+    logger.error('Error deleting user:', error)
 
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 })

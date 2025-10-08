@@ -28,27 +28,27 @@ export default function LoginPage() {
       })
 
       if (result?.error) {
-        toast.error('Invalid username or password')
+        toast.error('Username atau password tidak valid')
       } else if (result?.ok) {
-        toast.success('Login successful')
+        toast.success('Login berhasil')
         router.push('/')
         router.refresh()
       }
     } catch (error) {
       console.error('Login error:', error)
-      toast.error('An error occurred during login')
+      toast.error('Terjadi kesalahan saat login')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-lg p-6 lg:p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-900">Stock Management</h1>
-            <p className="text-slate-600 mt-2">Sign in to your account</p>
+            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Stock Management</h1>
+            <p className="text-slate-600 mt-2">Masuk ke akun Anda</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -57,7 +57,7 @@ export default function LoginPage() {
               <Input
                 id="username"
                 type="text"
-                placeholder="Enter your username"
+                placeholder="Masukkan username Anda"
                 value={formData.username}
                 onChange={(e) =>
                   setFormData({ ...formData, username: e.target.value })
@@ -73,7 +73,7 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="Masukkan password Anda"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
@@ -85,13 +85,13 @@ export default function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? 'Memproses...' : 'Masuk'}
             </Button>
           </form>
 
           <div className="mt-6 pt-6 border-t border-slate-200">
             <p className="text-xs text-slate-500 text-center">
-              Default credentials for testing:
+              Kredensial default untuk testing:
               <br />
               Username: <span className="font-mono font-medium">admin</span> | Password:{' '}
               <span className="font-mono font-medium">password123</span>

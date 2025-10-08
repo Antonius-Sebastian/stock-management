@@ -6,7 +6,7 @@ import { RawMaterial } from "@prisma/client"
 import { DataTable } from "@/components/ui/data-table"
 import { StockLevelBadge } from "@/components/ui/stock-level-badge"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown, MoreHorizontal, Edit, Trash2, ArrowDownCircle, ArrowUpCircle } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2, ArrowDownCircle } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
-import { canManageMaterials } from "@/lib/rbac"
+import { canManageMaterials, canDeleteMaterials, canCreateStockMovement } from "@/lib/rbac"
 
 interface RawMaterialsTableProps {
   data: RawMaterial[]
@@ -29,18 +29,10 @@ interface RawMaterialsTableProps {
 
 export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole }: RawMaterialsTableProps) {
   const [stockDialogOpen, setStockDialogOpen] = useState(false)
-  const [stockDialogType, setStockDialogType] = useState<"in" | "out">("in")
   const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null)
 
   const handleStockIn = (material: RawMaterial) => {
     setSelectedMaterial(material)
-    setStockDialogType("in")
-    setStockDialogOpen(true)
-  }
-
-  const handleStockOut = (material: RawMaterial) => {
-    setSelectedMaterial(material)
-    setStockDialogType("out")
     setStockDialogOpen(true)
   }
 
@@ -59,7 +51,7 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Code
+            Kode
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
@@ -73,7 +65,7 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Material Name
+            Nama Material
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
@@ -98,7 +90,7 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Current Stock
+            Stok Saat Ini
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
@@ -135,36 +127,45 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "Aksi",
       cell: ({ row }) => {
         const material = row.original
+
+        // Check if user has any permissions
+        const hasEditPermission = canManageMaterials(userRole)
+        const hasStockInPermission = canCreateStockMovement(userRole, 'raw-material', 'IN')
+        const hasDeletePermission = canDeleteMaterials(userRole)
+        const hasAnyPermission = hasEditPermission || hasStockInPermission || hasDeletePermission
+
+        // Don't show action button if no permissions
+        if (!hasAnyPermission) {
+          return null
+        }
 
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
+                <span className="sr-only">Buka menu</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuLabel>Aksi</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {canManageMaterials(userRole) && (
+              {hasEditPermission && (
                 <DropdownMenuItem onClick={() => onEdit?.(material)}>
                   <Edit className="mr-2 h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => handleStockIn(material)}>
-                <ArrowDownCircle className="mr-2 h-4 w-4" />
-                Input Stock In
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStockOut(material)}>
-                <ArrowUpCircle className="mr-2 h-4 w-4" />
-                Input Stock Out
-              </DropdownMenuItem>
-              {canManageMaterials(userRole) && (
+              {hasStockInPermission && (
+                <DropdownMenuItem onClick={() => handleStockIn(material)}>
+                  <ArrowDownCircle className="mr-2 h-4 w-4" />
+                  Input Stok Masuk
+                </DropdownMenuItem>
+              )}
+              {hasDeletePermission && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -172,7 +173,7 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
                     className="text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    Hapus
                   </DropdownMenuItem>
                 </>
               )}
@@ -189,15 +190,16 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
         columns={columns}
         data={data}
         searchKey="name"
-        searchPlaceholder="Search materials..."
-        emptyMessage="No raw materials yet. Click 'Add Raw Material' to get started!"
+        searchPlaceholder="Cari bahan baku..."
+        emptyMessage="Belum ada bahan baku. Klik 'Tambah Bahan Baku' untuk memulai!"
+        tableId="raw-materials"
       />
 
       {selectedMaterial && (
         <StockEntryDialog
           open={stockDialogOpen}
           onOpenChange={setStockDialogOpen}
-          type={stockDialogType}
+          type="in"
           entityType="raw-material"
           entityId={selectedMaterial.id}
           entityName={selectedMaterial.name}

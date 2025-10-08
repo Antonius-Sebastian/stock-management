@@ -41,7 +41,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Batch Code
+          Kode Batch
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       )
@@ -55,7 +55,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Date
+          Tanggal
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       )
@@ -67,7 +67,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
   },
   {
     id: "materials",
-    header: "Raw Materials Used",
+    header: "Bahan Baku Digunakan",
     cell: ({ row }) => {
       const batch = row.original
       if (!batch.batchUsages.length) return "-"
@@ -77,7 +77,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
           {batch.batchUsages.map((usage, index) => (
             <div key={index} className="text-sm">
               <span className="font-medium">{usage.rawMaterial.kode}</span>
-              <span className="text-muted-foreground"> - {usage.quantity.toLocaleString()} units</span>
+              <span className="text-muted-foreground"> - {usage.quantity.toLocaleString()} unit</span>
             </div>
           ))}
         </div>
@@ -86,7 +86,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
   },
   {
     id: "output",
-    header: "Finished Good",
+    header: "Produk Jadi",
     cell: ({ row }) => {
       const batch = row.original
       if (!batch.finishedGood) return "-"
@@ -98,7 +98,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
   },
   {
     accessorKey: "description",
-    header: "Description",
+    header: "Deskripsi",
     cell: ({ row }) => {
       const description = row.getValue("description") as string
       return description || "-"
@@ -106,7 +106,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
   },
   {
     id: "actions",
-    header: "Actions",
+    header: "Aksi",
     cell: ({ row }) => {
       const batch = row.original
 
@@ -114,16 +114,16 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
+              <span className="sr-only">Buka menu</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuLabel>Aksi</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onView?.(batch)}>
               <Eye className="mr-2 h-4 w-4" />
-              View Details
+              Lihat Detail
             </DropdownMenuItem>
             {canEditBatches(userRole) && (
               <DropdownMenuItem onClick={() => onEdit?.(batch)}>
@@ -139,7 +139,7 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
                   className="text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  Hapus
                 </DropdownMenuItem>
               </>
             )}
@@ -155,8 +155,9 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
       columns={columns}
       data={data}
       searchKey="code"
-      searchPlaceholder="Search batches..."
-      emptyMessage="No batches recorded yet. Click 'Catat Pemakaian Baru' to record raw material usage!"
+      searchPlaceholder="Cari batch..."
+      emptyMessage="Belum ada batch tercatat. Klik 'Catat Pemakaian Baru' untuk mencatat penggunaan bahan baku!"
+      tableId="batches"
     />
   )
 }

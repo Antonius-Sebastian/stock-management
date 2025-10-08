@@ -6,9 +6,7 @@ import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StockLevelBadge } from "@/components/ui/stock-level-badge"
-import { ArrowLeft, Package, TrendingUp, FileDown } from "lucide-react"
-import * as XLSX from "xlsx"
-import { format } from "date-fns"
+import { ArrowLeft, Package, TrendingUp } from "lucide-react"
 import { MovementHistoryTable } from "@/components/raw-materials/movement-history-table"
 import { BatchDetailDialog } from "@/components/batches/batch-detail-dialog"
 import { Batch, BatchUsage, RawMaterial, FinishedGood } from "@prisma/client"
@@ -119,44 +117,6 @@ export default function RawMaterialDetailPage({
     }
   }
 
-  const handleExportToExcel = () => {
-    if (!data) return
-
-    // Prepare data for Excel
-    const exportData = movements.map((movement) => ({
-      Date: format(new Date(movement.date), "yyyy-MM-dd"),
-      Type: movement.type === "IN" ? "Stock In" : "Stock Out",
-      Quantity: movement.type === "IN" ? movement.quantity : -movement.quantity,
-      Description: movement.description || "-",
-      Batch: movement.batch?.code || "-",
-      "Running Balance": movement.runningBalance,
-    }))
-
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(exportData)
-
-    // Set column widths
-    worksheet["!cols"] = [
-      { wch: 12 }, // Date
-      { wch: 10 }, // Type
-      { wch: 12 }, // Quantity
-      { wch: 30 }, // Description
-      { wch: 15 }, // Batch
-      { wch: 15 }, // Running Balance
-    ]
-
-    // Create workbook
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Movement History")
-
-    // Generate filename
-    const filename = `${material.kode}_${material.name}_Movement_History.xlsx`
-
-    // Download
-    XLSX.writeFile(workbook, filename)
-    toast.success("Excel file exported successfully!")
-  }
-
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -222,22 +182,10 @@ export default function RawMaterialDetailPage({
       {/* Movement History */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Stock Movement History</CardTitle>
-              <CardDescription>
-                Complete history of stock movements for this material
-              </CardDescription>
-            </div>
-            <Button
-              onClick={handleExportToExcel}
-              variant="outline"
-              disabled={movements.length === 0}
-            >
-              <FileDown className="mr-2 h-4 w-4" />
-              Export to Excel
-            </Button>
-          </div>
+          <CardTitle>Stock Movement History</CardTitle>
+          <CardDescription>
+            Complete history of stock movements for this material
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <MovementHistoryTable

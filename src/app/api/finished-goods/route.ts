@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { successResponse, ErrorResponses } from '@/lib/api-response'
+import { logger } from '@/lib/logger'
 
 const createFinishedGoodSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error fetching finished goods:', error)
+    logger.error('Error fetching finished goods:', error)
     return ErrorResponses.internalError()
   }
 }
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse(finishedGood, 201)
   } catch (error) {
-    console.error('Error creating finished good:', error)
+    logger.error('Error creating finished good:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]

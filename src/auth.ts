@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -74,7 +75,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             role: user.role,
           }
         } catch (error) {
-          console.error('Auth error:', error)
+          logger.error('Auth error', error)
           return null
         }
       },

@@ -35,18 +35,18 @@ interface StockReportResponse {
 }
 
 const MONTHS = [
-  { value: "1", label: "January" },
-  { value: "2", label: "February" },
-  { value: "3", label: "March" },
+  { value: "1", label: "Januari" },
+  { value: "2", label: "Februari" },
+  { value: "3", label: "Maret" },
   { value: "4", label: "April" },
-  { value: "5", label: "May" },
-  { value: "6", label: "June" },
-  { value: "7", label: "July" },
-  { value: "8", label: "August" },
+  { value: "5", label: "Mei" },
+  { value: "6", label: "Juni" },
+  { value: "7", label: "Juli" },
+  { value: "8", label: "Agustus" },
   { value: "9", label: "September" },
-  { value: "10", label: "October" },
+  { value: "10", label: "Oktober" },
   { value: "11", label: "November" },
-  { value: "12", label: "December" },
+  { value: "12", label: "Desember" },
 ]
 
 const YEARS = ["2023", "2024", "2025"]
@@ -79,13 +79,13 @@ export default function ReportsPage() {
 
       const response = await fetch(`/api/reports/stock?${params}`)
       if (!response.ok) {
-        throw new Error("Failed to fetch report")
+        throw new Error("Gagal memuat laporan")
       }
       const data = await response.json()
       setReportData(data)
     } catch (error) {
       console.error("Error fetching report:", error)
-      toast.error("Failed to load report. Please try again.")
+      toast.error("Gagal memuat laporan. Silakan coba lagi.")
     } finally {
       setIsLoading(false)
     }
@@ -115,7 +115,7 @@ export default function ReportsPage() {
 
       const response = await fetch(`/api/reports/export?${params}`)
       if (!response.ok) {
-        throw new Error("Failed to export report")
+        throw new Error("Gagal mengekspor laporan")
       }
 
       // Get the filename from the Content-Disposition header
@@ -134,10 +134,10 @@ export default function ReportsPage() {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
 
-      toast.success("Report exported successfully")
+      toast.success("Laporan berhasil diekspor")
     } catch (error) {
       console.error("Error exporting report:", error)
-      toast.error("Failed to export report. Please try again.")
+      toast.error("Gagal mengekspor laporan. Silakan coba lagi.")
     } finally {
       setIsExporting(false)
     }
@@ -146,17 +146,17 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Stock Reports</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Laporan Stok</h1>
         <p className="text-muted-foreground">
-          Interactive stock movement reports with daily breakdown
+          Laporan pergerakan stok interaktif dengan rincian harian
         </p>
       </div>
 
-      <div className="flex gap-4 items-center justify-between">
+      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
         <div className="flex gap-4 items-center">
           <Select value={year} onValueChange={setYear}>
             <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Year" />
+              <SelectValue placeholder="Tahun" />
             </SelectTrigger>
             <SelectContent>
               {YEARS.map((y) => (
@@ -169,7 +169,7 @@ export default function ReportsPage() {
 
           <Select value={month} onValueChange={setMonth}>
             <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Month" />
+              <SelectValue placeholder="Bulan" />
             </SelectTrigger>
             <SelectContent>
               {MONTHS.map((m) => (
@@ -183,7 +183,7 @@ export default function ReportsPage() {
 
         <Button onClick={handleExport} variant="outline" disabled={isExporting}>
           <Download className="mr-2 h-4 w-4" />
-          {isExporting ? "Exporting..." : "Export to Excel"}
+          {isExporting ? "Mengekspor..." : "Ekspor ke Excel"}
         </Button>
       </div>
 
@@ -191,7 +191,7 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle>{getReportTitle()}</CardTitle>
           <CardDescription>
-            Daily stock movements in a pivoted table format with sticky item column
+            Pergerakan stok harian dalam format tabel pivot dengan kolom item yang tetap
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -214,21 +214,16 @@ export default function ReportsPage() {
                 <TabsContent value={dataType}>
                   {isLoading ? (
                     <div className="flex items-center justify-center h-64">
-                      <div className="text-lg">Loading report...</div>
+                      <div className="text-lg">Memuat laporan...</div>
                     </div>
                   ) : reportData ? (
                     <StockReportTable
                       data={reportData.data}
                       currentDay={reportData.meta.currentDay}
-                      dataType={dataType}
-                      itemType={reportType === 'raw-materials' ? 'raw-material' : 'finished-good'}
-                      year={parseInt(year)}
-                      month={parseInt(month)}
-                      onRefresh={fetchReport}
                     />
                   ) : (
                     <div className="flex items-center justify-center h-64">
-                      <div className="text-lg">No data available</div>
+                      <div className="text-lg">Tidak ada data tersedia</div>
                     </div>
                   )}
                 </TabsContent>

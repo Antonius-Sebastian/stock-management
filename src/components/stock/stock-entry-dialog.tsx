@@ -125,7 +125,9 @@ export function StockEntryDialog({
         throw new Error("Failed to fetch items")
       }
       const data = await response.json()
-      setItems(data)
+      // Handle both array response and paginated response
+      const items = Array.isArray(data) ? data : (data.data || [])
+      setItems(items)
     } catch (error) {
       // Ignore abort errors
       if (error instanceof Error && error.name === 'AbortError') {
@@ -245,19 +247,81 @@ export function StockEntryDialog({
                     </FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full [&>span]:truncate">
                           <SelectValue placeholder={`Select ${actualItemType === "raw-material" ? "raw material" : "finished good"}`} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {items.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {actualItemType === "raw-material"
-                              ? `${item.kode} - ${item.name}`
-                              : item.name
-                            }
-                          </SelectItem>
-                        ))}
+                        {(() => {
+                          const normalizedType = typeof type === 'string' ? type.toUpperCase() : type;
+                          const isOutMovement = normalizedType === 'OUT';
+
+                          // For OUT movements, filter items with stock first
+                          if (isOutMovement) {
+                            const itemsWithStock = items.filter((i) => (i.currentStock ?? 0) > 0);
+                            const itemsWithoutStock = items.filter((i) => (i.currentStock ?? 0) === 0);
+
+                            return (
+                              <>
+                                {itemsWithStock.length === 0 ? (
+                                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                    No items with stock available
+                                  </div>
+                                ) : (
+                                  itemsWithStock.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                      <div className="flex items-center gap-2 max-w-[400px]">
+                                        <span className="truncate">
+                                          {actualItemType === "raw-material"
+                                            ? `${item.kode} - ${item.name}`
+                                            : item.name
+                                          }
+                                        </span>
+                                        <span className="text-green-600 font-medium whitespace-nowrap shrink-0">
+                                          (Stock: {(item.currentStock ?? 0).toLocaleString()})
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))
+                                )}
+                                {itemsWithoutStock.length > 0 && (
+                                  <>
+                                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-t">
+                                      Out of Stock
+                                    </div>
+                                    {itemsWithoutStock.map((item) => (
+                                      <SelectItem key={item.id} value={item.id} disabled>
+                                        <div className="flex items-center gap-2 max-w-[400px]">
+                                          <span className="truncate">
+                                            {actualItemType === "raw-material"
+                                              ? `${item.kode} - ${item.name}`
+                                              : item.name
+                                            }
+                                          </span>
+                                          <span className="text-destructive whitespace-nowrap shrink-0">
+                                            (Out of Stock)
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </>
+                                )}
+                              </>
+                            );
+                          }
+
+                          // For IN movements, show all items normally
+                          return items.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              <div className="truncate max-w-[400px]">
+                                {actualItemType === "raw-material"
+                                  ? `${item.kode} - ${item.name}`
+                                  : item.name
+                                }
+                              </div>
+                            </SelectItem>
+                          ));
+                        })()}
                       </SelectContent>
                     </Select>
                     <FormMessage />

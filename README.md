@@ -38,9 +38,9 @@ Built for small to medium manufacturing operations with emphasis on simplicity a
 ### 📊 Reporting & Analytics
 - Interactive pivot-style reports
 - Four data views: Opening, In, Out, Remaining stock
-- Inline cell editing for quick corrections
-- Excel export for movement history
+- Excel export with comprehensive stock data
 - Month-by-month historical data
+- Real-time stock calculations
 
 ### 🔒 Security
 - NextAuth.js authentication with JWT sessions
@@ -123,23 +123,14 @@ Visit `http://localhost:3000` and login with:
 
 ### Quick Links
 - **[Quick Start Guide](docs/QUICKSTART.md)** - 5-minute setup
-- **[STATUS.md](STATUS.md)** - Current production readiness
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history
 - **[Documentation Index](docs/README.md)** - Complete documentation map
 
 ### For Developers
 - **[API Reference](docs/reference/API.md)** - Complete endpoint documentation
 - **[Deployment Guide](docs/guides/DEPLOYMENT.md)** - Production deployment
+- **[Testing Guide](docs/guides/TESTING_GUIDE.md)** - Testing scenarios
 - **[CLAUDE.md](CLAUDE.md)** - Product requirements (PRD)
-
-### For QA & Testing
-- **[Testing Guide](docs/guides/TESTING_GUIDE.md)** - 80+ test scenarios
-- **[Known Issues](docs/reference/KNOWN_ISSUES.md)** - Active issues & workarounds
-
-### Implementation Reports
-- **[Enhancement Plan](docs/reference/ENHANCEMENT_PLAN.md)** - Future roadmap
-- **[Auth Fixes](docs/reports/AUTH_FIXES_APPLIED.md)** - Security fixes
-- **[QA Fixes](docs/reports/QA_FIXES_APPLIED.md)** - Data integrity fixes
 
 ---
 
@@ -172,12 +163,11 @@ stock-management/
 │   ├── README.md            # Documentation index
 │   ├── QUICKSTART.md        # Quick start guide
 │   ├── guides/              # How-to guides
-│   ├── reference/           # Reference docs
-│   └── reports/             # Implementation reports
+│   └── reference/           # Reference docs
 ├── .env                      # Environment variables (not in git)
 ├── .env.example             # Environment template
+├── CLAUDE.md                # Product requirements (PRD)
 ├── README.md                # This file
-├── STATUS.md                # Project status
 └── CHANGELOG.md             # Version history
 ```
 
@@ -303,14 +293,17 @@ See **[API Reference](docs/reference/API.md)** for complete API reference.
 
 ---
 
-## 🐛 Known Issues
+## ✅ Recent Updates
 
-See **[Known Issues](docs/reference/KNOWN_ISSUES.md)** for complete list.
+### Latest Improvements
+- ✅ **Batch Editing**: ADMIN users can now edit batch raw material usage
+- ✅ **Stock Reports**: Simplified read-only display (removed inline editing)
+- ✅ **RBAC Enforcement**: Complete role-based access control implemented
+- ✅ **UI Fixes**: Long item names properly truncated in all modals
+- ✅ **Permission Cleanup**: Empty action buttons hidden when user has no permissions
 
 ### Current Limitations (MVP)
-- Batch materials cannot be edited after creation (workaround: delete & recreate)
 - No user management UI (API available)
-- RBAC roles stored but not enforced yet
 - Single location only (no multi-warehouse)
 
 ---
@@ -319,21 +312,21 @@ See **[Known Issues](docs/reference/KNOWN_ISSUES.md)** for complete list.
 
 ### Phase 1 (Post-MVP)
 - [ ] User management UI
-- [ ] Role-based access control enforcement
 - [ ] Clone Batch feature
 - [ ] Dashboard with analytics
+- [ ] Email notifications
 
 ### Phase 2 (Advanced)
 - [ ] Supplier management
 - [ ] Purchase order workflow
 - [ ] Low stock notifications
+- [ ] Advanced reporting
 
 ### Phase 3 (Enterprise)
 - [ ] Multi-location support
 - [ ] Barcode scanning
 - [ ] Mobile application
-
-See **[Enhancement Plan](docs/reference/ENHANCEMENT_PLAN.md)** for detailed roadmap.
+- [ ] API integrations
 
 ---
 
@@ -359,9 +352,9 @@ See **[Enhancement Plan](docs/reference/ENHANCEMENT_PLAN.md)** for detailed road
 - Generate unique secrets (don't use defaults!)
 - Enable HTTPS/SSL
 - Set up rate limiting
-- Configure error monitoring (Sentry)
-
-See **[Auth Fixes Report](docs/reports/AUTH_FIXES_APPLIED.md)** for security audit results.
+- Configure error monitoring (e.g., Sentry)
+- Enable audit logging
+- Regular security updates
 
 ---
 

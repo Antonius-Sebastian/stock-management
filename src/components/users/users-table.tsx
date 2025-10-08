@@ -39,7 +39,7 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
   }
 
   const handleDelete = async (user: User) => {
-    if (!confirm(`Are you sure you want to delete user "${user.username}"?`)) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus pengguna "${user.username}"?`)) {
       return
     }
 
@@ -49,14 +49,14 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
       })
 
       if (response.ok) {
-        toast.success(`User "${user.username}" deleted successfully`)
+        toast.success(`Pengguna "${user.username}" berhasil dihapus`)
         onRefresh()
       } else {
         const data = await response.json()
-        toast.error(data.error || "Failed to delete user")
+        toast.error(data.error || "Gagal menghapus pengguna")
       }
     } catch {
-      toast.error("Failed to delete user")
+      toast.error("Gagal menghapus pengguna")
     }
   }
 
@@ -80,19 +80,19 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Username</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead>Nama</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[70px]">Actions</TableHead>
+              <TableHead>Dibuat</TableHead>
+              <TableHead className="w-[70px]">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">
-                  No users found.
+                  Tidak ada pengguna ditemukan.
                 </TableCell>
               </TableRow>
             ) : (
@@ -111,12 +111,12 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                       {user.isActive ? (
                         <>
                           <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-sm text-green-600">Active</span>
+                          <span className="text-sm text-green-600">Aktif</span>
                         </>
                       ) : (
                         <>
                           <XCircle className="h-4 w-4 text-red-600" />
-                          <span className="text-sm text-red-600">Inactive</span>
+                          <span className="text-sm text-red-600">Nonaktif</span>
                         </>
                       )}
                     </div>
@@ -128,12 +128,12 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
+                          <span className="sr-only">Buka menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuLabel>Aksi</DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleEdit(user)}>
                           <Pencil className="mr-2 h-4 w-4" />
@@ -144,7 +144,7 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                           className="text-red-600"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
+                          Hapus
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
+import { logger } from '@/lib/logger'
+import { AuditHelpers } from '@/lib/audit'
 import { canEditBatches, canDeleteBatches, getPermissionErrorMessage } from '@/lib/rbac'
 
 const updateBatchSchema = z.object({
@@ -9,8 +11,12 @@ const updateBatchSchema = z.object({
   date: z.string().datetime(),
   description: z.string().optional(),
   finishedGoodId: z.string().min(1, 'Finished good is required'),
-  // Note: Material usage cannot be updated after batch creation
-  // to maintain data integrity. Delete and recreate the batch instead.
+  materials: z.array(
+    z.object({
+      rawMaterialId: z.string().min(1, 'Raw material is required'),
+      quantity: z.number().positive('Quantity must be positive'),
+    })
+  ).optional(), // Optional to maintain backwards compatibility
 })
 
 export async function GET(
@@ -47,7 +53,7 @@ export async function GET(
 
     return NextResponse.json(batch)
   } catch (error) {
-    console.error('Error fetching batch:', error)
+    logger.error('Error fetching batch:', error)
 
     if (error instanceof Error) {
       return NextResponse.json(
@@ -68,7 +74,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authentication and authorization required (ADMIN or FACTORY only)
+    // Authentication and authorization required (ADMIN only)
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -88,6 +94,9 @@ export async function PUT(
     // Check if batch exists
     const existingBatch = await prisma.batch.findUnique({
       where: { id },
+      include: {
+        batchUsages: true,
+      },
     })
 
     if (!existingBatch) {
@@ -112,27 +121,108 @@ export async function PUT(
       )
     }
 
-    const updatedBatch = await prisma.batch.update({
-      where: { id },
-      data: {
-        code: validatedData.code,
-        date: new Date(validatedData.date),
-        description: validatedData.description,
-        finishedGoodId: validatedData.finishedGoodId,
-      },
-      include: {
-        finishedGood: true,
-        batchUsages: {
-          include: {
-            rawMaterial: true,
+    // Handle material updates in a transaction
+    const updatedBatch = await prisma.$transaction(async (tx) => {
+      // If materials are provided, update them
+      if (validatedData.materials) {
+        // Step 1: Restore stock for all old materials
+        for (const oldUsage of existingBatch.batchUsages) {
+          await tx.rawMaterial.update({
+            where: { id: oldUsage.rawMaterialId },
+            data: {
+              currentStock: {
+                increment: oldUsage.quantity,
+              },
+            },
+          })
+
+          // Delete old stock movement
+          await tx.stockMovement.deleteMany({
+            where: {
+              batchId: id,
+              rawMaterialId: oldUsage.rawMaterialId,
+            },
+          })
+        }
+
+        // Step 2: Delete all old batch usages
+        await tx.batchUsage.deleteMany({
+          where: { batchId: id },
+        })
+
+        // Step 3: Create new batch usages and deduct stock
+        for (const material of validatedData.materials) {
+          // Check if raw material has enough stock
+          const rawMaterial = await tx.rawMaterial.findUnique({
+            where: { id: material.rawMaterialId },
+          })
+
+          if (!rawMaterial) {
+            throw new Error(`Raw material not found: ${material.rawMaterialId}`)
+          }
+
+          if (rawMaterial.currentStock < material.quantity) {
+            throw new Error(
+              `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${material.quantity}`
+            )
+          }
+
+          // Create batch usage
+          await tx.batchUsage.create({
+            data: {
+              batchId: id,
+              rawMaterialId: material.rawMaterialId,
+              quantity: material.quantity,
+            },
+          })
+
+          // Deduct stock
+          await tx.rawMaterial.update({
+            where: { id: material.rawMaterialId },
+            data: {
+              currentStock: {
+                decrement: material.quantity,
+              },
+            },
+          })
+
+          // Create stock movement (OUT)
+          await tx.stockMovement.create({
+            data: {
+              type: 'OUT',
+              quantity: material.quantity,
+              date: new Date(validatedData.date),
+              rawMaterialId: material.rawMaterialId,
+              batchId: id,
+              description: `Batch ${validatedData.code} production`,
+            },
+          })
+        }
+      }
+
+      // Update batch info
+      return await tx.batch.update({
+        where: { id },
+        data: {
+          code: validatedData.code,
+          date: new Date(validatedData.date),
+          description: validatedData.description,
+          finishedGoodId: validatedData.finishedGoodId,
+        },
+        include: {
+          finishedGood: true,
+          batchUsages: {
+            include: {
+              rawMaterial: true,
+            },
           },
         },
-      },
+      })
     })
 
     return NextResponse.json(updatedBatch)
   } catch (error) {
-    console.error('Error updating batch:', error)
+    logger.error('Error updating batch:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]
@@ -223,9 +313,25 @@ export async function DELETE(
       }
     })
 
+    // Audit log (using existingBatch since batch is deleted)
+    const finishedGood = await prisma.finishedGood.findUnique({
+      where: { id: existingBatch.finishedGoodId },
+      select: { name: true },
+    })
+
+    await AuditHelpers.batchDeleted(
+      existingBatch.code,
+      finishedGood?.name || 'Unknown',
+      {
+        id: session.user.id,
+        name: session.user.name || session.user.username,
+        role: session.user.role,
+      }
+    )
+
     return NextResponse.json({ message: 'Batch deleted successfully and stock restored' })
   } catch (error) {
-    console.error('Error deleting batch:', error)
+    logger.error('Error deleting batch:', error)
 
     if (error instanceof Error) {
       return NextResponse.json(

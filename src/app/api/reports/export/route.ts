@@ -4,6 +4,7 @@ import { z } from "zod";
 import ExcelJS from "exceljs";
 import { auth } from "@/auth";
 import { canExportReports, getPermissionErrorMessage } from "@/lib/rbac";
+import { logger } from "@/lib/logger";
 
 const exportReportSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2030),
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
      * @returns Array of item data with daily stock values
      */
     const calculateStockData = (dataType: string): ItemData[] => {
-      return items.map((item) => {
+      const results = items.map((item) => {
         const itemData: ItemData = {
           id: item.id,
           name: item.name,
@@ -149,6 +150,9 @@ export async function GET(request: NextRequest) {
           const movementDate = new Date(movement.date);
           return movementDate >= startDate && movementDate <= endDate;
         });
+
+        // Track if item has movements for filtering
+        const hasMovements = movementsInMonth.length > 0;
 
         // Step 3: Process each day and calculate stock values
         let runningStock = openingStock; // Start with opening balance
@@ -200,8 +204,22 @@ export async function GET(request: NextRequest) {
           runningStock = runningStock + inQty - outQty;
         }
 
-        return itemData;
+        return { itemData, hasMovements, openingStock };
       });
+
+      // Filter out items with no movements and zero opening stock
+      return results
+        .filter(item => {
+          // If item has movements in this month, include it
+          if (item.hasMovements) return true;
+
+          // If item has opening stock, include it (even without movements this month)
+          if (item.openingStock > 0) return true;
+
+          // Otherwise exclude it
+          return false;
+        })
+        .map(item => item.itemData);
     };
 
     // Handle edge case: no items in database
@@ -540,7 +558,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error exporting stock report:", error);
+    logger.error("Error exporting stock report:", error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

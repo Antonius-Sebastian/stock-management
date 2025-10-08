@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
-import { canManageMaterials, getPermissionErrorMessage } from '@/lib/rbac'
+import { canManageMaterials, canDeleteMaterials, getPermissionErrorMessage } from '@/lib/rbac'
+import { logger } from '@/lib/logger'
 
 const updateRawMaterialSchema = z.object({
   kode: z.string().min(1, 'Code is required'),
@@ -66,7 +67,7 @@ export async function PUT(
 
     return NextResponse.json(updatedMaterial)
   } catch (error) {
-    console.error('Error updating raw material:', error)
+    logger.error('Error updating raw material:', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]
@@ -95,13 +96,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authentication and authorization required (ADMIN or OFFICE only)
+    // Authentication and authorization required (ADMIN only)
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!canManageMaterials(session.user.role)) {
+    if (!canDeleteMaterials(session.user.role)) {
       return NextResponse.json(
         { error: getPermissionErrorMessage('delete raw materials', session.user.role) },
         { status: 403 }
@@ -144,7 +145,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Raw material deleted successfully' })
   } catch (error) {
-    console.error('Error deleting raw material:', error)
+    logger.error('Error deleting raw material:', error)
 
     if (error instanceof Error) {
       return NextResponse.json(

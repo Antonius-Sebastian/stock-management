@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { canViewReports, getPermissionErrorMessage } from "@/lib/rbac";
+import { logger } from "@/lib/logger";
 
 const stockReportSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2030),
@@ -152,12 +153,24 @@ export async function GET(request: NextRequest) {
         runningStock = runningStock + inQty - outQty;
       }
 
-      return { itemData, hasMovements: movementsInMonth.length > 0 };
+      return { itemData, hasMovements: movementsInMonth.length > 0, openingStock };
     });
 
-    // Filter to show only items with movements in the selected month
+    // Filter out items that have:
+    // 1. No movements in the month
+    // 2. Zero opening stock
+    // 3. All values are zero or empty
     const filteredReportData = reportData
-      .filter(item => item.hasMovements)
+      .filter(item => {
+        // If item has movements in this month, include it
+        if (item.hasMovements) return true;
+
+        // If item has opening stock, include it (even without movements this month)
+        if (item.openingStock > 0) return true;
+
+        // Otherwise exclude it
+        return false;
+      })
       .map(item => item.itemData);
 
     return NextResponse.json({
@@ -172,7 +185,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error generating stock report:", error);
+    logger.error("Error generating stock report:", error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

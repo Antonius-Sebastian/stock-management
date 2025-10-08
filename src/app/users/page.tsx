@@ -41,32 +41,32 @@ export default function UsersPage() {
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
+          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight">Manajemen User</h2>
           <p className="text-muted-foreground">
-            Manage system users and their roles
+            Kelola user sistem dan peran mereka
           </p>
         </div>
         <AddUserDialog onSuccess={fetchUsers}>
           <Button>
             <UserPlus className="mr-2 h-4 w-4" />
-            Add User
+            Tambah User
           </Button>
         </AddUserDialog>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Users</CardTitle>
+          <CardTitle>User</CardTitle>
           <CardDescription>
-            List of all users with their roles and status
+            Daftar semua user dengan peran dan status mereka
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <p className="text-muted-foreground">Loading users...</p>
+              <p className="text-muted-foreground">Memuat user...</p>
             </div>
           ) : (
             <UsersTable users={users} onRefresh={fetchUsers} />

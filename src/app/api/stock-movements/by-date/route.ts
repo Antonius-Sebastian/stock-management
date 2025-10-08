@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
+import { logger } from '@/lib/logger'
+import { canDeleteStockMovements, canEditStockMovements, getPermissionErrorMessage } from '@/lib/rbac'
 
 const deleteByDateSchema = z.object({
   itemId: z.string().min(1),
@@ -20,10 +22,17 @@ const updateByDateSchema = z.object({
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Authentication required (all authenticated users can edit report data)
+    // Authentication and authorization required (ADMIN only)
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!canDeleteStockMovements(session.user.role)) {
+      return NextResponse.json(
+        { error: getPermissionErrorMessage('delete stock movements', session.user.role) },
+        { status: 403 }
+      )
     }
 
     const { searchParams } = new URL(request.url)
@@ -77,17 +86,23 @@ export async function DELETE(request: NextRequest) {
       const stockChange = validatedQuery.movementType === 'IN' ? -totalQuantity : totalQuantity
 
       // Check if stock will go negative
+      // Use SELECT FOR UPDATE to lock rows and prevent race conditions
       if (validatedQuery.itemType === 'raw-material') {
-        const item = await tx.rawMaterial.findUnique({
-          where: { id: validatedQuery.itemId },
-          select: { currentStock: true, name: true }
-        })
+        // Lock the row with FOR UPDATE
+        const items = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+          SELECT id, name, "currentStock"
+          FROM raw_materials
+          WHERE id = ${validatedQuery.itemId}
+          FOR UPDATE
+        `
 
-        if (!item) {
+        if (items.length === 0) {
           throw new Error('Raw material not found')
         }
 
+        const item = items[0]
         const newStock = item.currentStock + stockChange
+
         if (newStock < 0) {
           throw new Error(`Cannot delete movements: would result in negative stock for ${item.name} (${newStock.toFixed(2)})`)
         }
@@ -101,16 +116,21 @@ export async function DELETE(request: NextRequest) {
           },
         })
       } else {
-        const item = await tx.finishedGood.findUnique({
-          where: { id: validatedQuery.itemId },
-          select: { currentStock: true, name: true }
-        })
+        // Lock the row with FOR UPDATE
+        const items = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+          SELECT id, name, "currentStock"
+          FROM finished_goods
+          WHERE id = ${validatedQuery.itemId}
+          FOR UPDATE
+        `
 
-        if (!item) {
+        if (items.length === 0) {
           throw new Error('Finished good not found')
         }
 
+        const item = items[0]
         const newStock = item.currentStock + stockChange
+
         if (newStock < 0) {
           throw new Error(`Cannot delete movements: would result in negative stock for ${item.name} (${newStock.toFixed(2)})`)
         }
@@ -128,7 +148,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Stock movements deleted successfully' })
   } catch (error) {
-    console.error('Error deleting stock movements:', error)
+    logger.error('Error deleting stock movements:', error)
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -153,10 +173,17 @@ export async function DELETE(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Authentication required (all authenticated users can edit report data)
+    // Authentication and authorization required (ADMIN only)
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!canEditStockMovements(session.user.role)) {
+      return NextResponse.json(
+        { error: getPermissionErrorMessage('edit stock movements', session.user.role) },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -183,7 +210,25 @@ export async function PUT(request: NextRequest) {
             ? { rawMaterialId: validatedData.itemId }
             : { finishedGoodId: validatedData.itemId }),
         },
+        include: {
+          batch: {
+            select: { code: true }
+          }
+        }
       })
+
+      // Safety check: Prevent editing if multiple movements exist
+      // This preserves audit trail and prevents data loss
+      if (existingMovements.length > 1) {
+        const movementDetails = existingMovements.map(m =>
+          m.batch ? `${m.quantity} (Batch: ${m.batch.code})` : `${m.quantity} (Manual)`
+        ).join(', ')
+
+        throw new Error(
+          `Cannot edit: ${existingMovements.length} separate movements exist for this day (${movementDetails}). ` +
+          `To preserve audit trail, please delete and recreate, or edit individual movements.`
+        )
+      }
 
       const oldTotal = existingMovements.reduce((sum, m) => sum + m.quantity, 0)
       const difference = validatedData.quantity - oldTotal
@@ -221,17 +266,23 @@ export async function PUT(request: NextRequest) {
       const stockChange = validatedData.movementType === 'IN' ? difference : -difference
 
       // Check if stock will go negative
+      // Use SELECT FOR UPDATE to lock rows and prevent race conditions
       if (validatedData.itemType === 'raw-material') {
-        const item = await tx.rawMaterial.findUnique({
-          where: { id: validatedData.itemId },
-          select: { currentStock: true, name: true }
-        })
+        // Lock the row with FOR UPDATE
+        const items = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+          SELECT id, name, "currentStock"
+          FROM raw_materials
+          WHERE id = ${validatedData.itemId}
+          FOR UPDATE
+        `
 
-        if (!item) {
+        if (items.length === 0) {
           throw new Error('Raw material not found')
         }
 
+        const item = items[0]
         const newStock = item.currentStock + stockChange
+
         if (newStock < 0) {
           throw new Error(`Cannot update movements: would result in negative stock for ${item.name} (${newStock.toFixed(2)})`)
         }
@@ -245,16 +296,21 @@ export async function PUT(request: NextRequest) {
           },
         })
       } else {
-        const item = await tx.finishedGood.findUnique({
-          where: { id: validatedData.itemId },
-          select: { currentStock: true, name: true }
-        })
+        // Lock the row with FOR UPDATE
+        const items = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+          SELECT id, name, "currentStock"
+          FROM finished_goods
+          WHERE id = ${validatedData.itemId}
+          FOR UPDATE
+        `
 
-        if (!item) {
+        if (items.length === 0) {
           throw new Error('Finished good not found')
         }
 
+        const item = items[0]
         const newStock = item.currentStock + stockChange
+
         if (newStock < 0) {
           throw new Error(`Cannot update movements: would result in negative stock for ${item.name} (${newStock.toFixed(2)})`)
         }
@@ -277,7 +333,7 @@ export async function PUT(request: NextRequest) {
       result,
     })
   } catch (error) {
-    console.error('Error updating stock movements:', error)
+    logger.error('Error updating stock movements:', error)
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

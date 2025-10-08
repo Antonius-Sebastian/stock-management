@@ -1,8 +1,19 @@
+/**
+ * Batch Management API
+ *
+ * Handles production batch tracking including:
+ * - Listing batches with pagination
+ * - Creating batches with automatic stock deduction
+ * - Audit logging for compliance
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
+import { logger } from '@/lib/logger'
+import { AuditHelpers } from '@/lib/audit'
 
 const createBatchSchema = z.object({
   code: z.string().min(1, 'Batch code is required'),
@@ -15,6 +26,19 @@ const createBatchSchema = z.object({
   })).min(1, 'At least one raw material is required'),
 })
 
+/**
+ * GET /api/batches
+ *
+ * List all production batches with optional pagination
+ *
+ * @param request - NextRequest with optional query params (page, limit)
+ * @returns Paginated list of batches with metadata
+ *
+ * @remarks
+ * - Requires authentication (all roles)
+ * - Supports backward-compatible pagination via query params
+ * - Returns batches with finished good and material details
+ */
 export async function GET(request: NextRequest) {
   try {
     // Authentication required (all roles can view)
@@ -93,7 +117,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error fetching batches:', error)
+    logger.error('Error fetching batches', error)
     return NextResponse.json(
       { error: 'Failed to fetch batches' },
       { status: 500 }
@@ -101,6 +125,26 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/batches
+ *
+ * Create a new production batch
+ *
+ * @param request - NextRequest with batch data in body
+ * @returns Created batch with details
+ *
+ * @remarks
+ * - Requires ADMIN or FACTORY role
+ * - Automatically deducts raw material stock
+ * - Creates stock movement records
+ * - Validates sufficient stock before creation
+ * - Prevents duplicate materials in same batch
+ * - Logs audit trail for compliance
+ *
+ * @throws 401 - Unauthorized (not logged in)
+ * @throws 403 - Forbidden (insufficient permissions)
+ * @throws 400 - Validation error or insufficient stock
+ */
 export async function POST(request: NextRequest) {
   try {
     // Authentication and authorization required (ADMIN or FACTORY only)
@@ -212,9 +256,36 @@ export async function POST(request: NextRequest) {
       return batch
     })
 
+    // Audit log
+    const finishedGood = await prisma.finishedGood.findUnique({
+      where: { id: validatedData.finishedGoodId },
+      select: { name: true },
+    })
+
+    const materials = await Promise.all(
+      validatedData.materials.map(async (m) => {
+        const material = await prisma.rawMaterial.findUnique({
+          where: { id: m.rawMaterialId },
+          select: { name: true },
+        })
+        return { name: material?.name || 'Unknown', quantity: m.quantity }
+      })
+    )
+
+    await AuditHelpers.batchCreated(
+      validatedData.code,
+      finishedGood?.name || 'Unknown',
+      materials,
+      {
+        id: session.user.id,
+        name: session.user.name || session.user.username,
+        role: session.user.role,
+      }
+    )
+
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
-    console.error('Error creating batch:', error)
+    logger.error('Error creating batch', error)
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]

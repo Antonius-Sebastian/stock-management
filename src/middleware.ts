@@ -1,10 +1,14 @@
-import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default auth((req) => {
+export function middleware(req: NextRequest) {
   const { nextUrl } = req
-  const isLoggedIn = !!req.auth
-  const userRole = req.auth?.user?.role
+
+  // Check if user has session token (NextAuth session cookie)
+  const sessionToken = req.cookies.get('authjs.session-token')?.value ||
+                       req.cookies.get('__Secure-authjs.session-token')?.value
+
+  const isLoggedIn = !!sessionToken
 
   // Public paths that don't require authentication
   const publicPaths = ['/login']
@@ -25,22 +29,12 @@ export default auth((req) => {
   } else if (isLoggedIn && nextUrl.pathname === '/login') {
     // If logged in and trying to access login page, redirect to home
     response = NextResponse.redirect(new URL('/', nextUrl))
-  } else if (isLoggedIn && userRole) {
-    // Role-based access control for UI routes
-    // Only ADMIN can access user management pages
-    if (nextUrl.pathname.startsWith('/users') && userRole !== 'ADMIN') {
-      response = NextResponse.redirect(new URL('/', nextUrl))
-    } else {
-      response = NextResponse.next()
-    }
   } else {
     response = NextResponse.next()
   }
 
   // Add CORS headers for API routes
   if (nextUrl.pathname.startsWith('/api')) {
-    // Allow same-origin requests by default
-    // Configure these based on your deployment needs
     const allowedOrigin = process.env.ALLOWED_ORIGIN || req.headers.get('origin') || '*'
 
     response.headers.set('Access-Control-Allow-Origin', allowedOrigin)
@@ -53,8 +47,17 @@ export default auth((req) => {
   }
 
   return response
-})
+}
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files (public folder)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }

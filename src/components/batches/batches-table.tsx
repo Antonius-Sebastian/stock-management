@@ -73,9 +73,9 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
       if (!batch.batchUsages.length) return "-"
 
       return (
-        <div className="space-y-1">
+        <div className="space-y-1 max-w-xs">
           {batch.batchUsages.map((usage, index) => (
-            <div key={index} className="text-sm">
+            <div key={index} className="text-sm truncate" title={`${usage.rawMaterial.kode} - ${usage.quantity.toLocaleString()} unit`}>
               <span className="font-medium">{usage.rawMaterial.kode}</span>
               <span className="text-muted-foreground"> - {usage.quantity.toLocaleString()} unit</span>
             </div>
@@ -92,7 +92,9 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
       if (!batch.finishedGood) return "-"
 
       return (
-        <div className="font-medium">{batch.finishedGood.name}</div>
+        <div className="font-medium max-w-xs truncate" title={batch.finishedGood.name}>
+          {batch.finishedGood.name}
+        </div>
       )
     },
   },
@@ -101,7 +103,11 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
     header: "Deskripsi",
     cell: ({ row }) => {
       const description = row.getValue("description") as string
-      return description || "-"
+      return (
+        <div className="max-w-xs truncate" title={description || undefined}>
+          {description || "-"}
+        </div>
+      )
     },
   },
   {

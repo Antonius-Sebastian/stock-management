@@ -43,12 +43,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-lg p-6 lg:p-8">
+        <div className="bg-white dark:bg-slate-950 rounded-lg shadow-lg p-6 lg:p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Stock Management</h1>
-            <p className="text-slate-600 mt-2">Masuk ke akun Anda</p>
+            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 dark:text-slate-50">Stock Management</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-2">Masuk ke akun Anda</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -89,8 +89,8 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-200">
-            <p className="text-xs text-slate-500 text-center">
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
               Kredensial default untuk testing:
               <br />
               Username: <span className="font-mono font-medium">admin</span> | Password:{' '}

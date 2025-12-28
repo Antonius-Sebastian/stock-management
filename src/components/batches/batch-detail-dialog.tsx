@@ -48,9 +48,9 @@ export function BatchDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Batch Details</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl">Batch Details</DialogTitle>
           <DialogDescription>
             Complete information about this production batch
           </DialogDescription>
@@ -58,7 +58,7 @@ export function BatchDetailDialog({
 
         <div className="space-y-6">
           {/* Batch Information */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Package className="h-4 w-4" />
@@ -77,7 +77,7 @@ export function BatchDetailDialog({
               </div>
             </div>
 
-            <div className="space-y-1 col-span-2">
+            <div className="space-y-1 sm:col-span-2">
               <div className="text-sm text-muted-foreground">Finished Good</div>
               <div className="text-lg font-semibold">
                 {batch.finishedGood?.name || "-"}
@@ -85,7 +85,7 @@ export function BatchDetailDialog({
             </div>
 
             {batch.description && (
-              <div className="space-y-1 col-span-2">
+              <div className="space-y-1 sm:col-span-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <FileText className="h-4 w-4" />
                   <span>Description</span>
@@ -104,13 +104,13 @@ export function BatchDetailDialog({
               </Badge>
             </div>
 
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Material Name</TableHead>
-                    <TableHead className="text-right">Quantity Used</TableHead>
+                    <TableHead className="min-w-[80px]">Code</TableHead>
+                    <TableHead className="min-w-[150px]">Material Name</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Quantity Used</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

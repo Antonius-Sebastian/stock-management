@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input"
 import { FinishedGood } from "@prisma/client"
 
 const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "Nama produk harus diisi"),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -79,12 +79,12 @@ export function EditFinishedGoodDialog({
         throw new Error(errorData.error || "Failed to update finished good")
       }
 
-      toast.success("Finished good updated successfully")
+      toast.success("Produk jadi berhasil diperbarui")
       onOpenChange(false)
       onSuccess()
     } catch (error) {
       console.error("Error updating finished good:", error)
-      const message = error instanceof Error ? error.message : "Failed to update finished good"
+      const message = error instanceof Error ? error.message : "Gagal memperbarui produk jadi"
       toast.error(message)
     } finally {
       setIsLoading(false)
@@ -93,23 +93,23 @@ export function EditFinishedGoodDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
         <DialogHeader>
-          <DialogTitle>Edit Finished Good</DialogTitle>
+          <DialogTitle>Edit Produk Jadi</DialogTitle>
           <DialogDescription>
-            Update the finished good information.
+            Perbarui informasi produk jadi.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-hidden">
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Name</FormLabel>
+                <FormItem className="min-w-0">
+                  <FormLabel>Nama Produk</FormLabel>
                   <FormControl>
-                    <Input placeholder="Product name" {...field} />
+                    <Input placeholder="Masukkan nama produk" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -121,10 +121,10 @@ export function EditFinishedGoodDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Updating..." : "Update"}
+                {isLoading ? "Memperbarui..." : "Perbarui"}
               </Button>
             </DialogFooter>
           </form>

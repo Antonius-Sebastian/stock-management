@@ -44,7 +44,7 @@ export function StockReportTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="sticky left-0 z-10 bg-white border-r shadow-sm min-w-[200px]">
+            <TableHead className="sticky left-0 z-10 bg-white dark:bg-slate-950 border-r shadow-sm min-w-[200px]">
               Item
             </TableHead>
             {dayColumns.map((day) => (
@@ -57,7 +57,7 @@ export function StockReportTable({
         <TableBody>
           {data.map((item) => (
             <TableRow key={item.id}>
-              <TableCell className="sticky left-0 z-10 bg-white border-r shadow-sm font-medium">
+              <TableCell className="sticky left-0 z-10 bg-white dark:bg-slate-950 border-r shadow-sm font-medium">
                 <div>
                   <div className="font-medium">{item.code}</div>
                   <div className="text-sm text-muted-foreground">{item.name}</div>

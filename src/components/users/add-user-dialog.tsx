@@ -82,8 +82,8 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit}>
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
+        <form onSubmit={handleSubmit} className="overflow-hidden">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription>

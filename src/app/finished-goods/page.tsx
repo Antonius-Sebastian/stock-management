@@ -93,16 +93,16 @@ export default function FinishedGoodsPage() {
             Kelola inventori produk jadi Anda
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {canCreateStockMovement(userRole, 'finished-good', 'IN') && (
             <StockEntryDialog
               type="IN"
               itemType="finished-good"
               onSuccess={handleSuccess}
             >
-              <Button variant="outline">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <TrendingUp className="mr-2 h-4 w-4" />
-                Input Stok Masuk
+                <span className="hidden sm:inline">Input </span>Stok Masuk
               </Button>
             </StockEntryDialog>
           )}
@@ -112,9 +112,9 @@ export default function FinishedGoodsPage() {
               itemType="finished-good"
               onSuccess={handleSuccess}
             >
-              <Button variant="outline">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <TrendingDown className="mr-2 h-4 w-4" />
-                Input Stok Keluar
+                <span className="hidden sm:inline">Input </span>Stok Keluar
               </Button>
             </StockEntryDialog>
           )}

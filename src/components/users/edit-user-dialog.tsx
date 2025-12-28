@@ -106,8 +106,8 @@ export function EditUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit}>
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
+        <form onSubmit={handleSubmit} className="overflow-hidden">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>

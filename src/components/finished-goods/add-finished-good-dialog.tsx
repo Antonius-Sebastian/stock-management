@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Plus } from "lucide-react"
 
 const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "Nama produk harus diisi"),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -63,13 +63,13 @@ export function AddFinishedGoodDialog({ onSuccess }: AddFinishedGoodDialogProps)
         throw new Error(errorData.error || "Failed to create finished good")
       }
 
-      toast.success("Finished good created successfully")
+      toast.success("Produk jadi berhasil ditambahkan")
       form.reset()
       setOpen(false)
       onSuccess()
     } catch (error) {
       console.error("Error creating finished good:", error)
-      const message = error instanceof Error ? error.message : "Failed to create finished good"
+      const message = error instanceof Error ? error.message : "Gagal membuat produk jadi"
       toast.error(message)
     } finally {
       setIsLoading(false)
@@ -79,16 +79,16 @@ export function AddFinishedGoodDialog({ onSuccess }: AddFinishedGoodDialogProps)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
-          Add Finished Good
+          Tambah Produk Jadi
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
         <DialogHeader>
-          <DialogTitle>Add Finished Good</DialogTitle>
+          <DialogTitle>Tambah Produk Jadi</DialogTitle>
           <DialogDescription>
-            Add a new finished good to the inventory system.
+            Tambahkan produk jadi baru ke sistem inventori.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -97,10 +97,10 @@ export function AddFinishedGoodDialog({ onSuccess }: AddFinishedGoodDialogProps)
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Name</FormLabel>
+                <FormItem className="min-w-0">
+                  <FormLabel>Nama Produk</FormLabel>
                   <FormControl>
-                    <Input placeholder="Product name" {...field} />
+                    <Input placeholder="Masukkan nama produk" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -112,10 +112,10 @@ export function AddFinishedGoodDialog({ onSuccess }: AddFinishedGoodDialogProps)
                 variant="outline"
                 onClick={() => setOpen(false)}
               >
-                Cancel
+                Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Creating..." : "Create"}
+                {isLoading ? "Membuat..." : "Buat"}
               </Button>
             </DialogFooter>
           </form>

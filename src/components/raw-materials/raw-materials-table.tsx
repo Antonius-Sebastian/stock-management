@@ -75,7 +75,8 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
         return (
           <Link
             href={`/raw-materials/${material.id}`}
-            className="text-primary hover:underline font-medium"
+            className="text-primary hover:underline font-medium block overflow-hidden truncate max-w-md"
+            title={material.name}
           >
             {material.name}
           </Link>
@@ -189,8 +190,8 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
       <DataTable
         columns={columns}
         data={data}
-        searchKey="name"
-        searchPlaceholder="Cari bahan baku..."
+        searchKeys={["name", "kode"]}
+        searchPlaceholder="Cari bahan baku (nama atau kode)..."
         emptyMessage="Belum ada bahan baku. Klik 'Tambah Bahan Baku' untuk memulai!"
         tableId="raw-materials"
       />

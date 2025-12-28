@@ -1,11 +1,15 @@
 "use client"
 
+import { useState } from "react"
 import { ColumnDef } from "@tanstack/react-table"
 import { format } from "date-fns"
 import { DataTable } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown } from "lucide-react"
+import { ArrowUpDown, CalendarIcon } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
 
 interface Movement {
   id: string
@@ -24,6 +28,20 @@ interface MovementHistoryTableProps {
 }
 
 export function MovementHistoryTable({ movements, onBatchClick }: MovementHistoryTableProps) {
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined)
+
+  // Filter movements by date if date filter is set
+  const filteredMovements = dateFilter
+    ? movements.filter((movement) => {
+        const movementDate = new Date(movement.date)
+        return (
+          movementDate.getDate() === dateFilter.getDate() &&
+          movementDate.getMonth() === dateFilter.getMonth() &&
+          movementDate.getFullYear() === dateFilter.getFullYear()
+        )
+      })
+    : movements
+
   const columns: ColumnDef<Movement>[] = [
     {
       accessorKey: "date",
@@ -132,13 +150,47 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
   ]
 
   return (
-    <DataTable
-      columns={columns}
-      data={movements}
-      searchKey="description"
-      searchPlaceholder="Cari berdasarkan deskripsi..."
-      emptyMessage="Belum ada pergerakan stok yang tercatat."
-      tableId="movement-history"
-    />
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "justify-start text-left font-normal",
+                !dateFilter && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateFilter ? format(dateFilter, "PPP") : "Filter berdasarkan tanggal"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={dateFilter}
+              onSelect={setDateFilter}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        {dateFilter && (
+          <Button
+            variant="ghost"
+            onClick={() => setDateFilter(undefined)}
+          >
+            Hapus Filter
+          </Button>
+        )}
+      </div>
+      <DataTable
+        columns={columns}
+        data={filteredMovements}
+        searchKey="description"
+        searchPlaceholder="Cari berdasarkan deskripsi..."
+        emptyMessage="Belum ada pergerakan stok yang tercatat."
+        tableId="movement-history"
+      />
+    </div>
   )
 }

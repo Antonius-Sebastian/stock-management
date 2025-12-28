@@ -12,6 +12,16 @@ import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
 import { Button } from "@/components/ui/button"
 import { TrendingUp } from "lucide-react"
 import { canManageMaterials, canCreateStockMovement } from "@/lib/rbac"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function RawMaterialsPage() {
   const { data: session } = useSession()
@@ -20,6 +30,9 @@ export default function RawMaterialsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [materialToDelete, setMaterialToDelete] = useState<RawMaterial | null>(null)
+  const [movementCount, setMovementCount] = useState(0)
 
   const fetchRawMaterials = async () => {
     try {
@@ -53,12 +66,27 @@ export default function RawMaterialsPage() {
   }
 
   const handleDelete = async (material: RawMaterial) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus "${material.name}"? Tindakan ini tidak dapat dibatalkan.`)) {
-      return
+    // Fetch movement count
+    try {
+      const response = await fetch(`/api/raw-materials/${material.id}/movements`)
+      if (response.ok) {
+        const data = await response.json()
+        setMovementCount(data.movements?.length || 0)
+      }
+    } catch (error) {
+      console.error("Error fetching movements:", error)
+      setMovementCount(0)
     }
 
+    setMaterialToDelete(material)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!materialToDelete) return
+
     try {
-      const response = await fetch(`/api/raw-materials/${material.id}`, {
+      const response = await fetch(`/api/raw-materials/${materialToDelete.id}`, {
         method: "DELETE",
       })
 
@@ -69,6 +97,8 @@ export default function RawMaterialsPage() {
 
       toast.success("Bahan baku berhasil dihapus")
       fetchRawMaterials()
+      setDeleteDialogOpen(false)
+      setMaterialToDelete(null)
     } catch (error) {
       console.error("Error deleting raw material:", error)
       const message = error instanceof Error ? error.message : "Gagal menghapus bahan baku"
@@ -136,6 +166,39 @@ export default function RawMaterialsPage() {
         onOpenChange={setEditDialogOpen}
         onSuccess={handleSuccess}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Bahan Baku?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus &quot;{materialToDelete?.name}&quot;?
+              {movementCount > 0 && (
+                <>
+                  <br /><br />
+                  <span className="font-semibold text-destructive">
+                    Peringatan: Bahan baku ini memiliki {movementCount} pergerakan stok yang akan ikut terhapus.
+                  </span>
+                  <br />
+                  Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data terkait termasuk riwayat pergerakan stok.
+                </>
+              )}
+              {movementCount === 0 && (
+                <>
+                  <br />
+                  Tindakan ini tidak dapat dibatalkan.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -75,16 +75,16 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
 
   return (
     <>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Username</TableHead>
-              <TableHead>Nama</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Dibuat</TableHead>
+              <TableHead className="min-w-[100px]">Username</TableHead>
+              <TableHead className="min-w-[120px]">Nama</TableHead>
+              <TableHead className="min-w-[150px]">Email</TableHead>
+              <TableHead className="min-w-[80px]">Role</TableHead>
+              <TableHead className="min-w-[100px]">Status</TableHead>
+              <TableHead className="min-w-[100px]">Dibuat</TableHead>
               <TableHead className="w-[70px]">Aksi</TableHead>
             </TableRow>
           </TableHeader>
@@ -110,13 +110,13 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                     <div className="flex items-center gap-2">
                       {user.isActive ? (
                         <>
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-sm text-green-600">Aktif</span>
+                          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                          <span className="text-sm text-green-600 dark:text-green-500">Aktif</span>
                         </>
                       ) : (
                         <>
-                          <XCircle className="h-4 w-4 text-red-600" />
-                          <span className="text-sm text-red-600">Nonaktif</span>
+                          <XCircle className="h-4 w-4 text-red-600 dark:text-red-500" />
+                          <span className="text-sm text-red-600 dark:text-red-500">Nonaktif</span>
                         </>
                       )}
                     </div>

@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
+import { CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -25,63 +25,83 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { cn } from "@/lib/utils"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
-const createFormSchema = (items: Item[], type: "in" | "out" | "IN" | "OUT") => z.object({
-  itemId: z.string().min(1, "Please select an item"),
-  quantity: z.coerce.number({
-    required_error: "Quantity is required",
-    invalid_type_error: "Quantity must be a number",
-  }).refine((val) => !isNaN(val) && val > 0, "Quantity must be greater than zero"),
-  date: z.date({
-    required_error: "Please select a date",
-  }),
-  description: z.string().optional(),
-}).refine((data) => {
-  const normalizedType = typeof type === 'string' ? type.toUpperCase() : type;
-  if (normalizedType === "OUT") {
-    const selectedItem = items.find(item => item.id === data.itemId);
-    if (selectedItem && 'currentStock' in selectedItem) {
-      return data.quantity <= (selectedItem as Item & {currentStock: number}).currentStock;
-    }
-  }
-  return true;
-}, {
-  message: "Quantity cannot exceed available stock",
-  path: ["quantity"],
-})
+const createFormSchema = (items: Item[], type: "in" | "out" | "IN" | "OUT") =>
+  z
+    .object({
+      itemId: z.string().min(1, "Please select an item"),
+      quantity: z.coerce
+        .number({
+          required_error: "Quantity is required",
+          invalid_type_error: "Quantity must be a number",
+        })
+        .refine(
+          (val) => !isNaN(val) && val > 0,
+          "Quantity must be greater than zero"
+        ),
+      date: z.date({
+        required_error: "Please select a date",
+      }),
+      description: z.string().optional(),
+    })
+    .refine(
+      (data) => {
+        const normalizedType =
+          typeof type === "string" ? type.toUpperCase() : type;
+        if (normalizedType === "OUT") {
+          const selectedItem = items.find((item) => item.id === data.itemId);
+          if (selectedItem && "currentStock" in selectedItem) {
+            return (
+              data.quantity <=
+              (selectedItem as Item & { currentStock: number }).currentStock
+            );
+          }
+        }
+        return true;
+      },
+      {
+        message: "Quantity cannot exceed available stock",
+        path: ["quantity"],
+      }
+    );
 
 interface StockEntryDialogProps {
-  type: "in" | "out" | "IN" | "OUT"
-  itemType?: "raw-material" | "finished-good"
-  entityType?: "raw-material" | "finished-good"
-  entityId?: string
-  entityName?: string
-  onSuccess: () => void
-  children?: React.ReactNode
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  type: "in" | "out" | "IN" | "OUT";
+  itemType?: "raw-material" | "finished-good";
+  entityType?: "raw-material" | "finished-good";
+  entityId?: string;
+  entityName?: string;
+  onSuccess: () => void;
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 interface Item {
-  id: string
-  name: string
-  kode?: string
-  sku?: string
-  currentStock?: number
+  id: string;
+  name: string;
+  kode?: string;
+  sku?: string;
+  currentStock?: number;
 }
 
-type FormData = z.infer<ReturnType<typeof createFormSchema>>
+type FormData = z.infer<ReturnType<typeof createFormSchema>>;
 
 export function StockEntryDialog({
   type,
@@ -94,18 +114,21 @@ export function StockEntryDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: StockEntryDialogProps) {
-  const [internalOpen, setInternalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [items, setItems] = useState<Item[]>([])
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [items, setItems] = useState<Item[]>([]);
 
   // Use controlled or uncontrolled state
-  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
-  const setOpen = controlledOnOpenChange !== undefined ? controlledOnOpenChange : setInternalOpen
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen =
+    controlledOnOpenChange !== undefined
+      ? controlledOnOpenChange
+      : setInternalOpen;
 
   // Determine the actual item type to use
-  const actualItemType = entityType || itemType || "raw-material"
+  const actualItemType = entityType || itemType || "raw-material";
 
-  const formSchema = createFormSchema(items, type)
+  const formSchema = createFormSchema(items, type);
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -115,55 +138,59 @@ export function StockEntryDialog({
       description: "",
     },
     mode: "onSubmit",
-  })
+  });
 
   const fetchItems = async (signal?: AbortSignal) => {
     try {
-      const endpoint = actualItemType === "raw-material" ? "/api/raw-materials" : "/api/finished-goods"
-      const response = await fetch(endpoint, { signal })
+      const endpoint =
+        actualItemType === "raw-material"
+          ? "/api/raw-materials"
+          : "/api/finished-goods";
+      const response = await fetch(endpoint, { signal });
       if (!response.ok) {
-        throw new Error("Failed to fetch items")
+        throw new Error("Failed to fetch items");
       }
-      const data = await response.json()
+      const data = await response.json();
       // Handle both array response and paginated response
-      const items = Array.isArray(data) ? data : (data.data || [])
-      setItems(items)
+      const items = Array.isArray(data) ? data : data.data || [];
+      setItems(items);
     } catch (error) {
       // Ignore abort errors
-      if (error instanceof Error && error.name === 'AbortError') {
-        return
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
       }
-      console.error("Error fetching items:", error)
-      toast.error("Failed to load items. Please try again.")
+      console.error("Error fetching items:", error);
+      toast.error("Failed to load items. Please try again.");
     }
-  }
+  };
 
   useEffect(() => {
     // Create AbortController for cleanup
-    const controller = new AbortController()
+    const controller = new AbortController();
 
     if (open) {
-      fetchItems(controller.signal)
+      fetchItems(controller.signal);
     }
 
     // Cleanup function to abort fetch on unmount or dependency change
     return () => {
-      controller.abort()
-    }
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, actualItemType])
+  }, [open, actualItemType]);
 
   // Update form when entityId changes
   useEffect(() => {
     if (entityId && open) {
-      form.setValue("itemId", entityId)
+      form.setValue("itemId", entityId);
     }
-  }, [entityId, open, form])
+  }, [entityId, open, form]);
 
   async function onSubmit(data: FormData) {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
+      const normalizedType =
+        typeof type === "string" ? type.toUpperCase() : type;
       const stockMovementData = {
         type: normalizedType,
         quantity: data.quantity,
@@ -172,7 +199,7 @@ export function StockEntryDialog({
         ...(actualItemType === "raw-material"
           ? { rawMaterialId: data.itemId }
           : { finishedGoodId: data.itemId }),
-      }
+      };
 
       const response = await fetch("/api/stock-movements", {
         method: "POST",
@@ -180,153 +207,212 @@ export function StockEntryDialog({
           "Content-Type": "application/json",
         },
         body: JSON.stringify(stockMovementData),
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Failed to create stock movement")
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Failed to create stock movement");
       }
 
-      const actionType = normalizedType === "IN" ? "incoming" : "outgoing"
-      const itemTypeLabel = actualItemType === "raw-material" ? "raw material" : "finished good"
+      const actionType = normalizedType === "IN" ? "incoming" : "outgoing";
+      const itemTypeLabel =
+        actualItemType === "raw-material" ? "raw material" : "finished good";
 
-      toast.success(`Successfully recorded ${actionType} stock for ${itemTypeLabel}`)
-      form.reset()
-      setOpen(false)
-      onSuccess()
+      toast.success(
+        `Successfully recorded ${actionType} stock for ${itemTypeLabel}`
+      );
+      form.reset();
+      setOpen(false);
+      onSuccess();
     } catch (error) {
-      console.error("Error creating stock movement:", error)
-      const message = error instanceof Error ? error.message : "Failed to create stock movement"
-      toast.error(message)
+      console.error("Error creating stock movement:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to create stock movement";
+      toast.error(message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   const getTitle = () => {
-    const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
-    const action = normalizedType === "IN" ? "Input Stok Masuk" : "Input Stok Keluar"
-    const itemTypeLabel = actualItemType === "raw-material" ? "Raw Material" : "Finished Good"
+    const normalizedType = typeof type === "string" ? type.toUpperCase() : type;
+    const action =
+      normalizedType === "IN" ? "Input Stok Masuk" : "Input Stok Keluar";
+    const itemTypeLabel =
+      actualItemType === "raw-material" ? "Raw Material" : "Finished Good";
     if (entityName) {
-      return `${action} - ${entityName}`
+      return `${action} - ${entityName}`;
     }
-    return `${action} - ${itemTypeLabel}`
-  }
+    return `${action} - ${itemTypeLabel}`;
+  };
 
   const getDescription = () => {
-    const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
-    const action = normalizedType === "IN" ? "incoming" : "outgoing"
-    const itemTypeLabel = actualItemType === "raw-material" ? "raw material" : "finished good"
-    return `Record ${action} stock for ${itemTypeLabel}`
-  }
+    const normalizedType = typeof type === "string" ? type.toUpperCase() : type;
+    const action = normalizedType === "IN" ? "incoming" : "outgoing";
+    const itemTypeLabel =
+      actualItemType === "raw-material" ? "raw material" : "finished good";
+    return `Record ${action} stock for ${itemTypeLabel}`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {children && (
-        <DialogTrigger asChild>
-          {children}
-        </DialogTrigger>
-      )}
-      <DialogContent className="sm:max-w-[425px]">
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
         <DialogHeader>
-          <DialogTitle>{getTitle()}</DialogTitle>
-          <DialogDescription>
-            {getDescription()}
-          </DialogDescription>
+          <DialogTitle className="truncate">{getTitle()}</DialogTitle>
+          <DialogDescription className="truncate">{getDescription()}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-hidden">
             {!entityId && (
               <FormField
                 control={form.control}
                 name="itemId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {actualItemType === "raw-material" ? "Raw Material" : "Finished Good"}
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full [&>span]:truncate">
-                          <SelectValue placeholder={`Select ${actualItemType === "raw-material" ? "raw material" : "finished good"}`} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {(() => {
-                          const normalizedType = typeof type === 'string' ? type.toUpperCase() : type;
-                          const isOutMovement = normalizedType === 'OUT';
+                render={({ field }) => {
+                  const normalizedType =
+                    typeof type === "string" ? type.toUpperCase() : type;
+                  const isOutMovement = normalizedType === "OUT";
+                  const itemsWithStock = isOutMovement
+                    ? items.filter((i) => (i.currentStock ?? 0) > 0)
+                    : items;
+                  const itemsWithoutStock = isOutMovement
+                    ? items.filter((i) => (i.currentStock ?? 0) === 0)
+                    : [];
+                  const selectedItem = items.find(
+                    (item) => item.id === field.value
+                  );
 
-                          // For OUT movements, filter items with stock first
-                          if (isOutMovement) {
-                            const itemsWithStock = items.filter((i) => (i.currentStock ?? 0) > 0);
-                            const itemsWithoutStock = items.filter((i) => (i.currentStock ?? 0) === 0);
-
-                            return (
-                              <>
-                                {itemsWithStock.length === 0 ? (
-                                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                    No items with stock available
-                                  </div>
-                                ) : (
-                                  itemsWithStock.map((item) => (
-                                    <SelectItem key={item.id} value={item.id}>
-                                      <div className="flex items-center gap-2 max-w-[400px]">
-                                        <span className="truncate">
+                  return (
+                    <FormItem className="flex flex-col min-w-0">
+                      <FormLabel>
+                        {actualItemType === "raw-material"
+                          ? "Raw Material"
+                          : "Finished Good"}
+                      </FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between overflow-hidden min-w-0",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              <span className="truncate block min-w-0 text-left">
+                                {field.value
+                                  ? actualItemType === "raw-material"
+                                    ? `${selectedItem?.kode} - ${selectedItem?.name}`
+                                    : selectedItem?.name
+                                  : `Select ${
+                                      actualItemType === "raw-material"
+                                        ? "raw material"
+                                        : "finished good"
+                                    }`}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder={`Cari ${
+                                actualItemType === "raw-material"
+                                  ? "bahan baku"
+                                  : "produk jadi"
+                              }...`}
+                            />
+                            <CommandList className="max-h-[300px]">
+                              <CommandEmpty>
+                                Tidak ada item yang ditemukan.
+                              </CommandEmpty>
+                              {itemsWithStock.length > 0 && (
+                                <CommandGroup
+                                  heading={
+                                    isOutMovement ? "Tersedia" : undefined
+                                  }
+                                >
+                                  {itemsWithStock.map((item) => (
+                                    <CommandItem
+                                      key={item.id}
+                                      value={
+                                        actualItemType === "raw-material"
+                                          ? `${item.kode} ${item.name}`
+                                          : item.name
+                                      }
+                                      onSelect={() => {
+                                        form.setValue("itemId", item.id);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4 shrink-0",
+                                          item.id === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                                        <span className="truncate block">
                                           {actualItemType === "raw-material"
                                             ? `${item.kode} - ${item.name}`
-                                            : item.name
-                                          }
+                                            : item.name}
                                         </span>
-                                        <span className="text-green-600 font-medium whitespace-nowrap shrink-0">
-                                          (Stock: {(item.currentStock ?? 0).toLocaleString()})
+                                        {isOutMovement && (
+                                          <span className="text-xs text-green-600 font-medium whitespace-nowrap shrink-0">
+                                            (
+                                            {(
+                                              item.currentStock ?? 0
+                                            ).toLocaleString()}
+                                            )
+                                          </span>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                              {itemsWithoutStock.length > 0 && (
+                                <CommandGroup heading="Stok Habis">
+                                  {itemsWithoutStock.map((item) => (
+                                    <CommandItem
+                                      key={item.id}
+                                      value={
+                                        actualItemType === "raw-material"
+                                          ? `${item.kode} ${item.name}`
+                                          : item.name
+                                      }
+                                      disabled
+                                    >
+                                      <Check className="mr-2 h-4 w-4 shrink-0 opacity-0" />
+                                      <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden opacity-50">
+                                        <span className="truncate block">
+                                          {actualItemType === "raw-material"
+                                            ? `${item.kode} - ${item.name}`
+                                            : item.name}
+                                        </span>
+                                        <span className="text-xs text-destructive whitespace-nowrap shrink-0">
+                                          (Habis)
                                         </span>
                                       </div>
-                                    </SelectItem>
-                                  ))
-                                )}
-                                {itemsWithoutStock.length > 0 && (
-                                  <>
-                                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-t">
-                                      Out of Stock
-                                    </div>
-                                    {itemsWithoutStock.map((item) => (
-                                      <SelectItem key={item.id} value={item.id} disabled>
-                                        <div className="flex items-center gap-2 max-w-[400px]">
-                                          <span className="truncate">
-                                            {actualItemType === "raw-material"
-                                              ? `${item.kode} - ${item.name}`
-                                              : item.name
-                                            }
-                                          </span>
-                                          <span className="text-destructive whitespace-nowrap shrink-0">
-                                            (Out of Stock)
-                                          </span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </>
-                                )}
-                              </>
-                            );
-                          }
-
-                          // For IN movements, show all items normally
-                          return items.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              <div className="truncate max-w-[400px]">
-                                {actualItemType === "raw-material"
-                                  ? `${item.kode} - ${item.name}`
-                                  : item.name
-                                }
-                              </div>
-                            </SelectItem>
-                          ));
-                        })()}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             )}
             <FormField
@@ -334,12 +420,15 @@ export function StockEntryDialog({
               name="quantity"
               render={({ field }) => {
                 const selectedItemId = form.watch("itemId");
-                const selectedItem = items.find(item => item.id === selectedItemId);
+                const selectedItem = items.find(
+                  (item) => item.id === selectedItemId
+                );
                 const availableStock = selectedItem?.currentStock || 0;
-                const normalizedType = typeof type === 'string' ? type.toUpperCase() : type;
+                const normalizedType =
+                  typeof type === "string" ? type.toUpperCase() : type;
 
                 return (
-                  <FormItem>
+                  <FormItem className="min-w-0">
                     <FormLabel>Quantity</FormLabel>
                     <FormControl>
                       <Input
@@ -364,7 +453,7 @@ export function StockEntryDialog({
               control={form.control}
               name="date"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
+                <FormItem className="flex flex-col min-w-0">
                   <FormLabel>Date</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -405,13 +494,10 @@ export function StockEntryDialog({
               control={form.control}
               name="description"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Enter description"
-                      {...field}
-                    />
+                    <Input placeholder="Enter description" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -433,5 +519,5 @@ export function StockEntryDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -28,17 +28,26 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -154,12 +163,16 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
 
       const rawMaterialsData = await rawMaterialsRes.json();
       // Handle both array response and paginated response
-      const rawMats = Array.isArray(rawMaterialsData) ? rawMaterialsData : (rawMaterialsData.data || []);
+      const rawMats = Array.isArray(rawMaterialsData)
+        ? rawMaterialsData
+        : rawMaterialsData.data || [];
       setRawMaterials(rawMats);
 
       const finishedGoodsData = await finishedGoodsRes.json();
       // Handle both array response and paginated response
-      const finishedGoods = Array.isArray(finishedGoodsData) ? finishedGoodsData : (finishedGoodsData.data || []);
+      const finishedGoods = Array.isArray(finishedGoodsData)
+        ? finishedGoodsData
+        : finishedGoodsData.data || [];
       setFinishedGoods(finishedGoods);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -226,7 +239,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
           Catat Pemakaian Baru
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-w-[95vw] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Catat Pemakaian Baru</DialogTitle>
           <DialogDescription>
@@ -235,8 +248,11 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-6 overflow-y-auto flex-1 pr-2"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="code"
@@ -317,77 +333,125 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                     <FormField
                       control={form.control}
                       name={`materials.${index}.rawMaterialId`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Raw Material</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="w-full [&>span]:truncate">
-                                <SelectValue placeholder="Select raw material" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {rawMaterials.filter((m) => m.currentStock > 0)
-                                .length === 0 ? (
-                                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                  No raw materials with stock available
-                                </div>
-                              ) : (
-                                <>
-                                  {rawMaterials
-                                    .filter((m) => m.currentStock > 0)
-                                    .map((material) => (
-                                      <SelectItem
-                                        key={material.id}
-                                        value={material.id}
-                                      >
-                                        <div className="flex items-center gap-2 max-w-[400px]">
-                                          <span className="truncate">
-                                            {material.kode} - {material.name}
-                                          </span>
-                                          <span className="text-green-600 font-medium whitespace-nowrap shrink-0">
-                                            (Stock: {material.currentStock.toLocaleString()})
-                                          </span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  {rawMaterials.filter(
-                                    (m) => m.currentStock === 0
-                                  ).length > 0 && (
-                                    <>
-                                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-t">
-                                        Out of Stock
-                                      </div>
-                                      {rawMaterials
-                                        .filter((m) => m.currentStock === 0)
-                                        .map((material) => (
-                                          <SelectItem
+                      render={({ field }) => {
+                        const selectedMaterial = rawMaterials.find(
+                          (m) => m.id === field.value
+                        );
+                        const materialsWithStock = rawMaterials.filter(
+                          (m) => m.currentStock > 0
+                        );
+                        const materialsWithoutStock = rawMaterials.filter(
+                          (m) => m.currentStock === 0
+                        );
+
+                        return (
+                          <FormItem className="flex-1 flex flex-col">
+                            <FormLabel>Raw Material</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn(
+                                      "w-full justify-between overflow-hidden min-w-0",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <span className="truncate block min-w-0 text-left">
+                                      {field.value && selectedMaterial
+                                        ? `${selectedMaterial.kode} - ${selectedMaterial.name}`
+                                        : "Select raw material"}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-[400px] p-0"
+                                align="start"
+                              >
+                                <Command>
+                                  <CommandInput placeholder="Cari bahan baku..." />
+                                  <CommandList className="max-h-[300px]">
+                                    <CommandEmpty>
+                                      Tidak ada bahan baku yang ditemukan.
+                                    </CommandEmpty>
+                                    {materialsWithStock.length > 0 && (
+                                      <CommandGroup heading="Tersedia">
+                                        {materialsWithStock.map((material) => (
+                                          <CommandItem
                                             key={material.id}
-                                            value={material.id}
-                                            disabled
+                                            value={`${material.kode} ${material.name}`}
+                                            onSelect={() => {
+                                              form.setValue(
+                                                `materials.${index}.rawMaterialId`,
+                                                material.id
+                                              );
+                                            }}
                                           >
-                                            <div className="flex items-center gap-2 max-w-[400px]">
-                                              <span className="truncate">
-                                                {material.kode} - {material.name}
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4 shrink-0",
+                                                material.id === field.value
+                                                  ? "opacity-100"
+                                                  : "opacity-0"
+                                              )}
+                                            />
+                                            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                                              <span className="truncate block">
+                                                {material.kode} -{" "}
+                                                {material.name}
                                               </span>
-                                              <span className="text-destructive whitespace-nowrap shrink-0">
-                                                (Out of Stock)
+                                              <span className="text-xs text-green-600 font-medium whitespace-nowrap shrink-0">
+                                                (Stock:{" "}
+                                                {material.currentStock.toLocaleString()}
+                                                )
                                               </span>
                                             </div>
-                                          </SelectItem>
+                                          </CommandItem>
                                         ))}
-                                    </>
-                                  )}
-                                </>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                                      </CommandGroup>
+                                    )}
+                                    {materialsWithoutStock.length > 0 && (
+                                      <CommandGroup heading="Stok Habis">
+                                        {materialsWithoutStock.map(
+                                          (material) => (
+                                            <CommandItem
+                                              key={material.id}
+                                              value={`${material.kode} ${material.name}`}
+                                              disabled
+                                            >
+                                              <Check className="mr-2 h-4 w-4 shrink-0 opacity-0" />
+                                              <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden opacity-50">
+                                                <span className="truncate block">
+                                                  {material.kode} -{" "}
+                                                  {material.name}
+                                                </span>
+                                                <span className="text-xs text-destructive whitespace-nowrap shrink-0">
+                                                  (Out of Stock)
+                                                </span>
+                                              </div>
+                                            </CommandItem>
+                                          )
+                                        )}
+                                      </CommandGroup>
+                                    )}
+                                    {materialsWithStock.length === 0 &&
+                                      materialsWithoutStock.length === 0 && (
+                                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                          No raw materials available
+                                        </div>
+                                      )}
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                     <FormField
                       control={form.control}
@@ -453,10 +517,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Finished Good</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger className="w-full [&>span]:truncate">
                         <SelectValue placeholder="Select finished good" />

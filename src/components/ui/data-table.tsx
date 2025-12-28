@@ -37,6 +37,7 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   searchKey?: string
+  searchKeys?: string[] // Multiple search keys
   searchPlaceholder?: string
   emptyMessage?: string
   tableId?: string // For persisting column visibility
@@ -46,6 +47,7 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   searchKey,
+  searchKeys,
   searchPlaceholder,
   emptyMessage = "Tidak ada hasil.",
   tableId,
@@ -54,6 +56,7 @@ export function DataTable<TData, TValue>({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+  const [globalFilter, setGlobalFilter] = React.useState("")
 
   // Load column visibility from cookies on mount
   React.useEffect(() => {
@@ -100,18 +103,34 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: handleColumnVisibilityChange,
     onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: searchKeys ? (row, columnId, filterValue) => {
+      const searchValue = String(filterValue).toLowerCase()
+      return searchKeys.some(key => {
+        const value = row.getValue(key)
+        return String(value).toLowerCase().includes(searchValue)
+      })
+    } : undefined,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
+      globalFilter,
     },
   })
 
   return (
     <div className="w-full">
       <div className="flex flex-col sm:flex-row gap-2 sm:items-center py-4">
-        {searchKey && (
+        {searchKeys ? (
+          <Input
+            placeholder={searchPlaceholder || "Cari..."}
+            value={globalFilter ?? ""}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="w-full sm:max-w-sm"
+          />
+        ) : searchKey ? (
           <Input
             placeholder={searchPlaceholder || "Cari..."}
             value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
@@ -120,7 +139,7 @@ export function DataTable<TData, TValue>({
             }
             className="w-full sm:max-w-sm"
           />
-        )}
+        ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="sm:ml-auto">

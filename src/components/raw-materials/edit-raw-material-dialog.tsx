@@ -99,7 +99,7 @@ export function EditRawMaterialDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
         <DialogHeader>
           <DialogTitle>Edit Raw Material</DialogTitle>
           <DialogDescription>
@@ -107,12 +107,12 @@ export function EditRawMaterialDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-hidden">
             <FormField
               control={form.control}
               name="kode"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>Code</FormLabel>
                   <FormControl>
                     <Input placeholder="Material code" {...field} />
@@ -125,7 +125,7 @@ export function EditRawMaterialDialog({
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>Name</FormLabel>
                   <FormControl>
                     <Input placeholder="Material name" {...field} />
@@ -138,7 +138,7 @@ export function EditRawMaterialDialog({
               control={form.control}
               name="moq"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>MOQ (Minimum Order Quantity)</FormLabel>
                   <FormControl>
                     <Input

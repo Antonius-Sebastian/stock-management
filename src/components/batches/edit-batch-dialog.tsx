@@ -95,6 +95,41 @@ export function EditBatchDialog({
     name: "materials",
   })
 
+  // Calculate available stock for each material (includes stock that will be restored from this batch)
+  const getAvailableStock = (materialId: string): number => {
+    const material = rawMaterials.find(m => m.id === materialId)
+    if (!material) return 0
+
+    // Find how much of this material is currently used in the batch being edited
+    const currentUsage = batch?.batchUsages.find(u => u.rawMaterialId === materialId)
+    const usedInBatch = currentUsage?.quantity || 0
+
+    // Available stock = current stock + stock that will be restored from this batch
+    return material.currentStock + usedInBatch
+  }
+
+  // Get list of material IDs currently used in the batch
+  const materialsInBatch = batch?.batchUsages.map(u => u.rawMaterialId) || []
+
+  // Sort materials: materials in batch first, then by stock availability, then alphabetically
+  const sortedRawMaterials = [...rawMaterials].sort((a, b) => {
+    const aInBatch = materialsInBatch.includes(a.id)
+    const bInBatch = materialsInBatch.includes(b.id)
+
+    // Materials in batch come first
+    if (aInBatch && !bInBatch) return -1
+    if (!aInBatch && bInBatch) return 1
+
+    // Then sort by available stock
+    const aAvailable = getAvailableStock(a.id)
+    const bAvailable = getAvailableStock(b.id)
+    if (aAvailable > 0 && bAvailable === 0) return -1
+    if (aAvailable === 0 && bAvailable > 0) return 1
+
+    // Finally sort alphabetically
+    return a.name.localeCompare(b.name)
+  })
+
   const fetchFinishedGoods = async () => {
     try {
       const response = await fetch("/api/finished-goods")
@@ -184,7 +219,7 @@ export function EditBatchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Batch</DialogTitle>
           <DialogDescription>
@@ -192,8 +227,8 @@ export function EditBatchDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="code"
@@ -315,57 +350,40 @@ export function EditBatchDialog({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {rawMaterials.filter((m) => m.currentStock > 0)
-                                .length === 0 ? (
+                              {sortedRawMaterials.length === 0 ? (
                                 <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                  No raw materials with stock available
+                                  No raw materials available
                                 </div>
                               ) : (
                                 <>
-                                  {rawMaterials
-                                    .filter((m) => m.currentStock > 0)
-                                    .map((material) => (
+                                  {sortedRawMaterials.map((material) => {
+                                    const availableStock = getAvailableStock(material.id)
+                                    const isInBatch = materialsInBatch.includes(material.id)
+                                    const isDisabled = availableStock === 0 && !isInBatch
+
+                                    return (
                                       <SelectItem
                                         key={material.id}
                                         value={material.id}
+                                        disabled={isDisabled}
                                       >
                                         <div className="flex items-center gap-2 max-w-[400px]">
                                           <span className="truncate">
                                             {material.kode} - {material.name}
                                           </span>
-                                          <span className="text-green-600 font-medium whitespace-nowrap shrink-0">
-                                            (Stock: {material.currentStock.toLocaleString()})
-                                          </span>
+                                          {availableStock > 0 ? (
+                                            <span className="text-green-600 font-medium whitespace-nowrap shrink-0">
+                                              (Available: {availableStock.toLocaleString()})
+                                            </span>
+                                          ) : (
+                                            <span className="text-destructive whitespace-nowrap shrink-0">
+                                              (No Stock)
+                                            </span>
+                                          )}
                                         </div>
                                       </SelectItem>
-                                    ))}
-                                  {rawMaterials.filter(
-                                    (m) => m.currentStock === 0
-                                  ).length > 0 && (
-                                    <>
-                                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-t">
-                                        Out of Stock
-                                      </div>
-                                      {rawMaterials
-                                        .filter((m) => m.currentStock === 0)
-                                        .map((material) => (
-                                          <SelectItem
-                                            key={material.id}
-                                            value={material.id}
-                                            disabled
-                                          >
-                                            <div className="flex items-center gap-2 max-w-[400px]">
-                                              <span className="truncate">
-                                                {material.kode} - {material.name}
-                                              </span>
-                                              <span className="text-destructive whitespace-nowrap shrink-0">
-                                                (Out of Stock)
-                                              </span>
-                                            </div>
-                                          </SelectItem>
-                                        ))}
-                                    </>
-                                  )}
+                                    )
+                                  })}
                                 </>
                               )}
                             </SelectContent>

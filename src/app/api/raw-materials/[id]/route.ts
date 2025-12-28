@@ -114,14 +114,6 @@ export async function DELETE(
     // Check if raw material exists
     const existingMaterial = await prisma.rawMaterial.findUnique({
       where: { id },
-      include: {
-        _count: {
-          select: {
-            stockMovements: true,
-            batchUsages: true,
-          },
-        },
-      },
     })
 
     if (!existingMaterial) {
@@ -131,14 +123,7 @@ export async function DELETE(
       )
     }
 
-    // Check if material has been used
-    if (existingMaterial._count.stockMovements > 0 || existingMaterial._count.batchUsages > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete raw material that has stock movements or has been used in batches' },
-        { status: 400 }
-      )
-    }
-
+    // Delete the raw material (cascade will handle related records)
     await prisma.rawMaterial.delete({
       where: { id },
     })

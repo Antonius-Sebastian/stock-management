@@ -120,18 +120,19 @@ export function canCreateStockEntries(role: string | undefined): boolean {
 export function canCreateStockMovement(
   role: string | undefined,
   itemType: "raw-material" | "finished-good",
-  movementType: "IN" | "OUT"
+  movementType: "IN" | "OUT" | "ADJUSTMENT"
 ): boolean {
   if (!role) return false;
 
   // ADMIN can do everything
   if (role === "ADMIN") return true;
 
+  // ADJUSTMENT type is only for ADMIN
+  if (movementType === "ADJUSTMENT") return false;
+
   // FACTORY permissions
   if (role === "FACTORY") {
-    // Finished good IN: allowed (manual input after batch production)
-    if (itemType === "finished-good" && movementType === "IN") return true;
-
+    // Finished good IN: not allowed (only via batch workflow now)
     // Raw material OUT: not allowed (only automatic via batch creation)
     // All other movements: not allowed
     return false;
@@ -169,6 +170,16 @@ export function canEditStockMovements(role: string | undefined): boolean {
  * @returns true if ADMIN only
  */
 export function canDeleteStockMovements(role: string | undefined): boolean {
+  if (!role) return false;
+  return role === "ADMIN";
+}
+
+/**
+ * Check if user can create stock adjustments
+ * @param role - User's role
+ * @returns true if ADMIN only
+ */
+export function canCreateStockAdjustment(role: string | undefined): boolean {
   if (!role) return false;
   return role === "ADMIN";
 }
@@ -230,6 +241,7 @@ export const PERMISSIONS = {
     canEditBatches: true,
     canDeleteBatches: true,
     canCreateStockMovements: true, // All types
+    canCreateStockAdjustment: true, // Stock adjustment
     canEditStockMovements: true,
     canDeleteStockMovements: true,
     canViewReports: true,
@@ -244,7 +256,8 @@ export const PERMISSIONS = {
     canCreateBatches: true, // ✅ Can create batches (auto-creates raw material OUT)
     canEditBatches: false, // Cannot edit batches
     canDeleteBatches: false, // Cannot delete batches
-    canCreateStockMovements: true, // ✅ Can create: Finished good IN (manual after production)
+    canCreateStockMovements: false, // ❌ Cannot create any stock movements (only via batch)
+    canCreateStockAdjustment: false, // Cannot adjust stock
     canEditStockMovements: false, // Cannot edit movements
     canDeleteStockMovements: false, // Cannot delete movements
     canViewReports: true,
@@ -260,6 +273,7 @@ export const PERMISSIONS = {
     canEditBatches: false, // ❌ Cannot edit batches
     canDeleteBatches: false, // ❌ Cannot delete batches
     canCreateStockMovements: true, // ✅ Can create: Raw material IN, Finished good OUT
+    canCreateStockAdjustment: false, // Cannot adjust stock
     canEditStockMovements: false, // ❌ Cannot edit movements
     canDeleteStockMovements: false, // ❌ Cannot delete movements
     canViewReports: true,

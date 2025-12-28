@@ -6,7 +6,7 @@ import { RawMaterial } from "@prisma/client"
 import { DataTable } from "@/components/ui/data-table"
 import { StockLevelBadge } from "@/components/ui/stock-level-badge"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown, MoreHorizontal, Edit, Trash2, ArrowDownCircle } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2, ArrowDownCircle, Settings } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
-import { canManageMaterials, canDeleteMaterials, canCreateStockMovement } from "@/lib/rbac"
+import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog"
+import { canManageMaterials, canDeleteMaterials, canCreateStockMovement, canCreateStockAdjustment } from "@/lib/rbac"
 
 interface RawMaterialsTableProps {
   data: RawMaterial[]
@@ -29,6 +30,7 @@ interface RawMaterialsTableProps {
 
 export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole }: RawMaterialsTableProps) {
   const [stockDialogOpen, setStockDialogOpen] = useState(false)
+  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null)
 
   const handleStockIn = (material: RawMaterial) => {
@@ -36,8 +38,14 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
     setStockDialogOpen(true)
   }
 
+  const handleAdjustStock = (material: RawMaterial) => {
+    setSelectedMaterial(material)
+    setAdjustmentDialogOpen(true)
+  }
+
   const handleStockSuccess = () => {
     setStockDialogOpen(false)
+    setAdjustmentDialogOpen(false)
     setSelectedMaterial(null)
     onRefresh?.()
   }
@@ -135,8 +143,9 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
         // Check if user has any permissions
         const hasEditPermission = canManageMaterials(userRole)
         const hasStockInPermission = canCreateStockMovement(userRole, 'raw-material', 'IN')
+        const hasAdjustPermission = canCreateStockAdjustment(userRole)
         const hasDeletePermission = canDeleteMaterials(userRole)
-        const hasAnyPermission = hasEditPermission || hasStockInPermission || hasDeletePermission
+        const hasAnyPermission = hasEditPermission || hasStockInPermission || hasAdjustPermission || hasDeletePermission
 
         // Don't show action button if no permissions
         if (!hasAnyPermission) {
@@ -164,6 +173,12 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
                 <DropdownMenuItem onClick={() => handleStockIn(material)}>
                   <ArrowDownCircle className="mr-2 h-4 w-4" />
                   Input Stok Masuk
+                </DropdownMenuItem>
+              )}
+              {hasAdjustPermission && (
+                <DropdownMenuItem onClick={() => handleAdjustStock(material)}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Sesuaikan Stok
                 </DropdownMenuItem>
               )}
               {hasDeletePermission && (
@@ -197,15 +212,26 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
       />
 
       {selectedMaterial && (
-        <StockEntryDialog
-          open={stockDialogOpen}
-          onOpenChange={setStockDialogOpen}
-          type="in"
-          entityType="raw-material"
-          entityId={selectedMaterial.id}
-          entityName={selectedMaterial.name}
-          onSuccess={handleStockSuccess}
-        />
+        <>
+          <StockEntryDialog
+            open={stockDialogOpen}
+            onOpenChange={setStockDialogOpen}
+            type="in"
+            entityType="raw-material"
+            entityId={selectedMaterial.id}
+            entityName={selectedMaterial.name}
+            onSuccess={handleStockSuccess}
+          />
+          <StockAdjustmentDialog
+            open={adjustmentDialogOpen}
+            onOpenChange={setAdjustmentDialogOpen}
+            itemType="raw-material"
+            entityType="raw-material"
+            entityId={selectedMaterial.id}
+            entityName={selectedMaterial.name}
+            onSuccess={handleStockSuccess}
+          />
+        </>
       )}
     </>
   )

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { successResponse, ErrorResponses } from '@/lib/api-response'
 import { logger } from '@/lib/logger'
+import { canManageFinishedGoods, getPermissionErrorMessage } from '@/lib/rbac'
 
 const createFinishedGoodSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -66,6 +67,12 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     if (!session) {
       return ErrorResponses.unauthorized()
+    }
+
+    if (!canManageFinishedGoods(session.user.role)) {
+      return ErrorResponses.forbidden(
+        getPermissionErrorMessage('create finished goods', session.user.role)
+      )
     }
 
     const body = await request.json()

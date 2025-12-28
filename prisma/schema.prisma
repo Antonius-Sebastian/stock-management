@@ -9,19 +9,19 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL") 
+  directUrl = env("DIRECT_URL")
 }
 
 model RawMaterial {
-  id          String   @id @default(cuid())
-  kode        String   @unique
-  name        String
-  currentStock Float   @default(0)
-  moq         Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  kode         String   @unique
+  name         String
+  currentStock Float    @default(0)
+  moq          Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
   stockMovements StockMovement[]
@@ -31,15 +31,15 @@ model RawMaterial {
 }
 
 model FinishedGood {
-  id          String   @id @default(cuid())
-  name        String
-  currentStock Float   @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  currentStock Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-  stockMovements StockMovement[]
-  batches        Batch[]
+  stockMovements     StockMovement[]
+  batchFinishedGoods BatchFinishedGood[]
 
   @@map("finished_goods")
 }
@@ -62,50 +62,63 @@ model StockMovement {
   batch          Batch?        @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   // Performance indexes for common queries
-  @@index([date])  // For date-based filtering in reports
-  @@index([rawMaterialId, date])  // For material movement history
-  @@index([finishedGoodId, date])  // For finished good movement history
-  @@index([type, date])  // For filtering by movement type
+  @@index([date]) // For date-based filtering in reports
+  @@index([rawMaterialId, date]) // For material movement history
+  @@index([finishedGoodId, date]) // For finished good movement history
+  @@index([type, date]) // For filtering by movement type
   @@map("stock_movements")
 }
 
 model Batch {
-  id               String        @id @default(cuid())
-  code             String        @unique
-  date             DateTime
-  description      String?
-  finishedGoodId   String
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id          String   @id @default(cuid())
+  code        String   @unique
+  date        DateTime
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  finishedGood     FinishedGood  @relation(fields: [finishedGoodId], references: [id], onDelete: Restrict)
-  stockMovements   StockMovement[]
-  batchUsages      BatchUsage[]
+  stockMovements     StockMovement[]
+  batchUsages        BatchUsage[]
+  batchFinishedGoods BatchFinishedGood[]
 
   // Performance indexes for common queries
-  @@index([date])  // For date-based filtering
-  @@index([finishedGoodId])  // For product-based filtering
+  @@index([date]) // For date-based filtering
   @@map("batches")
 }
 
 model BatchUsage {
-  id            String  @id @default(cuid())
+  id            String @id @default(cuid())
   quantity      Float
   batchId       String
   rawMaterialId String
 
   // Relations
-  batch         Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  batch       Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rawMaterial RawMaterial @relation(fields: [rawMaterialId], references: [id])
 
   @@unique([batchId, rawMaterialId])
   @@map("batch_usages")
 }
 
+model BatchFinishedGood {
+  id             String @id @default(cuid())
+  quantity       Float
+  batchId        String
+  finishedGoodId String
+
+  // Relations
+  batch        Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  finishedGood FinishedGood @relation(fields: [finishedGoodId], references: [id])
+
+  @@unique([batchId, finishedGoodId])
+  @@map("batch_finished_goods")
+}
+
 enum StockMovementType {
   IN
   OUT
+  ADJUSTMENT
 }
 
 enum UserRole {
@@ -115,19 +128,19 @@ enum UserRole {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  username      String    @unique
-  email         String?   @unique
-  password      String    // Hashed with bcrypt
-  name          String
-  role          UserRole  @default(OFFICE)
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String?  @unique
+  password  String // Hashed with bcrypt
+  name      String
+  role      UserRole @default(OFFICE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // NextAuth relations
-  accounts      Account[]
-  sessions      Session[]
+  accounts Account[]
+  sessions Session[]
 
   @@map("users")
 }

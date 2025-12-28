@@ -141,15 +141,21 @@ The Stock Management System is a web-based inventory management application desi
 
     - Protected: Cannot delete if product has transaction history
 
-  - **Input Stock IN** (FACTORY & ADMIN only)
+  - **Input Stock IN** (ADMIN only)
 
-    - Manual stock entry after batch production
+    - Manual stock entry for corrections
     - Date, quantity, and description
-    - Used when production results vary from expected
+    - Note: Factory staff input finished good IN through batch creation workflow
 
   - **Input Stock OUT** (OFFICE & ADMIN only)
     - Manual stock entry when sending to distributor
     - Date, quantity, and description
+
+  - **Adjust Stock** (ADMIN only)
+    - Manual stock adjustment for corrections
+    - Can increase or decrease stock (positive or negative quantity)
+    - Requires reason/description
+    - Prevents negative stock
 
 **Access:** All authenticated users (view), role-based actions
 
@@ -169,28 +175,31 @@ The Stock Management System is a web-based inventory management application desi
   - **Create Batch** (FACTORY & ADMIN only)
 
     - Batch code (unique identifier)
-    - Date
-    - Finished good selection
+    - Date (WIB timezone)
+    - Multiple finished goods with quantities (for size variants)
     - Description (optional)
     - Multiple raw materials with quantities
     - **Automatic Features:**
       - Creates raw material OUT movements automatically
+      - Creates finished good IN movements automatically for each finished good
       - Deducts raw material stock automatically
+      - Increases finished good stock automatically
       - Validates sufficient stock before creation
-      - Prevents duplicate materials in same batch
+      - Prevents duplicate materials/finished goods in same batch
 
   - **View Batch Details** (All roles)
 
     - Modal dialog showing:
       - Batch information
-      - Finished good details
+      - Multiple finished goods produced with quantities
       - Complete list of raw materials used with quantities
       - Linked stock movements
 
   - **Edit Batch** (ADMIN only)
 
-    - Update batch code, date, description, finished good
+    - Update batch code, date, description, finished goods
     - Update raw material usage (restores old stock, deducts new stock)
+    - Update finished goods (restores old stock, adds new stock)
 
   - **Delete Batch** (ADMIN only)
     - Restores raw material stock automatically

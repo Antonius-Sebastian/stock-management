@@ -2,7 +2,7 @@
 
 import { format } from "date-fns"
 import Link from "next/link"
-import { Batch, BatchUsage, RawMaterial, FinishedGood } from "@prisma/client"
+import { Batch, BatchUsage, RawMaterial, FinishedGood, BatchFinishedGood } from "@prisma/client"
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,9 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, Package, FileText } from "lucide-react"
 
 type BatchWithUsage = Batch & {
-  finishedGood?: FinishedGood | null
+  batchFinishedGoods?: (BatchFinishedGood & {
+    finishedGood: FinishedGood
+  })[]
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
   })[]
@@ -78,10 +80,19 @@ export function BatchDetailDialog({
             </div>
 
             <div className="space-y-1 sm:col-span-2">
-              <div className="text-sm text-muted-foreground">Finished Good</div>
-              <div className="text-lg font-semibold">
-                {batch.finishedGood?.name || "-"}
-              </div>
+              <div className="text-sm text-muted-foreground">Finished Goods Produced</div>
+              {batch.batchFinishedGoods && batch.batchFinishedGoods.length > 0 ? (
+                <div className="space-y-2">
+                  {batch.batchFinishedGoods.map((bfg, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                      <span className="text-lg font-semibold">{bfg.finishedGood.name}</span>
+                      <Badge variant="secondary">{bfg.quantity.toLocaleString()} unit</Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-lg font-semibold text-muted-foreground">-</div>
+              )}
             </div>
 
             {batch.description && (

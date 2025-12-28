@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { FinishedGood } from "@prisma/client"
 import { DataTable } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown, MoreHorizontal, Edit, Trash2, ArrowDownCircle, ArrowUpCircle } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2, ArrowDownCircle, ArrowUpCircle, Settings } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
-import { canManageFinishedGoods, canDeleteFinishedGoods, canCreateStockMovement } from "@/lib/rbac"
+import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog"
+import { canManageFinishedGoods, canDeleteFinishedGoods, canCreateStockMovement, canCreateStockAdjustment } from "@/lib/rbac"
 
 interface FinishedGoodsTableProps {
   data: FinishedGood[]
@@ -27,6 +28,7 @@ interface FinishedGoodsTableProps {
 
 export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole }: FinishedGoodsTableProps) {
   const [stockDialogOpen, setStockDialogOpen] = useState(false)
+  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
   const [stockDialogType, setStockDialogType] = useState<"in" | "out">("in")
   const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(null)
 
@@ -42,8 +44,14 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
     setStockDialogOpen(true)
   }
 
+  const handleAdjustStock = (product: FinishedGood) => {
+    setSelectedProduct(product)
+    setAdjustmentDialogOpen(true)
+  }
+
   const handleStockSuccess = () => {
     setStockDialogOpen(false)
+    setAdjustmentDialogOpen(false)
     setSelectedProduct(null)
     onRefresh?.()
   }
@@ -91,8 +99,9 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
       const hasEditPermission = canManageFinishedGoods(userRole)
       const hasStockInPermission = canCreateStockMovement(userRole, 'finished-good', 'IN')
       const hasStockOutPermission = canCreateStockMovement(userRole, 'finished-good', 'OUT')
+      const hasAdjustPermission = canCreateStockAdjustment(userRole)
       const hasDeletePermission = canDeleteFinishedGoods(userRole)
-      const hasAnyPermission = hasEditPermission || hasStockInPermission || hasStockOutPermission || hasDeletePermission
+      const hasAnyPermission = hasEditPermission || hasStockInPermission || hasStockOutPermission || hasAdjustPermission || hasDeletePermission
 
       // Don't show action button if no permissions
       if (!hasAnyPermission) {
@@ -128,6 +137,12 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
                 Input Stok Keluar
               </DropdownMenuItem>
             )}
+            {hasAdjustPermission && (
+              <DropdownMenuItem onClick={() => handleAdjustStock(product)}>
+                <Settings className="mr-2 h-4 w-4" />
+                Sesuaikan Stok
+              </DropdownMenuItem>
+            )}
             {hasDeletePermission && (
               <>
                 <DropdownMenuSeparator />
@@ -159,15 +174,26 @@ export function FinishedGoodsTable({ data, onEdit, onDelete, onRefresh, userRole
       />
 
       {selectedProduct && (
-        <StockEntryDialog
-          open={stockDialogOpen}
-          onOpenChange={setStockDialogOpen}
-          type={stockDialogType}
-          entityType="finished-good"
-          entityId={selectedProduct.id}
-          entityName={selectedProduct.name}
-          onSuccess={handleStockSuccess}
-        />
+        <>
+          <StockEntryDialog
+            open={stockDialogOpen}
+            onOpenChange={setStockDialogOpen}
+            type={stockDialogType}
+            entityType="finished-good"
+            entityId={selectedProduct.id}
+            entityName={selectedProduct.name}
+            onSuccess={handleStockSuccess}
+          />
+          <StockAdjustmentDialog
+            open={adjustmentDialogOpen}
+            onOpenChange={setAdjustmentDialogOpen}
+            itemType="finished-good"
+            entityType="finished-good"
+            entityId={selectedProduct.id}
+            entityName={selectedProduct.name}
+            onSuccess={handleStockSuccess}
+          />
+        </>
       )}
     </>
   )

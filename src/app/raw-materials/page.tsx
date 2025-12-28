@@ -11,7 +11,8 @@ import { EditRawMaterialDialog } from "@/components/raw-materials/edit-raw-mater
 import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
 import { Button } from "@/components/ui/button"
 import { TrendingUp } from "lucide-react"
-import { canManageMaterials, canCreateStockMovement } from "@/lib/rbac"
+import { canManageMaterials, canCreateStockMovement, canCreateStockAdjustment } from "@/lib/rbac"
+import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog"
 import {
   AlertDialog,
   AlertDialogAction,

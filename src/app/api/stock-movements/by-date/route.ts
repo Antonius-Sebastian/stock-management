@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { logger } from '@/lib/logger'
 import { canDeleteStockMovements, canEditStockMovements, getPermissionErrorMessage } from '@/lib/rbac'
+import { parseToWIB, startOfDayWIB, endOfDayWIB } from '@/lib/timezone'
 
 const deleteByDateSchema = z.object({
   itemId: z.string().min(1),
@@ -44,13 +45,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     const validatedQuery = deleteByDateSchema.parse(query)
-    const queryDate = new Date(validatedQuery.date)
+    const queryDate = parseToWIB(new Date(validatedQuery.date))
 
-    // Get start and end of day (using UTC to avoid timezone issues)
-    const startOfDay = new Date(queryDate)
-    startOfDay.setUTCHours(0, 0, 0, 0)
-    const endOfDay = new Date(queryDate)
-    endOfDay.setUTCHours(23, 59, 59, 999)
+    // Get start and end of day in WIB
+    const startOfDay = startOfDayWIB(queryDate)
+    const endOfDay = endOfDayWIB(queryDate)
 
     // Delete movements and update stock in a transaction
     await prisma.$transaction(async (tx) => {
@@ -188,13 +187,11 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
     const validatedData = updateByDateSchema.parse(body)
-    const queryDate = new Date(validatedData.date)
+    const queryDate = parseToWIB(new Date(validatedData.date))
 
-    // Get start and end of day (using UTC to avoid timezone issues)
-    const startOfDay = new Date(queryDate)
-    startOfDay.setUTCHours(0, 0, 0, 0)
-    const endOfDay = new Date(queryDate)
-    endOfDay.setUTCHours(23, 59, 59, 999)
+    // Get start and end of day in WIB
+    const startOfDay = startOfDayWIB(queryDate)
+    const endOfDay = endOfDayWIB(queryDate)
 
     // Update/replace movements in a transaction
     const result = await prisma.$transaction(async (tx) => {

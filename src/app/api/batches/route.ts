@@ -7,24 +7,36 @@
  * - Audit logging for compliance
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { z } from 'zod'
-import { auth } from '@/auth'
-import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
-import { logger } from '@/lib/logger'
-import { AuditHelpers } from '@/lib/audit'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { z } from "zod";
+import { auth } from "@/auth";
+import { canCreateBatches, getPermissionErrorMessage } from "@/lib/rbac";
+import { logger } from "@/lib/logger";
+import { AuditHelpers } from "@/lib/audit";
+import { parseToWIB } from "@/lib/timezone";
 
 const createBatchSchema = z.object({
-  code: z.string().min(1, 'Batch code is required'),
-  date: z.string().transform((str) => new Date(str)),
+  code: z.string().min(1, "Batch code is required"),
+  date: z.string().transform((str) => parseToWIB(new Date(str).toISOString())),
   description: z.string().optional(),
-  finishedGoodId: z.string().min(1, 'Finished good is required'),
-  materials: z.array(z.object({
-    rawMaterialId: z.string().min(1, 'Raw material is required'),
-    quantity: z.number().positive('Quantity must be positive'),
-  })).min(1, 'At least one raw material is required'),
-})
+  finishedGoods: z
+    .array(
+      z.object({
+        finishedGoodId: z.string().min(1, "Finished good is required"),
+        quantity: z.number().positive("Quantity must be positive"),
+      })
+    )
+    .min(1, "At least one finished good is required"),
+  materials: z
+    .array(
+      z.object({
+        rawMaterialId: z.string().min(1, "Raw material is required"),
+        quantity: z.number().positive("Quantity must be positive"),
+      })
+    )
+    .min(1, "At least one raw material is required"),
+});
 
 /**
  * GET /api/batches
@@ -42,15 +54,15 @@ const createBatchSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Authentication required (all roles can view)
-    const session = await auth()
+    const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Parse pagination parameters (optional - defaults to all)
-    const { searchParams } = new URL(request.url)
-    const pageParam = searchParams.get('page')
-    const limitParam = searchParams.get('limit')
+    const { searchParams } = new URL(request.url);
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
 
     const batchSelect = {
       id: true,
@@ -59,10 +71,16 @@ export async function GET(request: NextRequest) {
       description: true,
       createdAt: true,
       updatedAt: true,
-      finishedGood: {
+      batchFinishedGoods: {
         select: {
           id: true,
-          name: true,
+          quantity: true,
+          finishedGood: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
       batchUsages: {
@@ -78,21 +96,21 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-    }
+    };
 
     // If no pagination params, return all (backward compatible)
     if (!pageParam && !limitParam) {
       const batches = await prisma.batch.findMany({
         select: batchSelect,
-        orderBy: { createdAt: 'desc' },
-      })
-      return NextResponse.json(batches)
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(batches);
     }
 
     // Pagination mode
-    const page = Math.max(1, parseInt(pageParam || '1'))
-    const limit = Math.min(100, Math.max(1, parseInt(limitParam || '50')))
-    const skip = (page - 1) * limit
+    const page = Math.max(1, parseInt(pageParam || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam || "50")));
+    const skip = (page - 1) * limit;
 
     // Get total count and paginated data in parallel
     const [batches, total] = await Promise.all([
@@ -100,10 +118,10 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
         select: batchSelect,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.batch.count(),
-    ])
+    ]);
 
     // Return data with pagination metadata
     return NextResponse.json({
@@ -115,13 +133,13 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
         hasMore: skip + batches.length < total,
       },
-    })
+    });
   } catch (error) {
-    logger.error('Error fetching batches', error)
+    logger.error("Error fetching batches", error);
     return NextResponse.json(
-      { error: 'Failed to fetch batches' },
+      { error: "Failed to fetch batches" },
       { status: 500 }
-    )
+    );
   }
 }
 
@@ -148,40 +166,45 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Authentication and authorization required (ADMIN or FACTORY only)
-    const session = await auth()
+    const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (!canCreateBatches(session.user.role)) {
       return NextResponse.json(
-        { error: getPermissionErrorMessage('create batches', session.user.role) },
+        {
+          error: getPermissionErrorMessage("create batches", session.user.role),
+        },
         { status: 403 }
-      )
+      );
     }
 
-    const body = await request.json()
-    const validatedData = createBatchSchema.parse(body)
+    const body = await request.json();
+    const validatedData = createBatchSchema.parse(body);
 
     // Check for duplicate materials in the batch
-    const materialIds = validatedData.materials.map(m => m.rawMaterialId)
-    const uniqueMaterialIds = new Set(materialIds)
+    const materialIds = validatedData.materials.map((m) => m.rawMaterialId);
+    const uniqueMaterialIds = new Set(materialIds);
     if (materialIds.length !== uniqueMaterialIds.size) {
       return NextResponse.json(
-        { error: 'Duplicate materials found in batch. Each material can only be used once per batch.' },
+        {
+          error:
+            "Duplicate materials found in batch. Each material can only be used once per batch.",
+        },
         { status: 400 }
-      )
+      );
     }
 
     // Check for duplicate batch code
     const existingBatch = await prisma.batch.findFirst({
       where: { code: validatedData.code },
-    })
+    });
     if (existingBatch) {
       return NextResponse.json(
         { error: `Batch code "${validatedData.code}" already exists` },
         { status: 400 }
-      )
+      );
     }
 
     // Start a transaction to create batch, batch usages, and stock movements
@@ -189,21 +212,46 @@ export async function POST(request: NextRequest) {
       // Verify all raw materials exist and have sufficient stock
       // Use raw query with FOR UPDATE to lock rows and prevent race conditions
       for (const material of validatedData.materials) {
-        const rawMaterials = await tx.$queryRaw<Array<{ id: string; name: string; currentStock: number }>>`
+        const rawMaterials = await tx.$queryRaw<
+          Array<{ id: string; name: string; currentStock: number }>
+        >`
           SELECT id, name, "currentStock"
           FROM raw_materials
           WHERE id = ${material.rawMaterialId}
           FOR UPDATE
-        `
+        `;
 
         if (rawMaterials.length === 0) {
-          throw new Error(`Raw material not found`)
+          throw new Error(`Raw material not found`);
         }
 
-        const rawMaterial = rawMaterials[0]
+        const rawMaterial = rawMaterials[0];
 
         if (rawMaterial.currentStock < material.quantity) {
-          throw new Error(`Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${material.quantity}`)
+          throw new Error(
+            `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${material.quantity}`
+          );
+        }
+      }
+
+      // Check for duplicate finished goods in the batch
+      const finishedGoodIds = validatedData.finishedGoods.map(
+        (fg) => fg.finishedGoodId
+      );
+      const uniqueFinishedGoodIds = new Set(finishedGoodIds);
+      if (finishedGoodIds.length !== uniqueFinishedGoodIds.size) {
+        throw new Error(
+          "Duplicate finished goods found in batch. Each finished good can only be used once per batch."
+        );
+      }
+
+      // Verify all finished goods exist
+      for (const fg of validatedData.finishedGoods) {
+        const finishedGood = await tx.finishedGood.findUnique({
+          where: { id: fg.finishedGoodId },
+        });
+        if (!finishedGood) {
+          throw new Error(`Finished good not found: ${fg.finishedGoodId}`);
         }
       }
 
@@ -213,9 +261,8 @@ export async function POST(request: NextRequest) {
           code: validatedData.code,
           date: validatedData.date,
           description: validatedData.description,
-          finishedGoodId: validatedData.finishedGoodId,
         },
-      })
+      });
 
       // Process each raw material usage
       for (const material of validatedData.materials) {
@@ -226,19 +273,19 @@ export async function POST(request: NextRequest) {
             rawMaterialId: material.rawMaterialId,
             quantity: material.quantity,
           },
-        })
+        });
 
         // Create stock OUT movement for raw material
         await tx.stockMovement.create({
           data: {
-            type: 'OUT',
+            type: "OUT",
             quantity: material.quantity,
             date: validatedData.date,
             description: `Batch production: ${validatedData.code}`,
             rawMaterialId: material.rawMaterialId,
             batchId: batch.id,
           },
-        })
+        });
 
         // Update raw material current stock
         await tx.rawMaterial.update({
@@ -248,63 +295,97 @@ export async function POST(request: NextRequest) {
               decrement: material.quantity,
             },
           },
-        })
+        });
       }
 
-      // Note: Finished good stock will be updated manually through stock entry
+      // Process each finished good production
+      for (const finishedGood of validatedData.finishedGoods) {
+        // Create batch finished good record
+        await tx.batchFinishedGood.create({
+          data: {
+            batchId: batch.id,
+            finishedGoodId: finishedGood.finishedGoodId,
+            quantity: finishedGood.quantity,
+          },
+        });
 
-      return batch
-    })
+        // Create stock IN movement for finished good
+        await tx.stockMovement.create({
+          data: {
+            type: "IN",
+            quantity: finishedGood.quantity,
+            date: validatedData.date,
+            description: `Batch production: ${validatedData.code}`,
+            finishedGoodId: finishedGood.finishedGoodId,
+            batchId: batch.id,
+          },
+        });
+
+        // Update finished good current stock
+        await tx.finishedGood.update({
+          where: { id: finishedGood.finishedGoodId },
+          data: {
+            currentStock: {
+              increment: finishedGood.quantity,
+            },
+          },
+        });
+      }
+
+      return batch;
+    });
 
     // Audit log
-    const finishedGood = await prisma.finishedGood.findUnique({
-      where: { id: validatedData.finishedGoodId },
-      select: { name: true },
-    })
+    const finishedGoods = await Promise.all(
+      validatedData.finishedGoods.map(async (fg) => {
+        const finishedGood = await prisma.finishedGood.findUnique({
+          where: { id: fg.finishedGoodId },
+          select: { name: true },
+        });
+        return { name: finishedGood?.name || "Unknown", quantity: fg.quantity };
+      })
+    );
 
     const materials = await Promise.all(
       validatedData.materials.map(async (m) => {
         const material = await prisma.rawMaterial.findUnique({
           where: { id: m.rawMaterialId },
           select: { name: true },
-        })
-        return { name: material?.name || 'Unknown', quantity: m.quantity }
+        });
+        return { name: material?.name || "Unknown", quantity: m.quantity };
       })
-    )
+    );
 
     await AuditHelpers.batchCreated(
       validatedData.code,
-      finishedGood?.name || 'Unknown',
+      finishedGoods.map((fg) => `${fg.name} (${fg.quantity})`).join(", "),
       materials,
       {
         id: session.user.id,
         name: session.user.name || session.user.username,
         role: session.user.role,
       }
-    )
+    );
 
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    logger.error('Error creating batch', error)
+    logger.error("Error creating batch", error);
 
     if (error instanceof z.ZodError) {
-      const firstError = error.errors[0]
+      const firstError = error.errors[0];
       return NextResponse.json(
-        { error: firstError.message || 'Validation failed' },
+        { error: firstError.message || "Validation failed" },
         { status: 400 }
-      )
+      );
     }
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json(
-      { error: 'Failed to create batch' },
+      { error: "Failed to create batch" },
       { status: 500 }
-    )
+    );
   }
 }

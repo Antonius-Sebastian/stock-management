@@ -1,7 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { Batch, BatchUsage, RawMaterial, FinishedGood } from "@prisma/client"
+import { Batch, BatchUsage, RawMaterial, FinishedGood, BatchFinishedGood } from "@prisma/client"
 import { DataTable } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from "lucide-react"
@@ -17,7 +17,9 @@ import { format } from "date-fns"
 import { canEditBatches, canDeleteBatches } from "@/lib/rbac"
 
 type BatchWithUsage = Batch & {
-  finishedGood?: FinishedGood | null
+  batchFinishedGoods?: (BatchFinishedGood & {
+    finishedGood: FinishedGood
+  })[]
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
   })[]
@@ -89,11 +91,16 @@ export function BatchesTable({ data, onView, onEdit, onDelete, userRole }: Batch
     header: "Produk Jadi",
     cell: ({ row }) => {
       const batch = row.original
-      if (!batch.finishedGood) return "-"
+      if (!batch.batchFinishedGoods || batch.batchFinishedGoods.length === 0) return "-"
 
       return (
-        <div className="font-medium max-w-xs truncate" title={batch.finishedGood.name}>
-          {batch.finishedGood.name}
+        <div className="space-y-1 max-w-xs">
+          {batch.batchFinishedGoods.map((bfg, index) => (
+            <div key={index} className="text-sm truncate" title={`${bfg.finishedGood.name} - ${bfg.quantity.toLocaleString()} unit`}>
+              <span className="font-medium">{bfg.finishedGood.name}</span>
+              <span className="text-muted-foreground"> - {bfg.quantity.toLocaleString()} unit</span>
+            </div>
+          ))}
         </div>
       )
     },

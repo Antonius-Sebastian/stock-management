@@ -68,8 +68,8 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
             ),
         })
       )
-      .min(1, 'At least one finished good is required')
       .refine((finishedGoods) => {
+        if (finishedGoods.length === 0) return true
         const finishedGoodIds = finishedGoods
           .map((fg) => fg.finishedGoodId)
           .filter((id) => id !== '')
@@ -116,8 +116,6 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
       ),
   })
 
-type FormData = z.infer<ReturnType<typeof createFormSchema>>
-
 interface RawMaterial {
   id: string
   name: string
@@ -142,15 +140,14 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
 
   const formSchema = createFormSchema(rawMaterials)
+  type FormData = z.infer<typeof formSchema>
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       code: '',
       date: getWIBDate(),
       description: '',
-      finishedGoods: [
-        { finishedGoodId: '', quantity: '' as unknown as number },
-      ],
+      finishedGoods: [],
       materials: [{ rawMaterialId: '', quantity: '' as unknown as number }],
     },
     mode: 'onSubmit',
@@ -229,7 +226,9 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
           code: data.code,
           date: data.date.toISOString(),
           description: data.description,
-          finishedGoods: data.finishedGoods,
+          finishedGoods: data.finishedGoods?.filter(
+            (fg) => fg.finishedGoodId && fg.quantity
+          ) || [],
           materials: data.materials,
         }),
       })

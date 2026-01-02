@@ -86,6 +86,16 @@ export function canDeleteBatches(role: string | undefined): boolean {
 }
 
 /**
+ * Check if user can add finished goods to batches
+ * @param role - User's role
+ * @returns true if ADMIN or FACTORY
+ */
+export function canAddFinishedGoodsToBatch(role: string | undefined): boolean {
+  if (!role) return false
+  return ['ADMIN', 'FACTORY'].includes(role)
+}
+
+/**
  * Check if user can create stock entries (IN/OUT)
  * @param role - User's role
  * @returns true for all authenticated users

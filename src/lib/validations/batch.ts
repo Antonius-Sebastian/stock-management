@@ -25,11 +25,13 @@ export const batchSchema = z.object({
 /**
  * Validation schema for batch API routes
  * Uses string date with WIB transform and supports multiple finished goods
+ * Finished goods are optional during creation - can be added later via update
  */
 export const batchSchemaAPI = z.object({
   code: z.string().min(1, 'Batch code is required'),
   date: z.string().transform((str) => parseToWIB(str)),
   description: z.string().optional(),
+  status: z.enum(['IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
   finishedGoods: z
     .array(
       z.object({
@@ -37,7 +39,8 @@ export const batchSchemaAPI = z.object({
         quantity: z.number().positive('Quantity must be positive'),
       })
     )
-    .min(1, 'At least one finished good is required'),
+    .optional()
+    .default([]),
   materials: z
     .array(
       z.object({
@@ -48,5 +51,28 @@ export const batchSchemaAPI = z.object({
     .min(1, 'At least one raw material is required'),
 })
 
+/**
+ * Validation schema for adding finished goods to a batch
+ * Used in the separate endpoint for adding finished goods
+ */
+export const addFinishedGoodsSchema = z.object({
+  finishedGoods: z
+    .array(
+      z.object({
+        finishedGoodId: z.string().min(1, 'Finished good is required'),
+        quantity: z.number().positive('Quantity must be positive'),
+      })
+    )
+    .min(1, 'At least one finished good is required')
+    .refine(
+      (finishedGoods) => {
+        const finishedGoodIds = finishedGoods.map((fg) => fg.finishedGoodId)
+        return finishedGoodIds.length === new Set(finishedGoodIds).size
+      },
+      'Cannot select the same finished good multiple times'
+    ),
+})
+
 export type BatchInput = z.infer<typeof batchSchema>
 export type BatchInputAPI = z.infer<typeof batchSchemaAPI>
+export type AddFinishedGoodsInput = z.infer<typeof addFinishedGoodsSchema>

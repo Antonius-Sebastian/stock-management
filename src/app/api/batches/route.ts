@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       code: validatedData.code,
       date: validatedData.date,
       description: validatedData.description || null,
-      finishedGoods: validatedData.finishedGoods,
+      finishedGoods: validatedData.finishedGoods.length > 0 ? validatedData.finishedGoods : undefined,
       materials: validatedData.materials,
     }
 
@@ -118,15 +118,17 @@ export async function POST(request: NextRequest) {
 
     // Audit log - fetch names for audit
     const { prisma } = await import('@/lib/db')
-    const finishedGoods = await Promise.all(
-      validatedData.finishedGoods.map(async (fg) => {
-        const finishedGood = await prisma.finishedGood.findUnique({
-          where: { id: fg.finishedGoodId },
-          select: { name: true },
-        })
-        return { name: finishedGood?.name || 'Unknown', quantity: fg.quantity }
-      })
-    )
+    const finishedGoods = validatedData.finishedGoods.length > 0
+      ? await Promise.all(
+          validatedData.finishedGoods.map(async (fg) => {
+            const finishedGood = await prisma.finishedGood.findUnique({
+              where: { id: fg.finishedGoodId },
+              select: { name: true },
+            })
+            return { name: finishedGood?.name || 'Unknown', quantity: fg.quantity }
+          })
+        )
+      : []
 
     const materials = await Promise.all(
       validatedData.materials.map(async (m) => {
@@ -140,7 +142,9 @@ export async function POST(request: NextRequest) {
 
     await AuditHelpers.batchCreated(
       validatedData.code,
-      finishedGoods.map((fg) => `${fg.name} (${fg.quantity})`).join(', '),
+      finishedGoods.length > 0
+        ? finishedGoods.map((fg) => `${fg.name} (${fg.quantity})`).join(', ')
+        : 'No finished goods',
       materials,
       {
         id: session.user.id,

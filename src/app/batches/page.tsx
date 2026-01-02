@@ -1,7 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Batch, BatchUsage, RawMaterial, FinishedGood } from '@prisma/client'
+import {
+  Batch,
+  BatchUsage,
+  RawMaterial,
+  FinishedGood,
+  BatchFinishedGood,
+} from '@prisma/client'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import {
@@ -15,10 +21,13 @@ import { BatchesTable } from '@/components/batches/batches-table'
 import { AddBatchDialog } from '@/components/batches/add-batch-dialog-new'
 import { EditBatchDialog } from '@/components/batches/edit-batch-dialog'
 import { BatchDetailDialog } from '@/components/batches/batch-detail-dialog'
+import { AddFinishedGoodsDialog } from '@/components/batches/add-finished-goods-dialog'
 import { canCreateBatches } from '@/lib/rbac'
 
 type BatchWithUsage = Batch & {
-  finishedGood?: FinishedGood | null
+  batchFinishedGoods?: (BatchFinishedGood & {
+    finishedGood: FinishedGood
+  })[]
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
   })[]
@@ -31,6 +40,8 @@ export default function BatchesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [addFinishedGoodsDialogOpen, setAddFinishedGoodsDialogOpen] =
+    useState(false)
   const [selectedBatch, setSelectedBatch] = useState<BatchWithUsage | null>(
     null
   )
@@ -69,6 +80,11 @@ export default function BatchesPage() {
   const handleEdit = (batch: BatchWithUsage) => {
     setSelectedBatch(batch)
     setEditDialogOpen(true)
+  }
+
+  const handleAddFinishedGoods = (batch: BatchWithUsage) => {
+    setSelectedBatch(batch)
+    setAddFinishedGoodsDialogOpen(true)
   }
 
   const handleDelete = async (batch: BatchWithUsage) => {
@@ -139,6 +155,7 @@ export default function BatchesPage() {
             onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onAddFinishedGoods={handleAddFinishedGoods}
             userRole={userRole}
           />
         </CardContent>
@@ -156,6 +173,16 @@ export default function BatchesPage() {
         onOpenChange={setEditDialogOpen}
         onSuccess={handleSuccess}
       />
+
+      {selectedBatch && (
+        <AddFinishedGoodsDialog
+          batchId={selectedBatch.id}
+          batchCode={selectedBatch.code}
+          open={addFinishedGoodsDialogOpen}
+          onOpenChange={setAddFinishedGoodsDialogOpen}
+          onSuccess={handleSuccess}
+        />
+      )}
     </div>
   )
 }

@@ -19,7 +19,8 @@ export interface BatchInput {
   code: string
   date: Date
   description?: string | null
-  finishedGoods: Array<{
+  status?: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  finishedGoods?: Array<{
     finishedGoodId: string
     quantity: number
   }>
@@ -60,6 +61,7 @@ const batchSelect = {
   code: true,
   date: true,
   description: true,
+  status: true,
   createdAt: true,
   updatedAt: true,
   batchFinishedGoods: {
@@ -213,13 +215,15 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
     )
   }
 
-  // Pre-transaction: Check for duplicate finished goods
-  const finishedGoodIds = data.finishedGoods.map((fg) => fg.finishedGoodId)
-  const uniqueFinishedGoodIds = new Set(finishedGoodIds)
-  if (finishedGoodIds.length !== uniqueFinishedGoodIds.size) {
-    throw new Error(
-      'Duplicate finished goods found in batch. Each finished good can only be used once per batch.'
-    )
+  // Pre-transaction: Check for duplicate finished goods (if provided)
+  if (data.finishedGoods && data.finishedGoods.length > 0) {
+    const finishedGoodIds = data.finishedGoods.map((fg) => fg.finishedGoodId)
+    const uniqueFinishedGoodIds = new Set(finishedGoodIds)
+    if (finishedGoodIds.length !== uniqueFinishedGoodIds.size) {
+      throw new Error(
+        'Duplicate finished goods found in batch. Each finished good can only be used once per batch.'
+      )
+    }
   }
 
   // Transaction: Create batch and all related records
@@ -248,23 +252,33 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       }
     }
 
-    // Step 2: Validate all finished goods exist
-    for (const fg of data.finishedGoods) {
-      const finishedGood = await tx.finishedGood.findUnique({
-        where: { id: fg.finishedGoodId },
-      })
+    // Step 2: Validate all finished goods exist (if provided)
+    if (data.finishedGoods && data.finishedGoods.length > 0) {
+      for (const fg of data.finishedGoods) {
+        const finishedGood = await tx.finishedGood.findUnique({
+          where: { id: fg.finishedGoodId },
+        })
 
-      if (!finishedGood) {
-        throw new Error(`Finished good not found: ${fg.finishedGoodId}`)
+        if (!finishedGood) {
+          throw new Error(`Finished good not found: ${fg.finishedGoodId}`)
+        }
       }
     }
 
     // Step 3: Create the batch
+    // If finished goods are provided, status should be COMPLETED, otherwise IN_PROGRESS
+    const batchStatus =
+      data.status ||
+      (data.finishedGoods && data.finishedGoods.length > 0
+        ? 'COMPLETED'
+        : 'IN_PROGRESS')
+
     const batch = await tx.batch.create({
       data: {
         code: data.code,
         date: data.date,
         description: data.description,
+        status: batchStatus,
       },
     })
 
@@ -302,38 +316,40 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       })
     }
 
-    // Step 5: Process each finished good
-    for (const finishedGood of data.finishedGoods) {
-      // Create batch finished good record
-      await tx.batchFinishedGood.create({
-        data: {
-          batchId: batch.id,
-          finishedGoodId: finishedGood.finishedGoodId,
-          quantity: finishedGood.quantity,
-        },
-      })
-
-      // Create stock IN movement for finished good
-      await tx.stockMovement.create({
-        data: {
-          type: 'IN',
-          quantity: finishedGood.quantity,
-          date: data.date,
-          description: `Batch production: ${data.code}`,
-          finishedGoodId: finishedGood.finishedGoodId,
-          batchId: batch.id,
-        },
-      })
-
-      // Update finished good current stock
-      await tx.finishedGood.update({
-        where: { id: finishedGood.finishedGoodId },
-        data: {
-          currentStock: {
-            increment: finishedGood.quantity,
+    // Step 5: Process each finished good (if provided)
+    if (data.finishedGoods && data.finishedGoods.length > 0) {
+      for (const finishedGood of data.finishedGoods) {
+        // Create batch finished good record
+        await tx.batchFinishedGood.create({
+          data: {
+            batchId: batch.id,
+            finishedGoodId: finishedGood.finishedGoodId,
+            quantity: finishedGood.quantity,
           },
-        },
-      })
+        })
+
+        // Create stock IN movement for finished good
+        await tx.stockMovement.create({
+          data: {
+            type: 'IN',
+            quantity: finishedGood.quantity,
+            date: data.date,
+            description: `Batch production: ${data.code}`,
+            finishedGoodId: finishedGood.finishedGoodId,
+            batchId: batch.id,
+          },
+        })
+
+        // Update finished good current stock
+        await tx.finishedGood.update({
+          where: { id: finishedGood.finishedGoodId },
+          data: {
+            currentStock: {
+              increment: finishedGood.quantity,
+            },
+          },
+        })
+      }
     }
 
     return batch
@@ -388,13 +404,15 @@ export async function updateBatch(
     throw new Error(`Batch code "${data.code}" already exists`)
   }
 
-  // Pre-transaction: Check for duplicate finished goods
-  const finishedGoodIds = data.finishedGoods.map((fg) => fg.finishedGoodId)
-  const uniqueFinishedGoodIds = new Set(finishedGoodIds)
-  if (finishedGoodIds.length !== uniqueFinishedGoodIds.size) {
-    throw new Error(
-      'Duplicate finished goods found in batch. Each finished good can only be used once per batch.'
-    )
+  // Pre-transaction: Check for duplicate finished goods (if provided)
+  if (data.finishedGoods && data.finishedGoods.length > 0) {
+    const finishedGoodIds = data.finishedGoods.map((fg) => fg.finishedGoodId)
+    const uniqueFinishedGoodIds = new Set(finishedGoodIds)
+    if (finishedGoodIds.length !== uniqueFinishedGoodIds.size) {
+      throw new Error(
+        'Duplicate finished goods found in batch. Each finished good can only be used once per batch.'
+      )
+    }
   }
 
   // Pre-transaction: Check for duplicate materials
@@ -459,54 +477,56 @@ export async function updateBatch(
       where: { batchId: id },
     })
 
-    // Step 5: Create new finished goods and add stock
-    for (const finishedGood of data.finishedGoods) {
-      // Verify finished good exists with row locking for consistency
-      const finishedGoods = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
+    // Step 5: Create new finished goods and add stock (if provided)
+    if (data.finishedGoods && data.finishedGoods.length > 0) {
+      for (const finishedGood of data.finishedGoods) {
+        // Verify finished good exists with row locking for consistency
+        const finishedGoods = await tx.$queryRaw<
+          Array<{ id: string; name: string; currentStock: number }>
+        >`
         SELECT id, name, "currentStock"
         FROM finished_goods
         WHERE id = ${finishedGood.finishedGoodId}
         FOR UPDATE
       `
 
-      if (finishedGoods.length === 0) {
-        throw new Error(
-          `Finished good not found: ${finishedGood.finishedGoodId}`
-        )
-      }
+        if (finishedGoods.length === 0) {
+          throw new Error(
+            `Finished good not found: ${finishedGood.finishedGoodId}`
+          )
+        }
 
-      // Create batch finished good record
-      await tx.batchFinishedGood.create({
-        data: {
-          batchId: id,
-          finishedGoodId: finishedGood.finishedGoodId,
-          quantity: finishedGood.quantity,
-        },
-      })
-
-      // Create stock IN movement for finished good
-      await tx.stockMovement.create({
-        data: {
-          type: 'IN',
-          quantity: finishedGood.quantity,
-          date: data.date,
-          description: `Batch ${data.code} production`,
-          finishedGoodId: finishedGood.finishedGoodId,
-          batchId: id,
-        },
-      })
-
-      // Update finished good current stock
-      await tx.finishedGood.update({
-        where: { id: finishedGood.finishedGoodId },
-        data: {
-          currentStock: {
-            increment: finishedGood.quantity,
+        // Create batch finished good record
+        await tx.batchFinishedGood.create({
+          data: {
+            batchId: id,
+            finishedGoodId: finishedGood.finishedGoodId,
+            quantity: finishedGood.quantity,
           },
-        },
-      })
+        })
+
+        // Create stock IN movement for finished good
+        await tx.stockMovement.create({
+          data: {
+            type: 'IN',
+            quantity: finishedGood.quantity,
+            date: data.date,
+            description: `Batch ${data.code} production`,
+            finishedGoodId: finishedGood.finishedGoodId,
+            batchId: id,
+          },
+        })
+
+        // Update finished good current stock
+        await tx.finishedGood.update({
+          where: { id: finishedGood.finishedGoodId },
+          data: {
+            currentStock: {
+              increment: finishedGood.quantity,
+            },
+          },
+        })
+      }
     }
 
     // Step 6: Create new batch usages and deduct stock
@@ -572,6 +592,7 @@ export async function updateBatch(
         code: data.code,
         date: data.date,
         description: data.description,
+        ...(data.status && { status: data.status }),
       },
       include: {
         batchFinishedGoods: {

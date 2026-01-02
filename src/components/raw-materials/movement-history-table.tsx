@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 
 interface Movement {
   id: string
-  type: 'IN' | 'OUT'
+  type: 'IN' | 'OUT' | 'ADJUSTMENT'
   quantity: number
   date: string
   description: string | null
@@ -72,7 +72,15 @@ export function MovementHistoryTable({
       accessorKey: 'type',
       header: 'Tipe',
       cell: ({ row }) => {
-        const type = row.getValue('type') as 'IN' | 'OUT'
+        const type = row.getValue('type') as 'IN' | 'OUT' | 'ADJUSTMENT'
+        if (type === 'ADJUSTMENT') {
+          const quantity = row.original.quantity
+          return (
+            <Badge variant={quantity >= 0 ? 'default' : 'destructive'}>
+              Penyesuaian
+            </Badge>
+          )
+        }
         return (
           <Badge variant={type === 'IN' ? 'default' : 'destructive'}>
             {type === 'IN' ? 'Stok Masuk' : 'Stok Keluar'}
@@ -96,6 +104,18 @@ export function MovementHistoryTable({
       cell: ({ row }) => {
         const quantity = row.getValue('quantity') as number
         const type = row.original.type
+        if (type === 'ADJUSTMENT') {
+          // ADJUSTMENT can be positive or negative
+          const isPositive = quantity >= 0
+          return (
+            <div
+              className={`font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}
+            >
+              {isPositive ? '+' : ''}
+              {quantity.toLocaleString()}
+            </div>
+          )
+        }
         return (
           <div
             className={`font-medium ${type === 'IN' ? 'text-green-600' : 'text-red-600'}`}

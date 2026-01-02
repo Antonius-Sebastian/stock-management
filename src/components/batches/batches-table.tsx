@@ -10,7 +10,8 @@ import {
 } from '@prisma/client'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
-import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye, Plus } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { format } from 'date-fns'
-import { canEditBatches, canDeleteBatches } from '@/lib/rbac'
+import {
+  canEditBatches,
+  canDeleteBatches,
+  canAddFinishedGoodsToBatch,
+} from '@/lib/rbac'
 
 type BatchWithUsage = Batch & {
   batchFinishedGoods?: (BatchFinishedGood & {
@@ -36,6 +41,7 @@ interface BatchesTableProps {
   onView?: (batch: BatchWithUsage) => void
   onEdit?: (batch: BatchWithUsage) => void
   onDelete?: (batch: BatchWithUsage) => void
+  onAddFinishedGoods?: (batch: BatchWithUsage) => void
   userRole?: string
 }
 
@@ -44,6 +50,7 @@ export function BatchesTable({
   onView,
   onEdit,
   onDelete,
+  onAddFinishedGoods,
   userRole,
 }: BatchesTableProps) {
   const columns: ColumnDef<BatchWithUsage>[] = [
@@ -77,6 +84,23 @@ export function BatchesTable({
       cell: ({ row }) => {
         const date = row.getValue('date') as Date
         return format(new Date(date), 'MMM dd, yyyy')
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.getValue('status') as string
+        if (status === 'COMPLETED') {
+          return <Badge variant="default">Selesai</Badge>
+        }
+        if (status === 'IN_PROGRESS') {
+          return <Badge variant="secondary">Dalam Proses</Badge>
+        }
+        if (status === 'CANCELLED') {
+          return <Badge variant="destructive">Dibatalkan</Badge>
+        }
+        return <Badge variant="secondary">-</Badge>
       },
     },
     {
@@ -165,6 +189,15 @@ export function BatchesTable({
                 <Eye className="mr-2 h-4 w-4" />
                 Lihat Detail
               </DropdownMenuItem>
+              {canAddFinishedGoodsToBatch(userRole) &&
+                (!batch.batchFinishedGoods ||
+                  batch.batchFinishedGoods.length === 0) &&
+                batch.status === 'IN_PROGRESS' && (
+                  <DropdownMenuItem onClick={() => onAddFinishedGoods?.(batch)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Tambah Produk Jadi
+                  </DropdownMenuItem>
+                )}
               {canEditBatches(userRole) && (
                 <DropdownMenuItem onClick={() => onEdit?.(batch)}>
                   <Edit className="mr-2 h-4 w-4" />

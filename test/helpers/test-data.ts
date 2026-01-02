@@ -80,6 +80,7 @@ export function createTestBatch(overrides?: Partial<Batch>): Batch {
     code: 'BATCH-001',
     date: new Date('2024-01-01'),
     description: 'Test batch',
+    status: 'IN_PROGRESS',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     ...overrides,

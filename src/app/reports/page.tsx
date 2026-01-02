@@ -109,17 +109,23 @@ export default function ReportsPage() {
         }
         const data = await response.json()
         const years = data.years || []
-        setAvailableYears(years)
+        
+        // Filter out future years - only allow current year or earlier
+        const currentDate = new Date()
+        const currentYear = currentDate.getFullYear()
+        const filteredYears = years.filter(
+          (y: string) => parseInt(y) <= currentYear
+        )
+        setAvailableYears(filteredYears)
 
         // Set default to current year/month if available
-        const currentDate = new Date()
-        const currentYear = currentDate.getFullYear().toString()
+        const currentYearStr = currentYear.toString()
         const currentMonth = (currentDate.getMonth() + 1).toString()
 
-        if (years.includes(currentYear)) {
-          setYear(currentYear)
-        } else if (years.length > 0) {
-          setYear(years[years.length - 1]) // Use latest available year
+        if (filteredYears.includes(currentYearStr)) {
+          setYear(currentYearStr)
+        } else if (filteredYears.length > 0) {
+          setYear(filteredYears[filteredYears.length - 1]) // Use latest available year
         }
 
         setMonth(currentMonth)
@@ -243,11 +249,27 @@ export default function ReportsPage() {
               <SelectValue placeholder="Bulan" />
             </SelectTrigger>
             <SelectContent>
-              {MONTHS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
+              {MONTHS.map((m) => {
+                const monthNum = parseInt(m.value)
+                const yearNum = year ? parseInt(year) : new Date().getFullYear()
+                const currentDate = new Date()
+                const currentYear = currentDate.getFullYear()
+                const currentMonth = currentDate.getMonth() + 1
+                
+                // Disable future months/years
+                const isFuture = yearNum > currentYear || 
+                  (yearNum === currentYear && monthNum > currentMonth)
+                
+                return (
+                  <SelectItem 
+                    key={m.value} 
+                    value={m.value}
+                    disabled={isFuture}
+                  >
+                    {m.label}
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
         </div>

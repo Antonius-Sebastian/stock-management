@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { auth } from '@/auth'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
+import { getRawMaterialMovements } from '@/lib/services'
 
 export async function GET(
   request: NextRequest,
@@ -20,75 +20,28 @@ export async function GET(
     // Validate ID format to prevent SQL injection
     const validatedId = z.string().cuid().parse(id)
 
-    // Fetch the raw material
-    const material = await prisma.rawMaterial.findUnique({
-      where: { id: validatedId },
-      select: {
-        id: true,
-        kode: true,
-        name: true,
-        currentStock: true,
-        moq: true,
-      },
-    })
+    // Get material movements using service
+    const result = await getRawMaterialMovements(validatedId)
 
-    if (!material) {
+    return NextResponse.json(result)
+  } catch (error) {
+    logger.error('Error fetching material movements:', error)
+
+    if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Raw material not found' },
-        { status: 404 }
+        { error: 'Invalid material ID format' },
+        { status: 400 }
       )
     }
 
-    // Fetch all stock movements for this material
-    const movements = await prisma.stockMovement.findMany({
-      where: {
-        rawMaterialId: validatedId,
-      },
-      include: {
-        batch: {
-          select: {
-            id: true,
-            code: true,
-          },
-        },
-      },
-      orderBy: {
-        date: 'asc', // Start from oldest to calculate running balance
-      },
-    })
-
-    // Calculate running balance for each movement
-    // Start from 0 and work forward through all movements in chronological order
-    let runningBalance = 0
-    const movementsWithBalance = movements.map((movement) => {
-      // Apply this movement
-      if (movement.type === 'IN') {
-        runningBalance += movement.quantity
-      } else {
-        runningBalance -= movement.quantity
+    if (error instanceof Error) {
+      // Check if it's a "not found" error
+      if (error.message.includes('not found')) {
+        return NextResponse.json({ error: error.message }, { status: 404 })
       }
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
 
-      return {
-        id: movement.id,
-        type: movement.type,
-        quantity: movement.quantity,
-        date: movement.date,
-        description: movement.description,
-        batch: movement.batch,
-        runningBalance: Math.round(runningBalance * 100) / 100, // Round to 2 decimal places
-        createdAt: movement.createdAt,
-      }
-    })
-
-    // Reverse to show newest first
-    movementsWithBalance.reverse()
-
-    return NextResponse.json({
-      material,
-      movements: movementsWithBalance,
-    })
-  } catch (error) {
-    logger.error('Error fetching material movements:', error)
     return NextResponse.json(
       { error: 'Failed to fetch material movements' },
       { status: 500 }

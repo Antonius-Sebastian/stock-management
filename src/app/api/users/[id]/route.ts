@@ -1,25 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import * as bcrypt from 'bcryptjs'
 import { auth } from '@/auth'
 import { canManageUsers, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { AuditHelpers, getIpAddress } from '@/lib/audit'
-
-const updateUserSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters').optional(),
-  email: z.string().email('Invalid email').optional().nullable(),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number')
-    .optional(),
-  name: z.string().min(1, 'Name is required').optional(),
-  role: z.enum(['ADMIN', 'FACTORY', 'OFFICE']).optional(),
-  isActive: z.boolean().optional(),
-})
+import {
+  getUserById,
+  updateUser,
+  deleteUser,
+  UpdateUserInput,
+} from '@/lib/services'
+import { updateUserSchema } from '@/lib/validations'
 
 export async function GET(
   request: NextRequest,
@@ -41,22 +32,8 @@ export async function GET(
 
     const { id } = await params
 
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+    // Get user using service
+    const user = await getUserById(id)
 
     return NextResponse.json(user)
   } catch (error) {
@@ -85,77 +62,10 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const validatedData = updateUserSchema.parse(body)
+    const validatedData = updateUserSchema.parse(body) as UpdateUserInput
 
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { id },
-    })
-
-    if (!existingUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Check for duplicate username if being changed
-    if (validatedData.username && validatedData.username !== existingUser.username) {
-      const duplicateUsername = await prisma.user.findUnique({
-        where: { username: validatedData.username },
-      })
-
-      if (duplicateUsername) {
-        return NextResponse.json(
-          { error: `Username "${validatedData.username}" already exists` },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Check for duplicate email if being changed
-    if (validatedData.email && validatedData.email !== existingUser.email) {
-      const duplicateEmail = await prisma.user.findUnique({
-        where: { email: validatedData.email },
-      })
-
-      if (duplicateEmail) {
-        return NextResponse.json(
-          { error: `Email "${validatedData.email}" already exists` },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Prepare update data
-    const updateData: {
-      username?: string
-      email?: string | null
-      name?: string
-      role?: 'ADMIN' | 'FACTORY' | 'OFFICE'
-      isActive?: boolean
-      password?: string
-    } = {}
-    if (validatedData.username) updateData.username = validatedData.username
-    if (validatedData.email !== undefined) updateData.email = validatedData.email
-    if (validatedData.name) updateData.name = validatedData.name
-    if (validatedData.role) updateData.role = validatedData.role
-    if (validatedData.isActive !== undefined) updateData.isActive = validatedData.isActive
-    if (validatedData.password) {
-      updateData.password = await bcrypt.hash(validatedData.password, 10)
-    }
-
-    // Update user
-    const user = await prisma.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-    })
+    // Update user using service
+    const user = await updateUser(id, validatedData)
 
     return NextResponse.json(user)
   } catch (error) {
@@ -173,7 +83,10 @@ export async function PUT(
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to update user' },
+      { status: 500 }
+    )
   }
 }
 
@@ -197,41 +110,11 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { id },
-    })
+    // Get user info for audit log before deletion
+    const existingUser = await getUserById(id)
 
-    if (!existingUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Prevent self-deletion
-    if (existingUser.id === session.user.id) {
-      return NextResponse.json(
-        { error: 'Cannot delete your own account' },
-        { status: 400 }
-      )
-    }
-
-    // Prevent deleting the last admin
-    if (existingUser.role === 'ADMIN') {
-      const adminCount = await prisma.user.count({
-        where: { role: 'ADMIN', isActive: true },
-      })
-
-      if (adminCount <= 1) {
-        return NextResponse.json(
-          { error: 'Cannot delete the last admin user' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Delete user
-    await prisma.user.delete({
-      where: { id },
-    })
+    // Delete user using service (includes self-deletion and last-admin checks)
+    await deleteUser(id, session.user.id)
 
     // Audit log
     await AuditHelpers.userDeleted(
@@ -253,6 +136,9 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to delete user' },
+      { status: 500 }
+    )
   }
 }

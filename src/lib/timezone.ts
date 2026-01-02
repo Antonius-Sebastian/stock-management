@@ -1,6 +1,6 @@
 /**
  * Timezone Utility Functions
- * 
+ *
  * All date/time operations should use WIB (Waktu Indonesia Barat) timezone
  * WIB = GMT+7 (Asia/Jakarta)
  */
@@ -12,8 +12,10 @@
  */
 export function toWIB(date: Date): Date {
   // Create a date string in WIB format
-  const wibDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-  return wibDate;
+  const wibDate = new Date(
+    date.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
+  )
+  return wibDate
 }
 
 /**
@@ -21,7 +23,7 @@ export function toWIB(date: Date): Date {
  * @returns Current date in WIB
  */
 export function getWIBDate(): Date {
-  return toWIB(new Date());
+  return toWIB(new Date())
 }
 
 /**
@@ -30,9 +32,9 @@ export function getWIBDate(): Date {
  * @returns Start of day in WIB
  */
 export function startOfDayWIB(date: Date): Date {
-  const wibDate = toWIB(date);
-  wibDate.setHours(0, 0, 0, 0);
-  return wibDate;
+  const wibDate = toWIB(date)
+  wibDate.setHours(0, 0, 0, 0)
+  return wibDate
 }
 
 /**
@@ -41,9 +43,9 @@ export function startOfDayWIB(date: Date): Date {
  * @returns End of day in WIB
  */
 export function endOfDayWIB(date: Date): Date {
-  const wibDate = toWIB(date);
-  wibDate.setHours(23, 59, 59, 999);
-  return wibDate;
+  const wibDate = toWIB(date)
+  wibDate.setHours(23, 59, 59, 999)
+  return wibDate
 }
 
 /**
@@ -53,8 +55,8 @@ export function endOfDayWIB(date: Date): Date {
  * @returns Date object in WIB timezone
  */
 export function parseToWIB(dateString: string): Date {
-  const date = new Date(dateString);
-  return toWIB(date);
+  const date = new Date(dateString)
+  return toWIB(date)
 }
 
 /**
@@ -63,8 +65,8 @@ export function parseToWIB(dateString: string): Date {
  * @returns ISO string representation in WIB
  */
 export function toWIBISOString(date: Date): string {
-  const wibDate = toWIB(date);
-  return wibDate.toISOString();
+  const wibDate = toWIB(date)
+  return wibDate.toISOString()
 }
 
 /**
@@ -73,17 +75,19 @@ export function toWIBISOString(date: Date): string {
  * @param month - Month (1-12)
  * @returns Object with startDate and endDate in WIB
  */
-export function getMonthRangeWIB(year: number, month: number): { startDate: Date; endDate: Date; daysInMonth: number } {
+export function getMonthRangeWIB(
+  year: number,
+  month: number
+): { startDate: Date; endDate: Date; daysInMonth: number } {
   // Create date in WIB timezone
-  const startDate = new Date(year, month - 1, 1);
-  const startWIB = startOfDayWIB(startDate);
-  
-  // Get last day of month
-  const endDate = new Date(year, month, 0);
-  const endWIB = endOfDayWIB(endDate);
-  
-  const daysInMonth = endDate.getDate();
-  
-  return { startDate: startWIB, endDate: endWIB, daysInMonth };
-}
+  const startDate = new Date(year, month - 1, 1)
+  const startWIB = startOfDayWIB(startDate)
 
+  // Get last day of month
+  const endDate = new Date(year, month, 0)
+  const endWIB = endOfDayWIB(endDate)
+
+  const daysInMonth = endDate.getDate()
+
+  return { startDate: startWIB, endDate: endWIB, daysInMonth }
+}

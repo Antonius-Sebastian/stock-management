@@ -62,7 +62,12 @@ export class ErrorBoundary extends React.Component<
       }
 
       // Default fallback UI
-      return <DefaultErrorFallback error={this.state.error} reset={this.resetErrorBoundary} />
+      return (
+        <DefaultErrorFallback
+          error={this.state.error}
+          reset={this.resetErrorBoundary}
+        />
+      )
     }
 
     return this.props.children
@@ -72,12 +77,18 @@ export class ErrorBoundary extends React.Component<
 /**
  * Default Error Fallback UI
  */
-function DefaultErrorFallback({ error, reset }: { error: Error; reset: () => void }) {
+function DefaultErrorFallback({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
   return (
-    <div className="flex items-center justify-center min-h-[400px] p-4">
-      <Card className="max-w-md w-full p-6">
-        <div className="flex flex-col items-center text-center space-y-4">
-          <div className="rounded-full bg-red-100 dark:bg-red-900/20 p-3">
+    <div className="flex min-h-[400px] items-center justify-center p-4">
+      <Card className="w-full max-w-md p-6">
+        <div className="flex flex-col items-center space-y-4 text-center">
+          <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
             <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-500" />
           </div>
 
@@ -92,15 +103,15 @@ function DefaultErrorFallback({ error, reset }: { error: Error; reset: () => voi
 
           {process.env.NODE_ENV === 'development' && (
             <details className="w-full text-left">
-              <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+              <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100">
                 Error details (development only)
               </summary>
-              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 overflow-auto">
-                <p className="text-xs font-mono text-red-600 dark:text-red-400 whitespace-pre-wrap">
+              <div className="mt-2 overflow-auto rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+                <p className="font-mono text-xs whitespace-pre-wrap text-red-600 dark:text-red-400">
                   {error.message}
                 </p>
                 {error.stack && (
-                  <pre className="mt-2 text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">
+                  <pre className="mt-2 overflow-x-auto text-xs text-gray-600 dark:text-gray-400">
                     {error.stack}
                   </pre>
                 )}
@@ -108,12 +119,8 @@ function DefaultErrorFallback({ error, reset }: { error: Error; reset: () => voi
             </details>
           )}
 
-          <div className="flex gap-2 w-full">
-            <Button
-              onClick={reset}
-              variant="default"
-              className="flex-1"
-            >
+          <div className="flex w-full gap-2">
+            <Button onClick={reset} variant="default" className="flex-1">
               Try again
             </Button>
             <Button
@@ -133,22 +140,28 @@ function DefaultErrorFallback({ error, reset }: { error: Error; reset: () => voi
 /**
  * Compact Error Fallback (for smaller components)
  */
-export function CompactErrorFallback({ error, reset }: { error: Error; reset: () => void }) {
+export function CompactErrorFallback({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
   return (
-    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+    <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
       <div className="flex items-start gap-3">
-        <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-500 flex-shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
+        <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-500" />
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-red-800 dark:text-red-300">
             Error loading component
           </p>
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
             {error.message}
           </p>
           <Button
             onClick={reset}
             variant="link"
-            className="h-auto p-0 text-xs text-red-700 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 mt-2"
+            className="mt-2 h-auto p-0 text-xs text-red-700 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
           >
             Try again
           </Button>

@@ -1,15 +1,21 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { Batch, BatchUsage, RawMaterial, FinishedGood } from "@prisma/client"
-import { toast } from "sonner"
-import { useSession } from "next-auth/react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BatchesTable } from "@/components/batches/batches-table"
-import { AddBatchDialog } from "@/components/batches/add-batch-dialog-new"
-import { EditBatchDialog } from "@/components/batches/edit-batch-dialog"
-import { BatchDetailDialog } from "@/components/batches/batch-detail-dialog"
-import { canCreateBatches } from "@/lib/rbac"
+import { useEffect, useState } from 'react'
+import { Batch, BatchUsage, RawMaterial, FinishedGood } from '@prisma/client'
+import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { BatchesTable } from '@/components/batches/batches-table'
+import { AddBatchDialog } from '@/components/batches/add-batch-dialog-new'
+import { EditBatchDialog } from '@/components/batches/edit-batch-dialog'
+import { BatchDetailDialog } from '@/components/batches/batch-detail-dialog'
+import { canCreateBatches } from '@/lib/rbac'
 
 type BatchWithUsage = Batch & {
   finishedGood?: FinishedGood | null
@@ -25,21 +31,23 @@ export default function BatchesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [selectedBatch, setSelectedBatch] = useState<BatchWithUsage | null>(null)
+  const [selectedBatch, setSelectedBatch] = useState<BatchWithUsage | null>(
+    null
+  )
 
   const fetchBatches = async () => {
     try {
-      const response = await fetch("/api/batches")
+      const response = await fetch('/api/batches')
       if (!response.ok) {
-        throw new Error("Failed to fetch batches")
+        throw new Error('Failed to fetch batches')
       }
       const data = await response.json()
       // Handle both array response and paginated response
-      const batches = Array.isArray(data) ? data : (data.data || [])
+      const batches = Array.isArray(data) ? data : data.data || []
       setBatches(batches)
     } catch (error) {
-      console.error("Error fetching batches:", error)
-      toast.error("Gagal memuat batches. Silakan refresh halaman.")
+      console.error('Error fetching batches:', error)
+      toast.error('Gagal memuat batches. Silakan refresh halaman.')
     } finally {
       setIsLoading(false)
     }
@@ -64,32 +72,39 @@ export default function BatchesPage() {
   }
 
   const handleDelete = async (batch: BatchWithUsage) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus batch "${batch.code}"? Stok bahan baku yang digunakan akan dikembalikan. Tindakan ini tidak dapat dibatalkan.`)) {
+    if (
+      !confirm(
+        `Apakah Anda yakin ingin menghapus batch "${batch.code}"? Stok bahan baku yang digunakan akan dikembalikan. Tindakan ini tidak dapat dibatalkan.`
+      )
+    ) {
       return
     }
 
     try {
       const response = await fetch(`/api/batches/${batch.id}`, {
-        method: "DELETE",
+        method: 'DELETE',
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Gagal menghapus batch")
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Gagal menghapus batch')
       }
 
-      toast.success("Batch berhasil dihapus dan stok dikembalikan")
+      toast.success('Batch berhasil dihapus dan stok dikembalikan')
       fetchBatches()
     } catch (error) {
-      console.error("Error deleting batch:", error)
-      const message = error instanceof Error ? error.message : "Gagal menghapus batch"
+      console.error('Error deleting batch:', error)
+      const message =
+        error instanceof Error ? error.message : 'Gagal menghapus batch'
       toast.error(message)
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-lg">Memuat...</div>
       </div>
     )
@@ -97,9 +112,11 @@ export default function BatchesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Pemakaian Batch</h1>
+          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            Pemakaian Batch
+          </h1>
           <p className="text-muted-foreground">
             Lacak konsumsi bahan baku untuk batch produksi
           </p>

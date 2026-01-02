@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client"
-import { RawMaterialInput } from "@/lib/validations"
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api-client'
+import { RawMaterialInput } from '@/lib/validations'
 
 /**
  * Raw Materials Query Hooks
@@ -25,8 +25,8 @@ export interface RawMaterial {
  */
 export function useRawMaterials() {
   return useQuery({
-    queryKey: ["raw-materials"],
-    queryFn: () => apiGet<RawMaterial[]>("/api/raw-materials"),
+    queryKey: ['raw-materials'],
+    queryFn: () => apiGet<RawMaterial[]>('/api/raw-materials'),
   })
 }
 
@@ -35,7 +35,7 @@ export function useRawMaterials() {
  */
 export function useRawMaterial(id: string) {
   return useQuery({
-    queryKey: ["raw-materials", id],
+    queryKey: ['raw-materials', id],
     queryFn: () => apiGet<RawMaterial>(`/api/raw-materials/${id}`),
     enabled: !!id, // Only run if ID exists
   })
@@ -49,10 +49,10 @@ export function useCreateRawMaterial() {
 
   return useMutation({
     mutationFn: (data: RawMaterialInput) =>
-      apiPost<RawMaterial>("/api/raw-materials", data),
+      apiPost<RawMaterial>('/api/raw-materials', data),
     onSuccess: () => {
       // Invalidate and refetch materials list
-      queryClient.invalidateQueries({ queryKey: ["raw-materials"] })
+      queryClient.invalidateQueries({ queryKey: ['raw-materials'] })
     },
   })
 }
@@ -68,8 +68,8 @@ export function useUpdateRawMaterial(id: string) {
       apiPut<RawMaterial>(`/api/raw-materials/${id}`, data),
     onSuccess: () => {
       // Invalidate specific material and list
-      queryClient.invalidateQueries({ queryKey: ["raw-materials", id] })
-      queryClient.invalidateQueries({ queryKey: ["raw-materials"] })
+      queryClient.invalidateQueries({ queryKey: ['raw-materials', id] })
+      queryClient.invalidateQueries({ queryKey: ['raw-materials'] })
     },
   })
 }
@@ -81,11 +81,10 @@ export function useDeleteRawMaterial() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (id: string) =>
-      apiDelete<void>(`/api/raw-materials/${id}`),
+    mutationFn: (id: string) => apiDelete<void>(`/api/raw-materials/${id}`),
     onSuccess: () => {
       // Invalidate materials list
-      queryClient.invalidateQueries({ queryKey: ["raw-materials"] })
+      queryClient.invalidateQueries({ queryKey: ['raw-materials'] })
     },
   })
 }

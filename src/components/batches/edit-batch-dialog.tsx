@@ -1,15 +1,15 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { useForm, useFieldArray } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { format } from "date-fns"
-import { CalendarIcon, Trash2, Plus } from "lucide-react"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from 'react'
+import { useForm, useFieldArray } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { format } from 'date-fns'
+import { CalendarIcon, Trash2, Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 import {
   Form,
   FormControl,
@@ -25,39 +25,50 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+} from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { cn } from "@/lib/utils"
-import { Batch, BatchUsage, RawMaterial, FinishedGood } from "@prisma/client"
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logger'
+import { Batch, BatchUsage, RawMaterial, FinishedGood } from '@prisma/client'
 
 type BatchWithUsage = Batch & {
-  finishedGood?: FinishedGood | null
+  batchFinishedGoods?: Array<{
+    finishedGood: FinishedGood
+    finishedGoodId: string
+    quantity: number
+  }>
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
   })[]
 }
 
 const formSchema = z.object({
-  code: z.string().min(1, "Batch code is required"),
+  code: z.string().min(1, 'Batch code is required'),
   date: z.date({
-    required_error: "Please select a date",
+    required_error: 'Please select a date',
   }),
   description: z.string().optional(),
-  finishedGoodId: z.string().min(1, "Please select a finished good"),
-  materials: z.array(
-    z.object({
-      rawMaterialId: z.string().min(1, "Please select a raw material"),
-      quantity: z.coerce.number().positive("Quantity must be greater than 0"),
-    })
-  ).min(1, "At least one raw material is required"),
+  finishedGoodId: z.string().min(1, 'Please select a finished good'),
+  materials: z
+    .array(
+      z.object({
+        rawMaterialId: z.string().min(1, 'Please select a raw material'),
+        quantity: z.coerce.number().positive('Quantity must be greater than 0'),
+      })
+    )
+    .min(1, 'At least one raw material is required'),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -82,26 +93,28 @@ export function EditBatchDialog({
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      code: "",
+      code: '',
       date: new Date(),
-      description: "",
-      finishedGoodId: "",
+      description: '',
+      finishedGoodId: '',
       materials: [],
     },
   })
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: "materials",
+    name: 'materials',
   })
 
   // Calculate available stock for each material (includes stock that will be restored from this batch)
   const getAvailableStock = (materialId: string): number => {
-    const material = rawMaterials.find(m => m.id === materialId)
+    const material = rawMaterials.find((m) => m.id === materialId)
     if (!material) return 0
 
     // Find how much of this material is currently used in the batch being edited
-    const currentUsage = batch?.batchUsages.find(u => u.rawMaterialId === materialId)
+    const currentUsage = batch?.batchUsages.find(
+      (u) => u.rawMaterialId === materialId
+    )
     const usedInBatch = currentUsage?.quantity || 0
 
     // Available stock = current stock + stock that will be restored from this batch
@@ -109,7 +122,7 @@ export function EditBatchDialog({
   }
 
   // Get list of material IDs currently used in the batch
-  const materialsInBatch = batch?.batchUsages.map(u => u.rawMaterialId) || []
+  const materialsInBatch = batch?.batchUsages.map((u) => u.rawMaterialId) || []
 
   // Sort materials: materials in batch first, then by stock availability, then alphabetically
   const sortedRawMaterials = [...rawMaterials].sort((a, b) => {
@@ -132,32 +145,32 @@ export function EditBatchDialog({
 
   const fetchFinishedGoods = async () => {
     try {
-      const response = await fetch("/api/finished-goods")
+      const response = await fetch('/api/finished-goods')
       if (!response.ok) {
-        throw new Error("Failed to fetch finished goods")
+        throw new Error('Failed to fetch finished goods')
       }
       const json = await response.json()
       // API returns { success: true, data: [...] }
       const data = json.data || json
       setFinishedGoods(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error("Error fetching finished goods:", error)
-      toast.error("Failed to load finished goods")
+      logger.error('Error fetching finished goods:', error)
+      toast.error('Failed to load finished goods')
     }
   }
 
   const fetchRawMaterials = async () => {
     try {
-      const response = await fetch("/api/raw-materials")
+      const response = await fetch('/api/raw-materials')
       if (!response.ok) {
-        throw new Error("Failed to fetch raw materials")
+        throw new Error('Failed to fetch raw materials')
       }
       const json = await response.json()
       const data = json.data || json
       setRawMaterials(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error("Error fetching raw materials:", error)
-      toast.error("Failed to load raw materials")
+      logger.error('Error fetching raw materials:', error)
+      toast.error('Failed to load raw materials')
     }
   }
 
@@ -173,9 +186,9 @@ export function EditBatchDialog({
       form.reset({
         code: batch.code,
         date: new Date(batch.date),
-        description: batch.description || "",
-        finishedGoodId: batch.finishedGoodId,
-        materials: batch.batchUsages.map(usage => ({
+        description: batch.description || '',
+        finishedGoodId: batch.batchFinishedGoods?.[0]?.finishedGoodId || '',
+        materials: batch.batchUsages.map((usage) => ({
           rawMaterialId: usage.rawMaterialId,
           quantity: usage.quantity,
         })),
@@ -189,9 +202,9 @@ export function EditBatchDialog({
     setIsLoading(true)
     try {
       const response = await fetch(`/api/batches/${batch.id}`, {
-        method: "PUT",
+        method: 'PUT',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           ...data,
@@ -201,16 +214,19 @@ export function EditBatchDialog({
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Failed to update batch")
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to update batch')
       }
 
-      toast.success("Batch updated successfully with material changes")
+      toast.success('Batch updated successfully with material changes')
       onOpenChange(false)
       onSuccess()
     } catch (error) {
-      console.error("Error updating batch:", error)
-      const message = error instanceof Error ? error.message : "Failed to update batch"
+      logger.error('Error updating batch:', error)
+      const message =
+        error instanceof Error ? error.message : 'Failed to update batch'
       toast.error(message)
     } finally {
       setIsLoading(false)
@@ -219,7 +235,7 @@ export function EditBatchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-[95vw] overflow-y-auto sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle>Edit Batch</DialogTitle>
           <DialogDescription>
@@ -227,8 +243,11 @@ export function EditBatchDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 overflow-hidden"
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="code"
@@ -252,14 +271,14 @@ export function EditBatchDialog({
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
-                            variant={"outline"}
+                            variant={'outline'}
                             className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
                             )}
                           >
                             {field.value ? (
-                              format(field.value, "PPP")
+                              format(field.value, 'PPP')
                             ) : (
                               <span>Pick a date</span>
                             )}
@@ -273,7 +292,7 @@ export function EditBatchDialog({
                           selected={field.value}
                           onSelect={field.onChange}
                           disabled={(date) =>
-                            date > new Date() || date < new Date("1900-01-01")
+                            date > new Date() || date < new Date('1900-01-01')
                           }
                           initialFocus
                         />
@@ -304,14 +323,14 @@ export function EditBatchDialog({
               name="finishedGoodId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Finished Good</FormLabel>
+                  <FormLabel>Produk Jadi</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    value={field.value || ""}
+                    value={field.value || ''}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select finished good" />
+                        <SelectValue placeholder="Pilih produk jadi" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -329,37 +348,44 @@ export function EditBatchDialog({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Raw Materials Used</CardTitle>
+                <CardTitle className="text-base">
+                  Bahan Baku yang Digunakan
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-2 items-start">
+                  <div key={field.id} className="flex items-start gap-2">
                     <FormField
                       control={form.control}
                       name={`materials.${index}.rawMaterialId`}
                       render={({ field }) => (
                         <FormItem className="flex-1">
-                          <FormLabel>Raw Material</FormLabel>
+                          <FormLabel>Bahan Baku</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger className="w-full [&>span]:truncate">
-                                <SelectValue placeholder="Select raw material" />
+                                <SelectValue placeholder="Pilih bahan baku" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
                               {sortedRawMaterials.length === 0 ? (
-                                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                  No raw materials available
+                                <div className="text-muted-foreground px-2 py-6 text-center text-sm">
+                                  Tidak ada bahan baku tersedia
                                 </div>
                               ) : (
                                 <>
                                   {sortedRawMaterials.map((material) => {
-                                    const availableStock = getAvailableStock(material.id)
-                                    const isInBatch = materialsInBatch.includes(material.id)
-                                    const isDisabled = availableStock === 0 && !isInBatch
+                                    const availableStock = getAvailableStock(
+                                      material.id
+                                    )
+                                    const isInBatch = materialsInBatch.includes(
+                                      material.id
+                                    )
+                                    const isDisabled =
+                                      availableStock === 0 && !isInBatch
 
                                     return (
                                       <SelectItem
@@ -367,16 +393,17 @@ export function EditBatchDialog({
                                         value={material.id}
                                         disabled={isDisabled}
                                       >
-                                        <div className="flex items-center gap-2 max-w-[400px]">
+                                        <div className="flex max-w-[400px] items-center gap-2">
                                           <span className="truncate">
                                             {material.kode} - {material.name}
                                           </span>
                                           {availableStock > 0 ? (
-                                            <span className="text-green-600 font-medium whitespace-nowrap shrink-0">
-                                              (Available: {availableStock.toLocaleString()})
+                                            <span className="shrink-0 font-medium whitespace-nowrap text-green-600">
+                                              (Available:{' '}
+                                              {availableStock.toLocaleString()})
                                             </span>
                                           ) : (
-                                            <span className="text-destructive whitespace-nowrap shrink-0">
+                                            <span className="text-destructive shrink-0 whitespace-nowrap">
                                               (No Stock)
                                             </span>
                                           )}
@@ -428,7 +455,7 @@ export function EditBatchDialog({
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => append({ rawMaterialId: "", quantity: 0 })}
+                  onClick={() => append({ rawMaterialId: '', quantity: 0 })}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Material
@@ -445,7 +472,7 @@ export function EditBatchDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Updating..." : "Update"}
+                {isLoading ? 'Updating...' : 'Update'}
               </Button>
             </DialogFooter>
           </form>

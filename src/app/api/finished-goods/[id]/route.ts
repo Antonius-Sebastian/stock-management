@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
-import { canManageFinishedGoods, canDeleteFinishedGoods, getPermissionErrorMessage } from '@/lib/rbac'
+import {
+  canManageFinishedGoods,
+  canDeleteFinishedGoods,
+  getPermissionErrorMessage,
+} from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-
-const updateFinishedGoodSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-})
+import { finishedGoodSchema } from '@/lib/validations'
+import { updateFinishedGood, deleteFinishedGood } from '@/lib/services'
 
 export async function PUT(
   request: NextRequest,
@@ -22,46 +23,22 @@ export async function PUT(
 
     if (!canManageFinishedGoods(session.user.role)) {
       return NextResponse.json(
-        { error: getPermissionErrorMessage('edit finished goods', session.user.role) },
+        {
+          error: getPermissionErrorMessage(
+            'edit finished goods',
+            session.user.role
+          ),
+        },
         { status: 403 }
       )
     }
 
     const { id } = await params
     const body = await request.json()
-    const validatedData = updateFinishedGoodSchema.parse(body)
+    const validatedData = finishedGoodSchema.parse(body)
 
-    // Check if finished good exists
-    const existingProduct = await prisma.finishedGood.findUnique({
-      where: { id },
-    })
-
-    if (!existingProduct) {
-      return NextResponse.json(
-        { error: 'Finished good not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check for duplicate name (excluding current product)
-    const duplicateProduct = await prisma.finishedGood.findFirst({
-      where: {
-        name: validatedData.name,
-        id: { not: id },
-      },
-    })
-
-    if (duplicateProduct) {
-      return NextResponse.json(
-        { error: `Product "${validatedData.name}" already exists` },
-        { status: 400 }
-      )
-    }
-
-    const updatedProduct = await prisma.finishedGood.update({
-      where: { id },
-      data: validatedData,
-    })
+    // Update finished good using service
+    const updatedProduct = await updateFinishedGood(id, validatedData)
 
     return NextResponse.json(updatedProduct)
   } catch (error) {
@@ -76,10 +53,7 @@ export async function PUT(
     }
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json(
@@ -102,54 +76,27 @@ export async function DELETE(
 
     if (!canDeleteFinishedGoods(session.user.role)) {
       return NextResponse.json(
-        { error: getPermissionErrorMessage('delete finished goods', session.user.role) },
+        {
+          error: getPermissionErrorMessage(
+            'delete finished goods',
+            session.user.role
+          ),
+        },
         { status: 403 }
       )
     }
 
     const { id } = await params
 
-    // Check if finished good exists
-    const existingProduct = await prisma.finishedGood.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            stockMovements: true,
-            batches: true,
-          },
-        },
-      },
-    })
-
-    if (!existingProduct) {
-      return NextResponse.json(
-        { error: 'Finished good not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check if product has been used
-    if (existingProduct._count.stockMovements > 0 || existingProduct._count.batches > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete finished good that has stock movements or has been produced in batches' },
-        { status: 400 }
-      )
-    }
-
-    await prisma.finishedGood.delete({
-      where: { id },
-    })
+    // Delete finished good using service
+    await deleteFinishedGood(id)
 
     return NextResponse.json({ message: 'Finished good deleted successfully' })
   } catch (error) {
     logger.error('Error deleting finished good:', error)
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json(

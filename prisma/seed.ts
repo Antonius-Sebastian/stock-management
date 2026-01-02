@@ -60,9 +60,15 @@ async function main() {
   console.log('   Password: password123')
   console.log('')
   console.log('👤 Users created:')
-  console.log('   - Username: admin   | Role: ADMIN   | Email: admin@stockmanagement.local')
-  console.log('   - Username: factory | Role: FACTORY | Email: factory@stockmanagement.local')
-  console.log('   - Username: office  | Role: OFFICE  | Email: office@stockmanagement.local')
+  console.log(
+    '   - Username: admin   | Role: ADMIN   | Email: admin@stockmanagement.local'
+  )
+  console.log(
+    '   - Username: factory | Role: FACTORY | Email: factory@stockmanagement.local'
+  )
+  console.log(
+    '   - Username: office  | Role: OFFICE  | Email: office@stockmanagement.local'
+  )
 }
 
 main()

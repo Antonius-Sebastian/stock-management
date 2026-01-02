@@ -1,23 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import * as bcrypt from 'bcryptjs'
 import { auth } from '@/auth'
 import { canManageUsers, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { AuditHelpers, getIpAddress } from '@/lib/audit'
-
-const createUserSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  email: z.string().email('Invalid email').optional().nullable(),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
-  name: z.string().min(1, 'Name is required'),
-  role: z.enum(['ADMIN', 'FACTORY', 'OFFICE']),
-})
+import { createUserSchema } from '@/lib/validations'
+import { getUsers, createUser } from '@/lib/services'
 
 export async function GET() {
   try {
@@ -34,25 +22,16 @@ export async function GET() {
       )
     }
 
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    // Get users using service
+    const users = await getUsers()
 
     return NextResponse.json(users)
   } catch (error) {
     logger.error('Error fetching users:', error)
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to fetch users' },
+      { status: 500 }
+    )
   }
 }
 
@@ -93,55 +72,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = createUserSchema.parse(body)
 
-    // Check for duplicate username
-    const existingUser = await prisma.user.findUnique({
-      where: { username: validatedData.username },
-    })
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: `Username "${validatedData.username}" already exists` },
-        { status: 400 }
-      )
-    }
-
-    // Check for duplicate email if provided
-    if (validatedData.email) {
-      const existingEmail = await prisma.user.findUnique({
-        where: { email: validatedData.email },
-      })
-
-      if (existingEmail) {
-        return NextResponse.json(
-          { error: `Email "${validatedData.email}" already exists` },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(validatedData.password, 10)
-
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        username: validatedData.username,
-        email: validatedData.email,
-        password: hashedPassword,
-        name: validatedData.name,
-        role: validatedData.role,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-    })
+    // Create user using service
+    const user = await createUser(validatedData)
 
     // Audit log
     await AuditHelpers.userCreated(
@@ -171,6 +103,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to create user' },
+      { status: 500 }
+    )
   }
 }

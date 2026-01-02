@@ -27,7 +27,8 @@ export const translations = {
   rawMaterialsTitle: 'Bahan Baku',
   rawMaterialsDescription: 'Kelola inventori bahan baku Anda',
   rawMaterialsInventory: 'Inventori Bahan Baku',
-  rawMaterialsInventoryDescription: 'Lihat dan kelola semua bahan baku dengan indikator level stok',
+  rawMaterialsInventoryDescription:
+    'Lihat dan kelola semua bahan baku dengan indikator level stok',
   addRawMaterial: 'Tambah Bahan Baku',
   editRawMaterial: 'Edit Bahan Baku',
   deleteRawMaterial: 'Hapus Bahan Baku',
@@ -56,7 +57,8 @@ export const translations = {
 
   // Reports
   stockReportsTitle: 'Laporan Stok',
-  stockReportsDescription: 'Lihat laporan stok harian untuk bahan baku dan produk jadi',
+  stockReportsDescription:
+    'Lihat laporan stok harian untuk bahan baku dan produk jadi',
 
   // Users
   usersTitle: 'Manajemen User',

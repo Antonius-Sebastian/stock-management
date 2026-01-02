@@ -11,6 +11,7 @@ A modern, web-based inventory management system built for soap manufacturing ope
 ## 📋 Overview
 
 This system provides centralized management for:
+
 - **Raw material inventory** with MOQ-based stock alerts
 - **Finished goods tracking** with complete movement history
 - **Production batch logging** with automatic stock deduction
@@ -24,18 +25,21 @@ Built for small to medium manufacturing operations with emphasis on simplicity a
 ## ✨ Key Features
 
 ### 📦 Inventory Management
+
 - Raw materials & finished goods master data (CRUD)
 - Stock level indicators (red/yellow/green badges)
 - Manual stock entry (IN/OUT) with dual-mode dialog
 - Delete protection for items with transaction history
 
 ### 🏭 Production Tracking
+
 - Multi-material batch logging
 - Automatic raw material stock deduction
 - Batch detail views with material breakdown
 - Complete production history
 
 ### 📊 Reporting & Analytics
+
 - Interactive pivot-style reports
 - Four data views: Opening, In, Out, Remaining stock
 - Excel export with comprehensive stock data
@@ -43,12 +47,14 @@ Built for small to medium manufacturing operations with emphasis on simplicity a
 - Real-time stock calculations
 
 ### 🔒 Security
+
 - NextAuth.js authentication with JWT sessions
 - Role-based user accounts (Admin, Factory, Office)
 - Protected API endpoints
 - Bcrypt password hashing
 
 ### 📈 Audit Trail
+
 - Complete movement history for all items
 - Running balance calculations
 - Clickable batch references
@@ -89,6 +95,7 @@ npm run dev
 ```
 
 Visit `http://localhost:3000` and login with:
+
 - **Username:** `admin`
 - **Password:** `password123`
 
@@ -99,21 +106,25 @@ Visit `http://localhost:3000` and login with:
 ## 🛠️ Tech Stack
 
 ### Framework & Core
-- **Next.js 15.5.4** - App Router with Turbopack
+
+- **Next.js 16.1.1** - App Router with Turbopack (default)
 - **TypeScript** - 100% type coverage
-- **React 19** - Latest features
+- **React 19.2.3** - Latest stable version
 
 ### UI & Styling
+
 - **Tailwind CSS** - Utility-first styling
 - **shadcn/ui** - High-quality components
 - **Radix UI** - Accessible primitives
 
 ### Backend & Database
+
 - **Prisma** - Type-safe ORM
 - **PostgreSQL** - Primary database (via Supabase)
 - **NextAuth.js v5** - Authentication
 
 ### Validation & Security
+
 - **Zod** - Schema validation
 - **Bcrypt** - Password hashing
 
@@ -122,11 +133,13 @@ Visit `http://localhost:3000` and login with:
 ## 📚 Documentation
 
 ### Quick Links
+
 - **[Quick Start Guide](docs/QUICKSTART.md)** - 5-minute setup
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history
 - **[Documentation Index](docs/README.md)** - Complete documentation map
 
 ### For Developers
+
 - **[API Reference](docs/reference/API.md)** - Complete endpoint documentation
 - **[Deployment Guide](docs/guides/DEPLOYMENT.md)** - Production deployment
 - **[Testing Guide](docs/guides/TESTING_GUIDE.md)** - Testing scenarios
@@ -189,6 +202,7 @@ AUTH_SECRET="<same-as-nextauth-secret>"
 ```
 
 **Generate secure secrets:**
+
 ```bash
 openssl rand -base64 32
 ```
@@ -223,11 +237,11 @@ npx prisma generate  # Generate Prisma Client
 
 The seed script creates 3 default users:
 
-| Username | Password | Role | Description |
-|----------|----------|------|-------------|
-| admin | password123 | ADMIN | Full system access |
-| factory | password123 | FACTORY | Factory staff access |
-| office | password123 | OFFICE | Office staff access |
+| Username | Password    | Role    | Description          |
+| -------- | ----------- | ------- | -------------------- |
+| admin    | password123 | ADMIN   | Full system access   |
+| factory  | password123 | FACTORY | Factory staff access |
+| office   | password123 | OFFICE  | Office staff access  |
 
 ⚠️ **IMPORTANT:** Change these passwords in production!
 
@@ -248,6 +262,7 @@ vercel --prod
 ### Other Platforms
 
 See **[Deployment Guide](docs/guides/DEPLOYMENT.md)** for detailed deployment guides:
+
 - Vercel (recommended)
 - Netlify
 - Self-hosted VPS with PM2
@@ -262,6 +277,7 @@ See **[Deployment Guide](docs/guides/DEPLOYMENT.md)** for detailed deployment gu
 Follow **[Testing Guide](docs/guides/TESTING_GUIDE.md)** for comprehensive testing scenarios.
 
 Quick smoke test:
+
 ```bash
 # 1. Start dev server
 npm run dev
@@ -278,6 +294,7 @@ npm run dev
 ### API Testing
 
 Use cURL, Postman, or similar:
+
 ```bash
 # Login
 curl -X POST http://localhost:3000/api/auth/signin \
@@ -296,6 +313,7 @@ See **[API Reference](docs/reference/API.md)** for complete API reference.
 ## ✅ Recent Updates
 
 ### Latest Improvements
+
 - ✅ **Batch Editing**: ADMIN users can now edit batch raw material usage
 - ✅ **Stock Reports**: Simplified read-only display (removed inline editing)
 - ✅ **RBAC Enforcement**: Complete role-based access control implemented
@@ -303,6 +321,7 @@ See **[API Reference](docs/reference/API.md)** for complete API reference.
 - ✅ **Permission Cleanup**: Empty action buttons hidden when user has no permissions
 
 ### Current Limitations (MVP)
+
 - No user management UI (API available)
 - Single location only (no multi-warehouse)
 
@@ -311,18 +330,21 @@ See **[API Reference](docs/reference/API.md)** for complete API reference.
 ## 🗺️ Roadmap
 
 ### Phase 1 (Post-MVP)
+
 - [ ] User management UI
 - [ ] Clone Batch feature
 - [ ] Dashboard with analytics
 - [ ] Email notifications
 
 ### Phase 2 (Advanced)
+
 - [ ] Supplier management
 - [ ] Purchase order workflow
 - [ ] Low stock notifications
 - [ ] Advanced reporting
 
 ### Phase 3 (Enterprise)
+
 - [ ] Multi-location support
 - [ ] Barcode scanning
 - [ ] Mobile application
@@ -349,6 +371,7 @@ See **[API Reference](docs/reference/API.md)** for complete API reference.
 - ✅ Transaction-safe operations
 
 **For production:**
+
 - Generate unique secrets (don't use defaults!)
 - Enable HTTPS/SSL
 - Set up rate limiting
@@ -358,11 +381,144 @@ See **[API Reference](docs/reference/API.md)** for complete API reference.
 
 ---
 
+## 📐 Coding Standards
+
+This project enforces consistent code quality through automated linting and formatting tools.
+
+### Tools
+
+- **ESLint 9** - Code linting with strict rules
+- **Prettier** - Automatic code formatting
+- **TypeScript** - Type safety and static analysis
+- **EditorConfig** - Consistent editor settings
+
+### Formatting Rules
+
+**Prettier Configuration:**
+
+- No semicolons (`semi: false`)
+- Single quotes (`singleQuote: true`)
+- Trailing commas (ES5 style)
+- 2-space indentation
+- 80 character line width
+- LF line endings
+- Automatic Tailwind CSS class sorting
+
+**Example:**
+
+```typescript
+// ✅ Correct
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+
+export function MyComponent() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <Button
+      onClick={() => setCount(count + 1)}
+      className="rounded-lg bg-blue-500 px-4 py-2"
+    >
+      Count: {count}
+    </Button>
+  )
+}
+```
+
+### Linting Rules
+
+**ESLint Configuration:**
+
+- **Unused Variables:** Error (with `_` prefix exception)
+- **Import Order:** Alphabetical, grouped by type
+- **React Hooks:** Exhaustive deps warning
+- **TypeScript:** No `any` types (warning)
+- **Code Quality:** No console.log, prefer const, no var
+
+**Import Order:**
+
+1. Built-in modules (Node.js)
+2. External packages (npm)
+3. Internal modules (`@/...`)
+4. Parent directories (`../`)
+5. Sibling files (`./`)
+6. Index files
+
+**Example:**
+
+```typescript
+// ✅ Correct import order
+import { useState } from 'react'
+import { z } from 'zod'
+
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+
+import { formatDate } from '../utils/date'
+import { validateInput } from './validation'
+```
+
+### Available Commands
+
+```bash
+# Lint code
+npm run lint
+
+# Fix linting issues automatically
+npm run lint:fix
+
+# Format code with Prettier
+npm run format
+
+# Check formatting without changing files
+npm run format:check
+
+# Type check without building
+npm run type-check
+```
+
+### Editor Setup
+
+**VS Code (Recommended):**
+
+1. Install extensions:
+   - ESLint
+   - Prettier - Code formatter
+   - EditorConfig for VS Code
+2. Add to `.vscode/settings.json`:
+
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  }
+}
+```
+
+**Other Editors:**
+
+- Ensure EditorConfig plugin is installed
+- Configure Prettier as default formatter
+- Enable ESLint integration
+
+### Pre-commit Checklist
+
+Before committing code:
+
+1. ✅ Run `npm run lint` - No errors
+2. ✅ Run `npm run format` - Code formatted
+3. ✅ Run `npm run type-check` - No type errors
+4. ✅ Run `npm run build` - Build succeeds
+
+---
+
 ## 🤝 Contributing
 
 This is a private project for a specific client. However, if you're working on this codebase:
 
-1. Follow the existing code style (TypeScript + Prettier)
+1. Follow the coding standards above
 2. Write meaningful commit messages
 3. Test your changes thoroughly
 4. Update documentation as needed
@@ -381,11 +537,13 @@ This software is developed for a specific client and is not open source.
 ## 📞 Support
 
 ### Documentation
+
 - Start with **[STATUS.md](STATUS.md)** for current project status
 - Check **[Known Issues](docs/reference/KNOWN_ISSUES.md)** for common problems
 - Refer to **[Testing Guide](docs/guides/TESTING_GUIDE.md)** for usage instructions
 
 ### Contact
+
 - **Issues:** GitHub Issues (if available)
 - **Email:** support@yourdomain.com
 - **Documentation:** See `/docs` folder
@@ -395,6 +553,7 @@ This software is developed for a specific client and is not open source.
 ## 🎯 Success Metrics
 
 ### MVP Completion
+
 - ✅ All core features implemented
 - ✅ All critical bugs fixed
 - ✅ Authentication secured
@@ -403,6 +562,7 @@ This software is developed for a specific client and is not open source.
 - ✅ Production ready
 
 ### Code Quality
+
 - ✅ TypeScript: 100% coverage
 - ✅ Zero type errors
 - ✅ Security audit passed

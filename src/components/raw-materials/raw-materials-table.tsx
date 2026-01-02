@@ -1,12 +1,19 @@
-"use client"
+'use client'
 
-import Link from "next/link"
-import { ColumnDef } from "@tanstack/react-table"
-import { RawMaterial } from "@prisma/client"
-import { DataTable } from "@/components/ui/data-table"
-import { StockLevelBadge } from "@/components/ui/stock-level-badge"
-import { Button } from "@/components/ui/button"
-import { ArrowUpDown, MoreHorizontal, Edit, Trash2, ArrowDownCircle, Settings } from "lucide-react"
+import Link from 'next/link'
+import { ColumnDef } from '@tanstack/react-table'
+import { RawMaterial } from '@prisma/client'
+import { DataTable } from '@/components/ui/data-table'
+import { StockLevelBadge } from '@/components/ui/stock-level-badge'
+import { Button } from '@/components/ui/button'
+import {
+  ArrowUpDown,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  ArrowDownCircle,
+  Settings,
+} from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,11 +21,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useState } from "react"
-import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
-import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog"
-import { canManageMaterials, canDeleteMaterials, canCreateStockMovement, canCreateStockAdjustment } from "@/lib/rbac"
+} from '@/components/ui/dropdown-menu'
+import { useState } from 'react'
+import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
+import { StockAdjustmentDialog } from '@/components/stock/stock-adjustment-dialog'
+import {
+  canManageMaterials,
+  canDeleteMaterials,
+  canCreateStockMovement,
+  canCreateStockAdjustment,
+} from '@/lib/rbac'
 
 interface RawMaterialsTableProps {
   data: RawMaterial[]
@@ -28,10 +40,18 @@ interface RawMaterialsTableProps {
   userRole?: string
 }
 
-export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole }: RawMaterialsTableProps) {
+export function RawMaterialsTable({
+  data,
+  onEdit,
+  onDelete,
+  onRefresh,
+  userRole,
+}: RawMaterialsTableProps) {
   const [stockDialogOpen, setStockDialogOpen] = useState(false)
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
-  const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null)
+  const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(
+    null
+  )
 
   const handleStockIn = (material: RawMaterial) => {
     setSelectedMaterial(material)
@@ -52,12 +72,12 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
 
   const columns: ColumnDef<RawMaterial>[] = [
     {
-      accessorKey: "kode",
+      accessorKey: 'kode',
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             Kode
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -66,12 +86,12 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
       },
     },
     {
-      accessorKey: "name",
+      accessorKey: 'name',
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             Nama Material
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -83,7 +103,7 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
         return (
           <Link
             href={`/raw-materials/${material.id}`}
-            className="text-primary hover:underline font-medium block overflow-hidden truncate max-w-md"
+            className="text-primary block max-w-md truncate overflow-hidden font-medium hover:underline"
             title={material.name}
           >
             {material.name}
@@ -92,12 +112,12 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
       },
     },
     {
-      accessorKey: "currentStock",
+      accessorKey: 'currentStock',
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             Stok Saat Ini
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -105,7 +125,7 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
         )
       },
       cell: ({ row }) => {
-        const stock = row.getValue("currentStock") as number
+        const stock = row.getValue('currentStock') as number
         const moq = row.original.moq
 
         return (
@@ -117,12 +137,12 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
       },
     },
     {
-      accessorKey: "moq",
+      accessorKey: 'moq',
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             MOQ
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -130,22 +150,30 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
         )
       },
       cell: ({ row }) => {
-        const moq = row.getValue("moq") as number
+        const moq = row.getValue('moq') as number
         return <span>{moq.toLocaleString()}</span>
       },
     },
     {
-      id: "actions",
-      header: "Aksi",
+      id: 'actions',
+      header: 'Aksi',
       cell: ({ row }) => {
         const material = row.original
 
         // Check if user has any permissions
         const hasEditPermission = canManageMaterials(userRole)
-        const hasStockInPermission = canCreateStockMovement(userRole, 'raw-material', 'IN')
+        const hasStockInPermission = canCreateStockMovement(
+          userRole,
+          'raw-material',
+          'IN'
+        )
         const hasAdjustPermission = canCreateStockAdjustment(userRole)
         const hasDeletePermission = canDeleteMaterials(userRole)
-        const hasAnyPermission = hasEditPermission || hasStockInPermission || hasAdjustPermission || hasDeletePermission
+        const hasAnyPermission =
+          hasEditPermission ||
+          hasStockInPermission ||
+          hasAdjustPermission ||
+          hasDeletePermission
 
         // Don't show action button if no permissions
         if (!hasAnyPermission) {
@@ -205,7 +233,7 @@ export function RawMaterialsTable({ data, onEdit, onDelete, onRefresh, userRole 
       <DataTable
         columns={columns}
         data={data}
-        searchKeys={["name", "kode"]}
+        searchKeys={['name', 'kode']}
         searchPlaceholder="Cari bahan baku (nama atau kode)..."
         emptyMessage="Belum ada bahan baku. Klik 'Tambah Bahan Baku' untuk memulai!"
         tableId="raw-materials"

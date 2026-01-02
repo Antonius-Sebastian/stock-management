@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from 'next/server'
 
 /**
  * Standardized API response types
@@ -54,9 +54,16 @@ export function errorResponse(error: string, status: number, code?: string) {
  * Common error responses
  */
 export const ErrorResponses = {
-  unauthorized: () => errorResponse("Unauthorized", 401, "UNAUTHORIZED"),
-  forbidden: (message?: string) => errorResponse(message || "Forbidden", 403, "FORBIDDEN"),
-  notFound: (resource?: string) => errorResponse(resource ? `${resource} not found` : "Not found", 404, "NOT_FOUND"),
-  badRequest: (message: string) => errorResponse(message, 400, "BAD_REQUEST"),
-  internalError: () => errorResponse("Internal server error", 500, "INTERNAL_ERROR"),
+  unauthorized: () => errorResponse('Unauthorized', 401, 'UNAUTHORIZED'),
+  forbidden: (message?: string) =>
+    errorResponse(message || 'Forbidden', 403, 'FORBIDDEN'),
+  notFound: (resource?: string) =>
+    errorResponse(
+      resource ? `${resource} not found` : 'Not found',
+      404,
+      'NOT_FOUND'
+    ),
+  badRequest: (message: string) => errorResponse(message, 400, 'BAD_REQUEST'),
+  internalError: () =>
+    errorResponse('Internal server error', 500, 'INTERNAL_ERROR'),
 }

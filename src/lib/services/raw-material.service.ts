@@ -1,0 +1,280 @@
+/**
+ * Raw Material Service
+ *
+ * Handles all database operations for raw materials
+ * Separates business logic from API route handlers
+ */
+
+import { prisma } from '@/lib/db'
+import { RawMaterialInput } from '@/lib/validations'
+import { RawMaterial } from '@prisma/client'
+
+/**
+ * Pagination options for list queries
+ */
+export interface PaginationOptions {
+  page?: number
+  limit?: number
+}
+
+/**
+ * Pagination metadata returned with paginated results
+ */
+export interface PaginationMetadata {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasMore: boolean
+}
+
+/**
+ * Get all raw materials with optional pagination
+ *
+ * @param options - Optional pagination parameters
+ * @returns Raw materials list, with pagination metadata if pagination is used
+ *
+ * @remarks
+ * - If no pagination options provided, returns all materials
+ * - Pagination: page (min 1), limit (1-100, default 50)
+ * - Results ordered by creation date (newest first)
+ */
+export async function getRawMaterials(
+  options?: PaginationOptions
+): Promise<
+  RawMaterial[] | { data: RawMaterial[]; pagination: PaginationMetadata }
+> {
+  if (!options?.page && !options?.limit) {
+    return await prisma.rawMaterial.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  const page = Math.max(1, options.page || 1)
+  const limit = Math.min(100, Math.max(1, options.limit || 50))
+  const skip = (page - 1) * limit
+
+  const [rawMaterials, total] = await Promise.all([
+    prisma.rawMaterial.findMany({
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.rawMaterial.count(),
+  ])
+
+  return {
+    data: rawMaterials,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + rawMaterials.length < total,
+    },
+  }
+}
+
+/**
+ * Get a single raw material by ID
+ *
+ * @param id - Raw material ID
+ * @returns Raw material
+ * @throws {Error} If raw material not found
+ */
+export async function getRawMaterialById(id: string): Promise<RawMaterial> {
+  const material = await prisma.rawMaterial.findUnique({
+    where: { id },
+  })
+
+  if (!material) {
+    throw new Error('Raw material not found')
+  }
+
+  return material
+}
+
+/**
+ * Create a new raw material
+ *
+ * @param data - Raw material input data (validated)
+ * @returns Created raw material
+ * @throws {Error} If material code already exists
+ *
+ * @remarks
+ * - Always starts with currentStock = 0
+ * - Validates duplicate code before creation
+ */
+export async function createRawMaterial(
+  data: RawMaterialInput
+): Promise<RawMaterial> {
+  const existing = await prisma.rawMaterial.findFirst({
+    where: { kode: data.kode },
+  })
+
+  if (existing) {
+    throw new Error(`Material code "${data.kode}" already exists`)
+  }
+
+  return await prisma.rawMaterial.create({
+    data: {
+      ...data,
+      currentStock: 0,
+    },
+  })
+}
+
+/**
+ * Update an existing raw material
+ *
+ * @param id - Raw material ID
+ * @param data - Updated raw material data (validated)
+ * @returns Updated raw material
+ * @throws {Error} If raw material not found
+ * @throws {Error} If material code already exists (excluding current material)
+ *
+ * @remarks
+ * - Validates duplicate code excluding current material
+ * - Does not update currentStock (only changed via movements)
+ */
+export async function updateRawMaterial(
+  id: string,
+  data: RawMaterialInput
+): Promise<RawMaterial> {
+  const existing = await prisma.rawMaterial.findUnique({
+    where: { id },
+  })
+
+  if (!existing) {
+    throw new Error('Raw material not found')
+  }
+
+  const duplicate = await prisma.rawMaterial.findFirst({
+    where: {
+      kode: data.kode,
+      id: { not: id },
+    },
+  })
+
+  if (duplicate) {
+    throw new Error(`Material code "${data.kode}" already exists`)
+  }
+
+  return await prisma.rawMaterial.update({
+    where: { id },
+    data,
+  })
+}
+
+/**
+ * Delete a raw material
+ *
+ * @param id - Raw material ID
+ * @returns void
+ * @throws {Error} If raw material not found
+ *
+ * @remarks
+ * - Cascade deletes handled by Prisma schema
+ * - Should check for transaction history (currently not enforced)
+ */
+export async function deleteRawMaterial(id: string): Promise<void> {
+  const existing = await prisma.rawMaterial.findUnique({
+    where: { id },
+  })
+
+  if (!existing) {
+    throw new Error('Raw material not found')
+  }
+
+  await prisma.rawMaterial.delete({
+    where: { id },
+  })
+}
+
+/**
+ * Get stock movement history for a raw material with running balance
+ *
+ * @param id - Raw material ID
+ * @returns Material info and movements with running balance
+ * @throws {Error} If raw material not found
+ *
+ * @remarks
+ * - Calculates running balance starting from 0
+ * - Movements ordered by date ascending for balance calculation
+ * - Returns movements in reverse order (newest first) for display
+ */
+export async function getRawMaterialMovements(id: string): Promise<{
+  material: Pick<RawMaterial, 'id' | 'kode' | 'name' | 'currentStock' | 'moq'>
+  movements: Array<{
+    id: string
+    type: string
+    quantity: number
+    date: Date
+    description: string | null
+    batch: { id: string; code: string } | null
+    runningBalance: number
+    createdAt: Date
+  }>
+}> {
+  const material = await prisma.rawMaterial.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      kode: true,
+      name: true,
+      currentStock: true,
+      moq: true,
+    },
+  })
+
+  if (!material) {
+    throw new Error('Raw material not found')
+  }
+
+  const movements = await prisma.stockMovement.findMany({
+    where: {
+      rawMaterialId: id,
+    },
+    include: {
+      batch: {
+        select: {
+          id: true,
+          code: true,
+        },
+      },
+    },
+    orderBy: {
+      date: 'asc', // Start from oldest to calculate running balance
+    },
+  })
+
+  // Calculate running balance for each movement
+  let runningBalance = 0
+  const movementsWithBalance = movements.map((movement) => {
+    // Apply this movement
+    if (movement.type === 'IN' || movement.type === 'ADJUSTMENT') {
+      runningBalance += movement.quantity
+    } else {
+      runningBalance -= movement.quantity
+    }
+
+    return {
+      id: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      date: movement.date,
+      description: movement.description,
+      batch: movement.batch,
+      runningBalance: Math.round(runningBalance * 100) / 100, // Round to 2 decimal places
+      createdAt: movement.createdAt,
+    }
+  })
+
+  // Reverse to show newest first
+  movementsWithBalance.reverse()
+
+  return {
+    material,
+    movements: movementsWithBalance,
+  }
+}

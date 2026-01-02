@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -10,17 +10,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { toast } from "sonner"
+} from '@/components/ui/select'
+import { toast } from 'sonner'
 
 type AddUserDialogProps = {
   children: React.ReactNode
@@ -31,11 +31,11 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    password: "",
-    name: "",
-    role: "OFFICE" as "ADMIN" | "FACTORY" | "OFFICE",
+    username: '',
+    email: '',
+    password: '',
+    name: '',
+    role: 'OFFICE' as 'ADMIN' | 'FACTORY' | 'OFFICE',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,10 +43,10 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/users", {
-        method: "POST",
+      const response = await fetch('/api/users', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           username: formData.username,
@@ -61,19 +61,19 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
         toast.success(`User "${formData.username}" created successfully`)
         setOpen(false)
         setFormData({
-          username: "",
-          email: "",
-          password: "",
-          name: "",
-          role: "OFFICE",
+          username: '',
+          email: '',
+          password: '',
+          name: '',
+          role: 'OFFICE',
         })
         onSuccess()
       } else {
         const data = await response.json()
-        toast.error(data.error || "Failed to create user")
+        toast.error(data.error || 'Failed to create user')
       }
     } catch {
-      toast.error("Failed to create user")
+      toast.error('Failed to create user')
     } finally {
       setLoading(false)
     }
@@ -82,12 +82,13 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
         <form onSubmit={handleSubmit} className="overflow-hidden">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription>
-              Create a new user account. Default password can be changed after login.
+              Create a new user account. Default password can be changed after
+              login.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -154,7 +155,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               </Label>
               <Select
                 value={formData.role}
-                onValueChange={(value: "ADMIN" | "FACTORY" | "OFFICE") =>
+                onValueChange={(value: 'ADMIN' | 'FACTORY' | 'OFFICE') =>
                   setFormData({ ...formData, role: value })
                 }
               >
@@ -163,7 +164,9 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin - Full Access</SelectItem>
-                  <SelectItem value="FACTORY">Factory - Factory Staff</SelectItem>
+                  <SelectItem value="FACTORY">
+                    Factory - Factory Staff
+                  </SelectItem>
                   <SelectItem value="OFFICE">Office - Office Staff</SelectItem>
                 </SelectContent>
               </Select>
@@ -179,7 +182,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create User"}
+              {loading ? 'Creating...' : 'Create User'}
             </Button>
           </DialogFooter>
         </form>

@@ -1,18 +1,24 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { RawMaterial } from "@prisma/client"
-import { toast } from "sonner"
-import { useSession } from "next-auth/react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { RawMaterialsTable } from "@/components/raw-materials/raw-materials-table"
-import { AddRawMaterialDialog } from "@/components/raw-materials/add-raw-material-dialog"
-import { EditRawMaterialDialog } from "@/components/raw-materials/edit-raw-material-dialog"
-import { StockEntryDialog } from "@/components/stock/stock-entry-dialog"
-import { Button } from "@/components/ui/button"
-import { TrendingUp } from "lucide-react"
-import { canManageMaterials, canCreateStockMovement, canCreateStockAdjustment } from "@/lib/rbac"
-import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog"
+import { useEffect, useState } from 'react'
+import { RawMaterial } from '@prisma/client'
+import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { RawMaterialsTable } from '@/components/raw-materials/raw-materials-table'
+import { AddRawMaterialDialog } from '@/components/raw-materials/add-raw-material-dialog'
+import { EditRawMaterialDialog } from '@/components/raw-materials/edit-raw-material-dialog'
+import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
+import { Button } from '@/components/ui/button'
+import { TrendingUp } from 'lucide-react'
+import { logger } from '@/lib/logger'
+import { canManageMaterials, canCreateStockMovement } from '@/lib/rbac'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +28,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/alert-dialog'
 
 export default function RawMaterialsPage() {
   const { data: session } = useSession()
@@ -30,24 +36,28 @@ export default function RawMaterialsPage() {
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null)
+  const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(
+    null
+  )
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [materialToDelete, setMaterialToDelete] = useState<RawMaterial | null>(null)
+  const [materialToDelete, setMaterialToDelete] = useState<RawMaterial | null>(
+    null
+  )
   const [movementCount, setMovementCount] = useState(0)
 
   const fetchRawMaterials = async () => {
     try {
-      const response = await fetch("/api/raw-materials")
+      const response = await fetch('/api/raw-materials')
       if (!response.ok) {
-        throw new Error("Failed to fetch raw materials")
+        throw new Error('Failed to fetch raw materials')
       }
       const data = await response.json()
       // Handle both array response and paginated response
-      const materials = Array.isArray(data) ? data : (data.data || [])
+      const materials = Array.isArray(data) ? data : data.data || []
       setRawMaterials(materials)
     } catch (error) {
-      console.error("Error fetching raw materials:", error)
-      toast.error("Gagal memuat bahan baku. Silakan refresh halaman.")
+      logger.error('Error fetching raw materials:', error)
+      toast.error('Gagal memuat bahan baku. Silakan refresh halaman.')
     } finally {
       setIsLoading(false)
     }
@@ -69,13 +79,15 @@ export default function RawMaterialsPage() {
   const handleDelete = async (material: RawMaterial) => {
     // Fetch movement count
     try {
-      const response = await fetch(`/api/raw-materials/${material.id}/movements`)
+      const response = await fetch(
+        `/api/raw-materials/${material.id}/movements`
+      )
       if (response.ok) {
         const data = await response.json()
         setMovementCount(data.movements?.length || 0)
       }
     } catch (error) {
-      console.error("Error fetching movements:", error)
+      logger.error('Error fetching movements:', error)
       setMovementCount(0)
     }
 
@@ -87,29 +99,34 @@ export default function RawMaterialsPage() {
     if (!materialToDelete) return
 
     try {
-      const response = await fetch(`/api/raw-materials/${materialToDelete.id}`, {
-        method: "DELETE",
-      })
+      const response = await fetch(
+        `/api/raw-materials/${materialToDelete.id}`,
+        {
+          method: 'DELETE',
+        }
+      )
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Gagal menghapus bahan baku")
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Gagal menghapus bahan baku')
       }
 
-      toast.success("Bahan baku berhasil dihapus")
+      toast.success('Bahan baku berhasil dihapus')
       fetchRawMaterials()
       setDeleteDialogOpen(false)
       setMaterialToDelete(null)
     } catch (error) {
-      console.error("Error deleting raw material:", error)
-      const message = error instanceof Error ? error.message : "Gagal menghapus bahan baku"
+      const message =
+        error instanceof Error ? error.message : 'Gagal menghapus bahan baku'
       toast.error(message)
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-lg">Memuat...</div>
       </div>
     )
@@ -117,9 +134,11 @@ export default function RawMaterialsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Bahan Baku</h1>
+          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            Bahan Baku
+          </h1>
           <p className="text-muted-foreground text-sm lg:text-base">
             Kelola inventori bahan baku Anda
           </p>
@@ -173,15 +192,19 @@ export default function RawMaterialsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Bahan Baku?</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus &quot;{materialToDelete?.name}&quot;?
+              Apakah Anda yakin ingin menghapus &quot;{materialToDelete?.name}
+              &quot;?
               {movementCount > 0 && (
                 <>
-                  <br /><br />
-                  <span className="font-semibold text-destructive">
-                    Peringatan: Bahan baku ini memiliki {movementCount} pergerakan stok yang akan ikut terhapus.
+                  <br />
+                  <br />
+                  <span className="text-destructive font-semibold">
+                    Peringatan: Bahan baku ini memiliki {movementCount}{' '}
+                    pergerakan stok yang akan ikut terhapus.
                   </span>
                   <br />
-                  Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data terkait termasuk riwayat pergerakan stok.
+                  Tindakan ini tidak dapat dibatalkan dan akan menghapus semua
+                  data terkait termasuk riwayat pergerakan stok.
                 </>
               )}
               {movementCount === 0 && (
@@ -194,7 +217,10 @@ export default function RawMaterialsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
               Hapus
             </AlertDialogAction>
           </AlertDialogFooter>

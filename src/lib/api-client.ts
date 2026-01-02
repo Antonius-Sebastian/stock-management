@@ -13,7 +13,7 @@ export class ApiError extends Error {
     public code?: string
   ) {
     super(message)
-    this.name = "ApiError"
+    this.name = 'ApiError'
   }
 }
 
@@ -28,7 +28,7 @@ export async function apiFetch<T>(
     const response = await fetch(url, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         ...options?.headers,
       },
     })
@@ -36,11 +36,11 @@ export async function apiFetch<T>(
     if (!response.ok) {
       // Try to parse error response
       const errorData = await response.json().catch(() => ({
-        error: response.statusText || "Unknown error",
+        error: response.statusText || 'Unknown error',
       }))
 
       throw new ApiError(
-        errorData.error || "Request failed",
+        errorData.error || 'Request failed',
         response.status,
         errorData.code
       )
@@ -54,7 +54,7 @@ export async function apiFetch<T>(
 
     // Network error or other fetch error
     throw new ApiError(
-      error instanceof Error ? error.message : "Network error",
+      error instanceof Error ? error.message : 'Network error',
       0
     )
   }
@@ -64,7 +64,7 @@ export async function apiFetch<T>(
  * GET request helper
  */
 export async function apiGet<T>(url: string): Promise<T> {
-  return apiFetch<T>(url, { method: "GET" })
+  return apiFetch<T>(url, { method: 'GET' })
 }
 
 /**
@@ -72,7 +72,7 @@ export async function apiGet<T>(url: string): Promise<T> {
  */
 export async function apiPost<T>(url: string, data?: unknown): Promise<T> {
   return apiFetch<T>(url, {
-    method: "POST",
+    method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
   })
 }
@@ -82,7 +82,7 @@ export async function apiPost<T>(url: string, data?: unknown): Promise<T> {
  */
 export async function apiPut<T>(url: string, data?: unknown): Promise<T> {
   return apiFetch<T>(url, {
-    method: "PUT",
+    method: 'PUT',
     body: data ? JSON.stringify(data) : undefined,
   })
 }
@@ -91,5 +91,5 @@ export async function apiPut<T>(url: string, data?: unknown): Promise<T> {
  * DELETE request helper
  */
 export async function apiDelete<T>(url: string): Promise<T> {
-  return apiFetch<T>(url, { method: "DELETE" })
+  return apiFetch<T>(url, { method: 'DELETE' })
 }

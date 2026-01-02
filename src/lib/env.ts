@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from 'zod'
 
 /**
  * Environment variable validation
@@ -8,15 +8,17 @@ import { z } from "zod"
 
 const envSchema = z.object({
   // Database
-  DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
-  DIRECT_URL: z.string().url("DIRECT_URL must be a valid URL").optional(),
+  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
+  DIRECT_URL: z.string().url('DIRECT_URL must be a valid URL').optional(),
 
   // NextAuth
-  NEXTAUTH_SECRET: z.string().min(32, "NEXTAUTH_SECRET must be at least 32 characters"),
-  NEXTAUTH_URL: z.string().url("NEXTAUTH_URL must be a valid URL"),
+  NEXTAUTH_SECRET: z
+    .string()
+    .min(32, 'NEXTAUTH_SECRET must be at least 32 characters'),
+  NEXTAUTH_URL: z.string().url('NEXTAUTH_URL must be a valid URL'),
 
   // Node Environment
-  NODE_ENV: z.enum(["development", "production", "test"]).optional(),
+  NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
 })
 
 /**
@@ -28,15 +30,15 @@ export const env = envSchema.parse({
   DIRECT_URL: process.env.DIRECT_URL,
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-  NODE_ENV: process.env.NODE_ENV || "development",
+  NODE_ENV: process.env.NODE_ENV || 'development',
 })
 
 /**
  * Helper to check if we're in production
  */
-export const isProduction = env.NODE_ENV === "production"
+export const isProduction = env.NODE_ENV === 'production'
 
 /**
  * Helper to check if we're in development
  */
-export const isDevelopment = env.NODE_ENV === "development"
+export const isDevelopment = env.NODE_ENV === 'development'

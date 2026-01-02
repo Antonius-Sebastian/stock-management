@@ -1,14 +1,11 @@
 import { NextRequest } from 'next/server'
-import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { successResponse, ErrorResponses } from '@/lib/api-response'
 import { logger } from '@/lib/logger'
 import { canManageFinishedGoods, getPermissionErrorMessage } from '@/lib/rbac'
-
-const createFinishedGoodSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-})
+import { finishedGoodSchema } from '@/lib/validations'
+import { getFinishedGoods, createFinishedGood } from '@/lib/services'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,40 +19,19 @@ export async function GET(request: NextRequest) {
     const pageParam = searchParams.get('page')
     const limitParam = searchParams.get('limit')
 
-    // If no pagination params, return all (backward compatible)
-    if (!pageParam && !limitParam) {
-      const finishedGoods = await prisma.finishedGood.findMany({
-        orderBy: { createdAt: 'desc' },
-      })
-      return successResponse(finishedGoods)
-    }
+    // Prepare pagination options
+    const options =
+      pageParam || limitParam
+        ? {
+            page: pageParam ? parseInt(pageParam) : undefined,
+            limit: limitParam ? parseInt(limitParam) : undefined,
+          }
+        : undefined
 
-    // Pagination mode
-    const page = Math.max(1, parseInt(pageParam || '1'))
-    const limit = Math.min(100, Math.max(1, parseInt(limitParam || '50')))
-    const skip = (page - 1) * limit
+    // Get finished goods using service
+    const result = await getFinishedGoods(options)
 
-    // Get total count and paginated data in parallel
-    const [finishedGoods, total] = await Promise.all([
-      prisma.finishedGood.findMany({
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.finishedGood.count(),
-    ])
-
-    // Return data with pagination metadata
-    return successResponse({
-      data: finishedGoods,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasMore: skip + finishedGoods.length < total,
-      },
-    })
+    return successResponse(result)
   } catch (error) {
     logger.error('Error fetching finished goods:', error)
     return ErrorResponses.internalError()
@@ -76,22 +52,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const validatedData = createFinishedGoodSchema.parse(body)
+    const validatedData = finishedGoodSchema.parse(body)
 
-    // Check for duplicate name
-    const existingProduct = await prisma.finishedGood.findFirst({
-      where: { name: validatedData.name },
-    })
-    if (existingProduct) {
-      return ErrorResponses.badRequest(`Product "${validatedData.name}" already exists`)
-    }
-
-    const finishedGood = await prisma.finishedGood.create({
-      data: {
-        ...validatedData,
-        currentStock: 0, // Always start with 0 stock
-      },
-    })
+    // Create finished good using service
+    const finishedGood = await createFinishedGood(validatedData)
 
     return successResponse(finishedGood, 201)
   } catch (error) {
@@ -99,7 +63,9 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof z.ZodError) {
       const firstError = error.errors[0]
-      return ErrorResponses.badRequest(firstError.message || 'Validation failed')
+      return ErrorResponses.badRequest(
+        firstError.message || 'Validation failed'
+      )
     }
 
     if (error instanceof Error) {

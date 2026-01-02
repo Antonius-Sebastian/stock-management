@@ -1,8 +1,8 @@
-"use client"
+'use client'
 
-import { useState, useRef, useEffect, KeyboardEvent } from "react"
-import { Loader2, Trash2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { Loader2, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface EditableCellProps {
   value: number | string
@@ -17,10 +17,10 @@ export function EditableCell({
   isEditable,
   onSave,
   onDelete,
-  className
+  className,
 }: EditableCellProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState("")
+  const [editValue, setEditValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -43,7 +43,7 @@ export function EditableCell({
 
   const handleCancel = () => {
     setIsEditing(false)
-    setEditValue("")
+    setEditValue('')
   }
 
   const handleSave = async () => {
@@ -62,9 +62,9 @@ export function EditableCell({
     try {
       await onSave(newValue)
       setIsEditing(false)
-      setEditValue("")
+      setEditValue('')
     } catch (error) {
-      console.error("Error saving value:", error)
+      console.error('Error saving value:', error)
       // Keep editing mode open on error
     } finally {
       setIsLoading(false)
@@ -72,10 +72,10 @@ export function EditableCell({
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault()
       handleSave()
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       e.preventDefault()
       handleCancel()
     }
@@ -91,7 +91,7 @@ export function EditableCell({
   const handleDelete = async () => {
     if (!onDelete) return
 
-    if (!confirm("Delete this movement? This action cannot be undone.")) {
+    if (!confirm('Delete this movement? This action cannot be undone.')) {
       return
     }
 
@@ -99,7 +99,7 @@ export function EditableCell({
     try {
       await onDelete()
     } catch (error) {
-      console.error("Error deleting:", error)
+      console.error('Error deleting:', error)
     } finally {
       setIsLoading(false)
       setShowDelete(false)
@@ -109,7 +109,7 @@ export function EditableCell({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-2">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
       </div>
     )
   }
@@ -126,17 +126,17 @@ export function EditableCell({
         onInput={(e) => {
           const target = e.target as HTMLInputElement
           if (parseFloat(target.value) < 0) {
-            target.value = "0"
-            setEditValue("0")
+            target.value = '0'
+            setEditValue('0')
           }
         }}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         className={cn(
-          "w-full h-full px-2 py-1 text-center",
-          "border border-primary rounded bg-background",
-          "focus:outline-none focus:ring-2 focus:ring-primary/20",
-          "box-border", // Ensure border is included in dimensions
+          'h-full w-full px-2 py-1 text-center',
+          'border-primary bg-background rounded border',
+          'focus:ring-primary/20 focus:ring-2 focus:outline-none',
+          'box-border', // Ensure border is included in dimensions
           className
         )}
       />
@@ -146,16 +146,16 @@ export function EditableCell({
   return (
     <div
       className={cn(
-        "relative group h-full",
-        isEditable && "cursor-pointer hover:bg-muted/50",
+        'group relative h-full',
+        isEditable && 'hover:bg-muted/50 cursor-pointer',
         className
       )}
       onClick={handleClick}
       onMouseEnter={() => hasValue && onDelete && setShowDelete(true)}
       onMouseLeave={() => setShowDelete(false)}
     >
-      <div className="px-2 py-1 text-center h-full flex items-center justify-center">
-        {hasValue ? numericValue.toLocaleString() : "-"}
+      <div className="flex h-full items-center justify-center px-2 py-1 text-center">
+        {hasValue ? numericValue.toLocaleString() : '-'}
       </div>
 
       {showDelete && onDelete && hasValue && (
@@ -165,13 +165,13 @@ export function EditableCell({
             handleDelete()
           }}
           className={cn(
-            "absolute right-1 top-1/2 -translate-y-1/2",
-            "p-1 rounded bg-destructive/10 hover:bg-destructive/20",
-            "opacity-0 group-hover:opacity-100 transition-opacity"
+            'absolute top-1/2 right-1 -translate-y-1/2',
+            'bg-destructive/10 hover:bg-destructive/20 rounded p-1',
+            'opacity-0 transition-opacity group-hover:opacity-100'
           )}
           title="Delete movements"
         >
-          <Trash2 className="h-3 w-3 text-destructive" />
+          <Trash2 className="text-destructive h-3 w-3" />
         </button>
       )}
     </div>

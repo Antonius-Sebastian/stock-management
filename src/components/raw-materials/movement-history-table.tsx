@@ -1,19 +1,23 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { ColumnDef } from "@tanstack/react-table"
-import { format } from "date-fns"
-import { DataTable } from "@/components/ui/data-table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ArrowUpDown, CalendarIcon } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { cn } from "@/lib/utils"
+import { useState } from 'react'
+import { ColumnDef } from '@tanstack/react-table'
+import { format } from 'date-fns'
+import { DataTable } from '@/components/ui/data-table'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ArrowUpDown, CalendarIcon } from 'lucide-react'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { cn } from '@/lib/utils'
 
 interface Movement {
   id: string
-  type: "IN" | "OUT"
+  type: 'IN' | 'OUT'
   quantity: number
   date: string
   description: string | null
@@ -27,7 +31,10 @@ interface MovementHistoryTableProps {
   onBatchClick?: (batchId: string) => void
 }
 
-export function MovementHistoryTable({ movements, onBatchClick }: MovementHistoryTableProps) {
+export function MovementHistoryTable({
+  movements,
+  onBatchClick,
+}: MovementHistoryTableProps) {
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined)
 
   // Filter movements by date if date filter is set
@@ -44,12 +51,12 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
 
   const columns: ColumnDef<Movement>[] = [
     {
-      accessorKey: "date",
+      accessorKey: 'date',
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             Tanggal
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -57,29 +64,29 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
         )
       },
       cell: ({ row }) => {
-        const date = row.getValue("date") as string
-        return format(new Date(date), "MMM dd, yyyy")
+        const date = row.getValue('date') as string
+        return format(new Date(date), 'MMM dd, yyyy')
       },
     },
     {
-      accessorKey: "type",
-      header: "Tipe",
+      accessorKey: 'type',
+      header: 'Tipe',
       cell: ({ row }) => {
-        const type = row.getValue("type") as "IN" | "OUT"
+        const type = row.getValue('type') as 'IN' | 'OUT'
         return (
-          <Badge variant={type === "IN" ? "default" : "destructive"}>
-            {type === "IN" ? "Stok Masuk" : "Stok Keluar"}
+          <Badge variant={type === 'IN' ? 'default' : 'destructive'}>
+            {type === 'IN' ? 'Stok Masuk' : 'Stok Keluar'}
           </Badge>
         )
       },
     },
     {
-      accessorKey: "quantity",
+      accessorKey: 'quantity',
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             Jumlah
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -87,27 +94,29 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
         )
       },
       cell: ({ row }) => {
-        const quantity = row.getValue("quantity") as number
+        const quantity = row.getValue('quantity') as number
         const type = row.original.type
         return (
-          <div className={`font-medium ${type === "IN" ? "text-green-600" : "text-red-600"}`}>
-            {type === "IN" ? "+" : "-"}
+          <div
+            className={`font-medium ${type === 'IN' ? 'text-green-600' : 'text-red-600'}`}
+          >
+            {type === 'IN' ? '+' : '-'}
             {quantity.toLocaleString()}
           </div>
         )
       },
     },
     {
-      accessorKey: "description",
-      header: "Deskripsi",
+      accessorKey: 'description',
+      header: 'Deskripsi',
       cell: ({ row }) => {
-        const description = row.getValue("description") as string | null
+        const description = row.getValue('description') as string | null
         return description || <span className="text-muted-foreground">-</span>
       },
     },
     {
-      id: "batch",
-      header: "Batch",
+      id: 'batch',
+      header: 'Batch',
       cell: ({ row }) => {
         const batch = row.original.batch
         if (!batch) {
@@ -116,7 +125,7 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
         return (
           <button
             onClick={() => onBatchClick?.(batch.id)}
-            className="font-medium text-primary hover:underline cursor-pointer"
+            className="text-primary cursor-pointer font-medium hover:underline"
           >
             {batch.code}
           </button>
@@ -124,13 +133,15 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
       },
     },
     {
-      accessorKey: "runningBalance",
+      accessorKey: 'runningBalance',
       header: ({ column }) => {
         return (
           <div className="text-right">
             <Button
               variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === 'asc')
+              }
             >
               Saldo Berjalan
               <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -139,7 +150,7 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
         )
       },
       cell: ({ row }) => {
-        const balance = row.getValue("runningBalance") as number
+        const balance = row.getValue('runningBalance') as number
         return (
           <div className="text-right font-semibold">
             {balance.toLocaleString()}
@@ -151,18 +162,20 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               className={cn(
-                "justify-start text-left font-normal",
-                !dateFilter && "text-muted-foreground"
+                'justify-start text-left font-normal',
+                !dateFilter && 'text-muted-foreground'
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateFilter ? format(dateFilter, "PPP") : "Filter berdasarkan tanggal"}
+              {dateFilter
+                ? format(dateFilter, 'PPP')
+                : 'Filter berdasarkan tanggal'}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -175,10 +188,7 @@ export function MovementHistoryTable({ movements, onBatchClick }: MovementHistor
           </PopoverContent>
         </Popover>
         {dateFilter && (
-          <Button
-            variant="ghost"
-            onClick={() => setDateFilter(undefined)}
-          >
+          <Button variant="ghost" onClick={() => setDateFilter(undefined)}>
             Hapus Filter
           </Button>
         )}

@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { logger } from '@/lib/logger'
 import { canManageMaterials, getPermissionErrorMessage } from '@/lib/rbac'
-
-const createRawMaterialSchema = z.object({
-  kode: z.string().min(1, 'Code is required'),
-  name: z.string().min(1, 'Name is required'),
-  moq: z.number().min(1, 'MOQ must be at least 1'),
-})
+import { rawMaterialSchema } from '@/lib/validations'
+import { getRawMaterials, createRawMaterial } from '@/lib/services'
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,40 +19,19 @@ export async function GET(request: NextRequest) {
     const pageParam = searchParams.get('page')
     const limitParam = searchParams.get('limit')
 
-    // If no pagination params, return all (backward compatible)
-    if (!pageParam && !limitParam) {
-      const rawMaterials = await prisma.rawMaterial.findMany({
-        orderBy: { createdAt: 'desc' },
-      })
-      return NextResponse.json(rawMaterials)
-    }
+    // Prepare pagination options
+    const options =
+      pageParam || limitParam
+        ? {
+            page: pageParam ? parseInt(pageParam) : undefined,
+            limit: limitParam ? parseInt(limitParam) : undefined,
+          }
+        : undefined
 
-    // Pagination mode
-    const page = Math.max(1, parseInt(pageParam || '1'))
-    const limit = Math.min(100, Math.max(1, parseInt(limitParam || '50')))
-    const skip = (page - 1) * limit
+    // Get raw materials using service
+    const result = await getRawMaterials(options)
 
-    // Get total count and paginated data in parallel
-    const [rawMaterials, total] = await Promise.all([
-      prisma.rawMaterial.findMany({
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.rawMaterial.count(),
-    ])
-
-    // Return data with pagination metadata
-    return NextResponse.json({
-      data: rawMaterials,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasMore: skip + rawMaterials.length < total,
-      },
-    })
+    return NextResponse.json(result)
   } catch (error) {
     logger.error('Error fetching raw materials:', error)
     return NextResponse.json(
@@ -77,31 +51,21 @@ export async function POST(request: NextRequest) {
 
     if (!canManageMaterials(session.user.role)) {
       return NextResponse.json(
-        { error: getPermissionErrorMessage('create raw materials', session.user.role) },
+        {
+          error: getPermissionErrorMessage(
+            'create raw materials',
+            session.user.role
+          ),
+        },
         { status: 403 }
       )
     }
 
     const body = await request.json()
-    const validatedData = createRawMaterialSchema.parse(body)
+    const validatedData = rawMaterialSchema.parse(body)
 
-    // Check for duplicate code
-    const existingMaterial = await prisma.rawMaterial.findFirst({
-      where: { kode: validatedData.kode },
-    })
-    if (existingMaterial) {
-      return NextResponse.json(
-        { error: `Material code "${validatedData.kode}" already exists` },
-        { status: 400 }
-      )
-    }
-
-    const rawMaterial = await prisma.rawMaterial.create({
-      data: {
-        ...validatedData,
-        currentStock: 0, // Always start with 0 stock
-      },
-    })
+    // Create raw material using service
+    const rawMaterial = await createRawMaterial(validatedData)
 
     return NextResponse.json(rawMaterial, { status: 201 })
   } catch (error) {
@@ -116,10 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json(

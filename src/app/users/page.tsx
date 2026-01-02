@@ -1,18 +1,24 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { UsersTable } from "@/components/users/users-table"
-import { AddUserDialog } from "@/components/users/add-user-dialog"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { UserPlus } from "lucide-react"
+import { useEffect, useState } from 'react'
+import { UsersTable } from '@/components/users/users-table'
+import { AddUserDialog } from '@/components/users/add-user-dialog'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { UserPlus } from 'lucide-react'
 
 export type User = {
   id: string
   username: string
   email: string | null
   name: string
-  role: "ADMIN" | "FACTORY" | "OFFICE"
+  role: 'ADMIN' | 'FACTORY' | 'OFFICE'
   isActive: boolean
   createdAt: string
 }
@@ -23,13 +29,13 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("/api/users")
+      const response = await fetch('/api/users')
       if (response.ok) {
         const data = await response.json()
         setUsers(data)
       }
     } catch (error) {
-      console.error("Error fetching users:", error)
+      console.error('Error fetching users:', error)
     } finally {
       setLoading(false)
     }
@@ -41,9 +47,11 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight">Manajemen User</h2>
+          <h2 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            Manajemen User
+          </h2>
           <p className="text-muted-foreground">
             Kelola user sistem dan peran mereka
           </p>

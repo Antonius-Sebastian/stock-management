@@ -224,7 +224,12 @@ export const AuditHelpers = {
       },
     }),
 
-  loginSuccess: (userId: string, userName: string, ipAddress?: string, userAgent?: string) =>
+  loginSuccess: (
+    userId: string,
+    userName: string,
+    ipAddress?: string,
+    userAgent?: string
+  ) =>
     logAudit({
       action: 'LOGIN_SUCCESS',
       userId,
@@ -234,7 +239,12 @@ export const AuditHelpers = {
       userAgent,
     }),
 
-  loginFailed: (username: string, reason: string, ipAddress?: string, userAgent?: string) =>
+  loginFailed: (
+    username: string,
+    reason: string,
+    ipAddress?: string,
+    userAgent?: string
+  ) =>
     logAudit({
       action: 'LOGIN_FAILED',
       details: {

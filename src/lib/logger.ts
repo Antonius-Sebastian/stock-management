@@ -17,7 +17,11 @@ class Logger {
   /**
    * Format log message with context
    */
-  private formatMessage(level: LogLevel, message: string, context?: LogContext): string {
+  private formatMessage(
+    level: LogLevel,
+    message: string,
+    context?: LogContext
+  ): string {
     const timestamp = new Date().toISOString()
     const contextStr = context ? ` | Context: ${JSON.stringify(context)}` : ''
     return `[${timestamp}] [${level.toUpperCase()}] ${message}${contextStr}`
@@ -27,8 +31,12 @@ class Logger {
    * Send log to external service in production
    * TODO: Integrate with Sentry, LogRocket, or other service
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private sendToService(level: LogLevel, message: string, context?: LogContext, error?: Error) {
+  private sendToService(
+    _level: LogLevel,
+    _message: string,
+    _context?: LogContext,
+    _error?: Error
+  ) {
     if (!this.isProduction) return
 
     // TODO: Implement external logging service
@@ -140,8 +148,11 @@ class Logger {
 export const logger = new Logger()
 
 // Convenience exports for common patterns
-export const logError = (message: string, error?: Error | unknown, context?: LogContext) =>
-  logger.error(message, error, context)
+export const logError = (
+  message: string,
+  error?: Error | unknown,
+  context?: LogContext
+) => logger.error(message, error, context)
 
 export const logInfo = (message: string, context?: LogContext) =>
   logger.info(message, context)

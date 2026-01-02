@@ -1,11 +1,11 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 import {
   Form,
   FormControl,
@@ -22,12 +22,12 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Plus } from "lucide-react"
+} from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Plus } from 'lucide-react'
 
 const formSchema = z.object({
-  name: z.string().min(1, "Nama produk harus diisi"),
+  name: z.string().min(1, 'Nama produk harus diisi'),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -36,40 +36,45 @@ interface AddFinishedGoodDialogProps {
   onSuccess: () => void
 }
 
-export function AddFinishedGoodDialog({ onSuccess }: AddFinishedGoodDialogProps) {
+export function AddFinishedGoodDialog({
+  onSuccess,
+}: AddFinishedGoodDialogProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
+      name: '',
     },
   })
 
   async function onSubmit(data: FormData) {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/finished-goods", {
-        method: "POST",
+      const response = await fetch('/api/finished-goods', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || "Failed to create finished good")
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to create finished good')
       }
 
-      toast.success("Produk jadi berhasil ditambahkan")
+      toast.success('Produk jadi berhasil ditambahkan')
       form.reset()
       setOpen(false)
       onSuccess()
     } catch (error) {
-      console.error("Error creating finished good:", error)
-      const message = error instanceof Error ? error.message : "Gagal membuat produk jadi"
+      console.error('Error creating finished good:', error)
+      const message =
+        error instanceof Error ? error.message : 'Gagal membuat produk jadi'
       toast.error(message)
     } finally {
       setIsLoading(false)
@@ -84,7 +89,7 @@ export function AddFinishedGoodDialog({ onSuccess }: AddFinishedGoodDialogProps)
           Tambah Produk Jadi
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Tambah Produk Jadi</DialogTitle>
           <DialogDescription>
@@ -115,7 +120,7 @@ export function AddFinishedGoodDialog({ onSuccess }: AddFinishedGoodDialogProps)
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Membuat..." : "Buat"}
+                {isLoading ? 'Membuat...' : 'Buat'}
               </Button>
             </DialogFooter>
           </form>

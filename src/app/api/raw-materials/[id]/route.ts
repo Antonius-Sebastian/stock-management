@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { auth } from '@/auth'
-import { canManageMaterials, canDeleteMaterials, getPermissionErrorMessage } from '@/lib/rbac'
+import {
+  canManageMaterials,
+  canDeleteMaterials,
+  getPermissionErrorMessage,
+} from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-
-const updateRawMaterialSchema = z.object({
-  kode: z.string().min(1, 'Code is required'),
-  name: z.string().min(1, 'Name is required'),
-  moq: z.number().min(1, 'MOQ must be at least 1'),
-})
+import { rawMaterialSchema } from '@/lib/validations'
+import { updateRawMaterial, deleteRawMaterial } from '@/lib/services'
 
 export async function PUT(
   request: NextRequest,
@@ -24,46 +23,22 @@ export async function PUT(
 
     if (!canManageMaterials(session.user.role)) {
       return NextResponse.json(
-        { error: getPermissionErrorMessage('edit raw materials', session.user.role) },
+        {
+          error: getPermissionErrorMessage(
+            'edit raw materials',
+            session.user.role
+          ),
+        },
         { status: 403 }
       )
     }
 
     const { id } = await params
     const body = await request.json()
-    const validatedData = updateRawMaterialSchema.parse(body)
+    const validatedData = rawMaterialSchema.parse(body)
 
-    // Check if raw material exists
-    const existingMaterial = await prisma.rawMaterial.findUnique({
-      where: { id },
-    })
-
-    if (!existingMaterial) {
-      return NextResponse.json(
-        { error: 'Raw material not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check for duplicate code (excluding current material)
-    const duplicateCode = await prisma.rawMaterial.findFirst({
-      where: {
-        kode: validatedData.kode,
-        id: { not: id },
-      },
-    })
-
-    if (duplicateCode) {
-      return NextResponse.json(
-        { error: `Material code "${validatedData.kode}" already exists` },
-        { status: 400 }
-      )
-    }
-
-    const updatedMaterial = await prisma.rawMaterial.update({
-      where: { id },
-      data: validatedData,
-    })
+    // Update raw material using service
+    const updatedMaterial = await updateRawMaterial(id, validatedData)
 
     return NextResponse.json(updatedMaterial)
   } catch (error) {
@@ -78,10 +53,7 @@ export async function PUT(
     }
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json(
@@ -104,39 +76,27 @@ export async function DELETE(
 
     if (!canDeleteMaterials(session.user.role)) {
       return NextResponse.json(
-        { error: getPermissionErrorMessage('delete raw materials', session.user.role) },
+        {
+          error: getPermissionErrorMessage(
+            'delete raw materials',
+            session.user.role
+          ),
+        },
         { status: 403 }
       )
     }
 
     const { id } = await params
 
-    // Check if raw material exists
-    const existingMaterial = await prisma.rawMaterial.findUnique({
-      where: { id },
-    })
-
-    if (!existingMaterial) {
-      return NextResponse.json(
-        { error: 'Raw material not found' },
-        { status: 404 }
-      )
-    }
-
-    // Delete the raw material (cascade will handle related records)
-    await prisma.rawMaterial.delete({
-      where: { id },
-    })
+    // Delete raw material using service
+    await deleteRawMaterial(id)
 
     return NextResponse.json({ message: 'Raw material deleted successfully' })
   } catch (error) {
     logger.error('Error deleting raw material:', error)
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json(

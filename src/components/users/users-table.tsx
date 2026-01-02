@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import { useState } from "react"
+import { useState } from 'react'
 import {
   Table,
   TableBody,
@@ -8,9 +8,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,11 +18,17 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Pencil, Trash2, CheckCircle, XCircle } from "lucide-react"
-import { EditUserDialog } from "./edit-user-dialog"
-import { toast } from "sonner"
-import type { User } from "@/app/users/page"
+} from '@/components/ui/dropdown-menu'
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react'
+import { EditUserDialog } from './edit-user-dialog'
+import { toast } from 'sonner'
+import type { User } from '@/app/users/page'
 
 type UsersTableProps = {
   users: User[]
@@ -39,13 +45,15 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
   }
 
   const handleDelete = async (user: User) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus pengguna "${user.username}"?`)) {
+    if (
+      !confirm(`Apakah Anda yakin ingin menghapus pengguna "${user.username}"?`)
+    ) {
       return
     }
 
     try {
       const response = await fetch(`/api/users/${user.id}`, {
-        method: "DELETE",
+        method: 'DELETE',
       })
 
       if (response.ok) {
@@ -53,29 +61,29 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
         onRefresh()
       } else {
         const data = await response.json()
-        toast.error(data.error || "Gagal menghapus pengguna")
+        toast.error(data.error || 'Gagal menghapus pengguna')
       }
     } catch {
-      toast.error("Gagal menghapus pengguna")
+      toast.error('Gagal menghapus pengguna')
     }
   }
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
-      case "ADMIN":
-        return "default"
-      case "FACTORY":
-        return "secondary"
-      case "OFFICE":
-        return "outline"
+      case 'ADMIN':
+        return 'default'
+      case 'FACTORY':
+        return 'secondary'
+      case 'OFFICE':
+        return 'outline'
       default:
-        return "outline"
+        return 'outline'
     }
   }
 
   return (
     <>
-      <div className="rounded-md border overflow-x-auto">
+      <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -100,7 +108,7 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.username}</TableCell>
                   <TableCell>{user.name}</TableCell>
-                  <TableCell>{user.email || "-"}</TableCell>
+                  <TableCell>{user.email || '-'}</TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(user.role)}>
                       {user.role}
@@ -111,12 +119,16 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                       {user.isActive ? (
                         <>
                           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
-                          <span className="text-sm text-green-600 dark:text-green-500">Aktif</span>
+                          <span className="text-sm text-green-600 dark:text-green-500">
+                            Aktif
+                          </span>
                         </>
                       ) : (
                         <>
                           <XCircle className="h-4 w-4 text-red-600 dark:text-red-500" />
-                          <span className="text-sm text-red-600 dark:text-red-500">Nonaktif</span>
+                          <span className="text-sm text-red-600 dark:text-red-500">
+                            Nonaktif
+                          </span>
                         </>
                       )}
                     </div>

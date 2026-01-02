@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import { useMemo } from "react"
+import { useMemo } from 'react'
 import {
   Table,
   TableBody,
@@ -8,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 
 interface StockReportData {
   id: string
@@ -22,10 +22,7 @@ interface StockReportTableProps {
   currentDay: number
 }
 
-export function StockReportTable({
-  data,
-  currentDay,
-}: StockReportTableProps) {
+export function StockReportTable({ data, currentDay }: StockReportTableProps) {
   const dayColumns = useMemo(() => {
     return Array.from({ length: currentDay }, (_, i) => (i + 1).toString())
   }, [currentDay])
@@ -33,7 +30,7 @@ export function StockReportTable({
   // If no data, show simple empty state without scrollable columns
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
+      <div className="text-muted-foreground flex h-64 items-center justify-center">
         No data available for the selected period.
       </div>
     )
@@ -44,11 +41,11 @@ export function StockReportTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="sticky left-0 z-10 bg-white dark:bg-slate-950 border-r shadow-sm min-w-[200px]">
+            <TableHead className="sticky left-0 z-10 min-w-[200px] border-r bg-white shadow-sm dark:bg-slate-950">
               Item
             </TableHead>
             {dayColumns.map((day) => (
-              <TableHead key={day} className="text-center min-w-[80px]">
+              <TableHead key={day} className="min-w-[80px] text-center">
                 {day}
               </TableHead>
             ))}
@@ -57,10 +54,12 @@ export function StockReportTable({
         <TableBody>
           {data.map((item) => (
             <TableRow key={item.id}>
-              <TableCell className="sticky left-0 z-10 bg-white dark:bg-slate-950 border-r shadow-sm font-medium">
+              <TableCell className="sticky left-0 z-10 border-r bg-white font-medium shadow-sm dark:bg-slate-950">
                 <div>
                   <div className="font-medium">{item.code}</div>
-                  <div className="text-sm text-muted-foreground">{item.name}</div>
+                  <div className="text-muted-foreground text-sm">
+                    {item.name}
+                  </div>
                 </div>
               </TableCell>
               {dayColumns.map((day) => {
@@ -70,7 +69,7 @@ export function StockReportTable({
 
                 return (
                   <TableCell key={day} className="text-center">
-                    {hasValue ? numericValue.toLocaleString() : "-"}
+                    {hasValue ? numericValue.toLocaleString() : '-'}
                   </TableCell>
                 )
               })}

@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,19 +9,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { toast } from "sonner"
-import type { User } from "@/app/users/page"
+} from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
+import type { User } from '@/app/users/page'
 
 type EditUserDialogProps = {
   user: User
@@ -39,8 +39,8 @@ export function EditUserDialog({
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     username: user.username,
-    email: user.email || "",
-    password: "",
+    email: user.email || '',
+    password: '',
     name: user.name,
     role: user.role,
     isActive: user.isActive,
@@ -49,8 +49,8 @@ export function EditUserDialog({
   useEffect(() => {
     setFormData({
       username: user.username,
-      email: user.email || "",
-      password: "",
+      email: user.email || '',
+      password: '',
       name: user.name,
       role: user.role,
       isActive: user.isActive,
@@ -66,7 +66,7 @@ export function EditUserDialog({
         username: string
         email: string | null
         name: string
-        role: "ADMIN" | "FACTORY" | "OFFICE"
+        role: 'ADMIN' | 'FACTORY' | 'OFFICE'
         isActive: boolean
         password?: string
       } = {
@@ -83,9 +83,9 @@ export function EditUserDialog({
       }
 
       const response = await fetch(`/api/users/${user.id}`, {
-        method: "PUT",
+        method: 'PUT',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(updateData),
       })
@@ -95,10 +95,10 @@ export function EditUserDialog({
         onSuccess()
       } else {
         const data = await response.json()
-        toast.error(data.error || "Failed to update user")
+        toast.error(data.error || 'Failed to update user')
       }
     } catch {
-      toast.error("Failed to update user")
+      toast.error('Failed to update user')
     } finally {
       setLoading(false)
     }
@@ -106,7 +106,7 @@ export function EditUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-w-[95vw]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
         <form onSubmit={handleSubmit} className="overflow-hidden">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
@@ -157,9 +157,7 @@ export function EditUserDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-password">
-                New Password (Optional)
-              </Label>
+              <Label htmlFor="edit-password">New Password (Optional)</Label>
               <Input
                 id="edit-password"
                 type="password"
@@ -171,7 +169,7 @@ export function EditUserDialog({
                 minLength={6}
               />
               {formData.password && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Password must be at least 6 characters
                 </p>
               )}
@@ -182,7 +180,7 @@ export function EditUserDialog({
               </Label>
               <Select
                 value={formData.role}
-                onValueChange={(value: "ADMIN" | "FACTORY" | "OFFICE") =>
+                onValueChange={(value: 'ADMIN' | 'FACTORY' | 'OFFICE') =>
                   setFormData({ ...formData, role: value })
                 }
               >
@@ -191,7 +189,9 @@ export function EditUserDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin - Full Access</SelectItem>
-                  <SelectItem value="FACTORY">Factory - Factory Staff</SelectItem>
+                  <SelectItem value="FACTORY">
+                    Factory - Factory Staff
+                  </SelectItem>
                   <SelectItem value="OFFICE">Office - Office Staff</SelectItem>
                 </SelectContent>
               </Select>
@@ -201,7 +201,7 @@ export function EditUserDialog({
                 <Label htmlFor="edit-active" className="text-base">
                   Active Status
                 </Label>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-muted-foreground text-sm">
                   Inactive users cannot login
                 </div>
               </div>
@@ -224,7 +224,7 @@ export function EditUserDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Updating..." : "Update User"}
+              {loading ? 'Updating...' : 'Update User'}
             </Button>
           </DialogFooter>
         </form>

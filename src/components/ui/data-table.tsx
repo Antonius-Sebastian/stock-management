@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -12,17 +12,17 @@ import {
   SortingState,
   useReactTable,
   VisibilityState,
-} from "@tanstack/react-table"
-import { ChevronDown } from "lucide-react"
+} from '@tanstack/react-table'
+import { ChevronDown } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -30,8 +30,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { getColumnFilters, saveColumnFilters } from "@/lib/cookies"
+} from '@/components/ui/table'
+import { getColumnFilters, saveColumnFilters } from '@/lib/cookies'
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -49,14 +49,17 @@ export function DataTable<TData, TValue>({
   searchKey,
   searchKeys,
   searchPlaceholder,
-  emptyMessage = "Tidak ada hasil.",
+  emptyMessage = 'Tidak ada hasil.',
   tableId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  )
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
-  const [globalFilter, setGlobalFilter] = React.useState("")
+  const [globalFilter, setGlobalFilter] = React.useState('')
 
   // Load column visibility from cookies on mount
   React.useEffect(() => {
@@ -78,8 +81,11 @@ export function DataTable<TData, TValue>({
 
   // Save column visibility to cookies when it changes
   const handleColumnVisibilityChange = React.useCallback(
-    (updater: VisibilityState | ((old: VisibilityState) => VisibilityState)) => {
-      const newVisibility = typeof updater === 'function' ? updater(columnVisibility) : updater
+    (
+      updater: VisibilityState | ((old: VisibilityState) => VisibilityState)
+    ) => {
+      const newVisibility =
+        typeof updater === 'function' ? updater(columnVisibility) : updater
       setColumnVisibility(newVisibility)
 
       if (tableId) {
@@ -104,13 +110,15 @@ export function DataTable<TData, TValue>({
     onColumnVisibilityChange: handleColumnVisibilityChange,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: searchKeys ? (row, columnId, filterValue) => {
-      const searchValue = String(filterValue).toLowerCase()
-      return searchKeys.some(key => {
-        const value = row.getValue(key)
-        return String(value).toLowerCase().includes(searchValue)
-      })
-    } : undefined,
+    globalFilterFn: searchKeys
+      ? (row, columnId, filterValue) => {
+          const searchValue = String(filterValue).toLowerCase()
+          return searchKeys.some((key) => {
+            const value = row.getValue(key)
+            return String(value).toLowerCase().includes(searchValue)
+          })
+        }
+      : undefined,
     state: {
       sorting,
       columnFilters,
@@ -122,18 +130,20 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="w-full">
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center py-4">
+      <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center">
         {searchKeys ? (
           <Input
-            placeholder={searchPlaceholder || "Cari..."}
-            value={globalFilter ?? ""}
+            placeholder={searchPlaceholder || 'Cari...'}
+            value={globalFilter ?? ''}
             onChange={(event) => setGlobalFilter(event.target.value)}
             className="w-full sm:max-w-sm"
           />
         ) : searchKey ? (
           <Input
-            placeholder={searchPlaceholder || "Cari..."}
-            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+            placeholder={searchPlaceholder || 'Cari...'}
+            value={
+              (table.getColumn(searchKey)?.getFilterValue() as string) ?? ''
+            }
             onChange={(event) =>
               table.getColumn(searchKey)?.setFilterValue(event.target.value)
             }
@@ -167,7 +177,7 @@ export function DataTable<TData, TValue>({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="rounded-md border overflow-x-auto">
+      <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -192,7 +202,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
+                  data-state={row.getIsSelected() && 'selected'}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -208,7 +218,7 @@ export function DataTable<TData, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
+                  className="text-muted-foreground h-24 text-center"
                 >
                   {emptyMessage}
                 </TableCell>
@@ -217,24 +227,31 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between py-4">
-        <div className="text-sm text-muted-foreground">
-          Menampilkan {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} sampai{" "}
+      <div className="flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="text-muted-foreground text-sm">
+          Menampilkan{' '}
+          {table.getState().pagination.pageIndex *
+            table.getState().pagination.pageSize +
+            1}{' '}
+          sampai{' '}
           {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+            (table.getState().pagination.pageIndex + 1) *
+              table.getState().pagination.pageSize,
             table.getFilteredRowModel().rows.length
-          )}{" "}
+          )}{' '}
           dari {table.getFilteredRowModel().rows.length} entri
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-medium whitespace-nowrap">Baris per halaman</p>
+            <p className="text-sm font-medium whitespace-nowrap">
+              Baris per halaman
+            </p>
             <select
               value={table.getState().pagination.pageSize}
               onChange={(e) => {
                 table.setPageSize(Number(e.target.value))
               }}
-              className="h-8 w-[70px] rounded-md border border-input bg-background px-2 text-sm"
+              className="border-input bg-background h-8 w-[70px] rounded-md border px-2 text-sm"
             >
               {[10, 20, 30, 40, 50].map((pageSize) => (
                 <option key={pageSize} value={pageSize}>
@@ -262,8 +279,8 @@ export function DataTable<TData, TValue>({
               <span className="sm:hidden">&lt;</span>
               <span className="hidden sm:inline">Sebelumnya</span>
             </Button>
-            <div className="text-sm font-medium px-2 whitespace-nowrap">
-              Hal. {table.getState().pagination.pageIndex + 1} dari{" "}
+            <div className="px-2 text-sm font-medium whitespace-nowrap">
+              Hal. {table.getState().pagination.pageIndex + 1} dari{' '}
               {table.getPageCount()}
             </div>
             <Button

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Plus } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 const formSchema = z.object({
   kode: z.string().min(1, 'Code is required'),
@@ -74,7 +75,7 @@ export function AddRawMaterialDialog({ onSuccess }: AddRawMaterialDialogProps) {
       setOpen(false)
       onSuccess()
     } catch (error) {
-      console.error('Error creating raw material:', error)
+      logger.error('Error creating raw material:', error)
       const message =
         error instanceof Error ? error.message : 'Gagal membuat bahan baku'
       toast.error(message)

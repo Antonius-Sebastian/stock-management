@@ -16,6 +16,7 @@ import { ArrowLeft, Package, TrendingUp } from 'lucide-react'
 import { MovementHistoryTable } from '@/components/raw-materials/movement-history-table'
 import { BatchDetailDialog } from '@/components/batches/batch-detail-dialog'
 import { Batch, BatchUsage, RawMaterial, FinishedGood } from '@prisma/client'
+import { logger } from '@/lib/logger'
 
 interface MaterialDetail {
   id: string
@@ -80,7 +81,7 @@ export default function RawMaterialDetailPage({
         const result = await response.json()
         setData(result)
       } catch (error) {
-        console.error('Error fetching material movements:', error)
+        logger.error('Error fetching material movements:', error)
         toast.error('Failed to load material details. Please try again.')
       } finally {
         setIsLoading(false)
@@ -122,7 +123,7 @@ export default function RawMaterialDetailPage({
       setSelectedBatch(batch)
       setIsBatchDialogOpen(true)
     } catch (error) {
-      console.error('Error fetching batch details:', error)
+      logger.error('Error fetching batch details:', error)
       toast.error('Failed to load batch details. Please try again.')
     }
   }

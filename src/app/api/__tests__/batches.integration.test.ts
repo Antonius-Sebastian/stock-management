@@ -21,8 +21,6 @@ import { canCreateBatches, canEditBatches, canDeleteBatches } from '@/lib/rbac'
 import {
   createTestBatch,
   createTestUser,
-  createTestRawMaterial,
-  createTestFinishedGood,
 } from '../../../../test/helpers/test-data'
 
 // Mock dependencies

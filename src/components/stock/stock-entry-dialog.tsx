@@ -4,11 +4,8 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format } from 'date-fns'
-import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
 import {
   Dialog,
   DialogContent,
@@ -27,20 +24,9 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { cn } from '@/lib/utils'
+import { ItemSelector, DatePickerField } from '@/components/forms'
+import { useFormSubmission } from '@/lib/hooks'
+import type { Item } from '@/lib/types'
 
 const createFormSchema = (items: Item[], type: 'in' | 'out' | 'IN' | 'OUT') =>
   z
@@ -93,14 +79,6 @@ interface StockEntryDialogProps {
   onOpenChange?: (open: boolean) => void
 }
 
-interface Item {
-  id: string
-  name: string
-  kode?: string
-  sku?: string
-  currentStock?: number
-}
-
 type FormData = z.infer<ReturnType<typeof createFormSchema>>
 
 export function StockEntryDialog({
@@ -115,7 +93,6 @@ export function StockEntryDialog({
   onOpenChange: controlledOnOpenChange,
 }: StockEntryDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [items, setItems] = useState<Item[]>([])
 
   // Use controlled or uncontrolled state
@@ -189,9 +166,8 @@ export function StockEntryDialog({
     }
   }, [entityId, open, form])
 
-  async function onSubmit(data: FormData) {
-    setIsLoading(true)
-    try {
+  const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
+    onSubmit: async (data: FormData) => {
       const normalizedType =
         typeof type === 'string' ? type.toUpperCase() : type
       const stockMovementData = {
@@ -229,16 +205,9 @@ export function StockEntryDialog({
       form.reset()
       setOpen(false)
       onSuccess()
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Failed to create stock movement'
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    errorMessage: 'Failed to create stock movement',
+  })
 
   const getTitle = () => {
     const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
@@ -272,7 +241,7 @@ export function StockEntryDialog({
         </DialogHeader>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(handleFormSubmit)}
             className="space-y-4 overflow-hidden"
           >
             {!entityId && (
@@ -283,15 +252,10 @@ export function StockEntryDialog({
                   const normalizedType =
                     typeof type === 'string' ? type.toUpperCase() : type
                   const isOutMovement = normalizedType === 'OUT'
-                  const itemsWithStock = isOutMovement
+                  // For OUT movements, only show items with stock > 0
+                  const availableItems = isOutMovement
                     ? items.filter((i) => (i.currentStock ?? 0) > 0)
                     : items
-                  const itemsWithoutStock = isOutMovement
-                    ? items.filter((i) => (i.currentStock ?? 0) === 0)
-                    : []
-                  const selectedItem = items.find(
-                    (item) => item.id === field.value
-                  )
 
                   return (
                     <FormItem className="flex min-w-0 flex-col">
@@ -300,122 +264,19 @@ export function StockEntryDialog({
                           ? 'Bahan Baku'
                           : 'Produk Jadi'}
                       </FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn(
-                                'w-full min-w-0 justify-between overflow-hidden',
-                                !field.value && 'text-muted-foreground'
-                              )}
-                            >
-                              <span className="block min-w-0 truncate text-left">
-                                {field.value
-                                  ? actualItemType === 'raw-material'
-                                    ? `${selectedItem?.kode} - ${selectedItem?.name}`
-                                    : selectedItem?.name
-                                  : `Pilih ${
-                                      actualItemType === 'raw-material'
-                                        ? 'bahan baku'
-                                        : 'produk jadi'
-                                    }`}
-                              </span>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command>
-                            <CommandInput
-                              placeholder={`Cari ${
-                                actualItemType === 'raw-material'
-                                  ? 'bahan baku'
-                                  : 'produk jadi'
-                              }...`}
-                            />
-                            <CommandList className="max-h-[300px]">
-                              <CommandEmpty>
-                                Tidak ada item yang ditemukan.
-                              </CommandEmpty>
-                              {itemsWithStock.length > 0 && (
-                                <CommandGroup
-                                  heading={
-                                    isOutMovement ? 'Tersedia' : undefined
-                                  }
-                                >
-                                  {itemsWithStock.map((item) => (
-                                    <CommandItem
-                                      key={item.id}
-                                      value={
-                                        actualItemType === 'raw-material'
-                                          ? `${item.kode} ${item.name}`
-                                          : item.name
-                                      }
-                                      onSelect={() => {
-                                        form.setValue('itemId', item.id)
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          'mr-2 h-4 w-4 shrink-0',
-                                          item.id === field.value
-                                            ? 'opacity-100'
-                                            : 'opacity-0'
-                                        )}
-                                      />
-                                      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                                        <span className="block truncate">
-                                          {actualItemType === 'raw-material'
-                                            ? `${item.kode} - ${item.name}`
-                                            : item.name}
-                                        </span>
-                                        {isOutMovement && (
-                                          <span className="shrink-0 text-xs font-medium whitespace-nowrap text-green-600">
-                                            (
-                                            {(
-                                              item.currentStock ?? 0
-                                            ).toLocaleString()}
-                                            )
-                                          </span>
-                                        )}
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
-                              {itemsWithoutStock.length > 0 && (
-                                <CommandGroup heading="Stok Habis">
-                                  {itemsWithoutStock.map((item) => (
-                                    <CommandItem
-                                      key={item.id}
-                                      value={
-                                        actualItemType === 'raw-material'
-                                          ? `${item.kode} ${item.name}`
-                                          : item.name
-                                      }
-                                      disabled
-                                    >
-                                      <Check className="mr-2 h-4 w-4 shrink-0 opacity-0" />
-                                      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden opacity-50">
-                                        <span className="block truncate">
-                                          {actualItemType === 'raw-material'
-                                            ? `${item.kode} - ${item.name}`
-                                            : item.name}
-                                        </span>
-                                        <span className="text-destructive shrink-0 text-xs whitespace-nowrap">
-                                          (Habis)
-                                        </span>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <ItemSelector
+                          items={availableItems}
+                          itemType={actualItemType}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder={`Pilih ${
+                            actualItemType === 'raw-material'
+                              ? 'bahan baku'
+                              : 'produk jadi'
+                          }`}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )
@@ -462,37 +323,13 @@ export function StockEntryDialog({
               render={({ field }) => (
                 <FormItem className="flex min-w-0 flex-col">
                   <FormLabel>Tanggal</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={'outline'}
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, 'PPP')
-                          ) : (
-                            <span>Pilih tanggal</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date('1900-01-01')
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <FormControl>
+                    <DatePickerField
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Pilih tanggal"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

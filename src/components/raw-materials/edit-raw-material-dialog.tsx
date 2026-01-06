@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { RawMaterial } from '@prisma/client'
+import { logger } from '@/lib/logger'
 
 const formSchema = z.object({
   kode: z.string().min(1, 'Code is required'),
@@ -91,7 +92,7 @@ export function EditRawMaterialDialog({
       onOpenChange(false)
       onSuccess()
     } catch (error) {
-      console.error('Error updating raw material:', error)
+      logger.error('Error updating raw material:', error)
       const message =
         error instanceof Error ? error.message : 'Gagal memperbarui bahan baku'
       toast.error(message)

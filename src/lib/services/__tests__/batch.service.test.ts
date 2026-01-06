@@ -269,6 +269,7 @@ describe('Batch Service', () => {
           code: input.code,
           date: input.date,
           description: input.description,
+          status: 'COMPLETED', // Status is COMPLETED when finished goods are provided
         },
       })
       expect(mockTx.batchUsage.create).toHaveBeenCalled()

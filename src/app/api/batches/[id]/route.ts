@@ -75,7 +75,10 @@ export async function PUT(
       date: validatedData.date,
       description: validatedData.description || null,
       status: validatedData.status,
-      finishedGoods: validatedData.finishedGoods.length > 0 ? validatedData.finishedGoods : undefined,
+      finishedGoods:
+        validatedData.finishedGoods.length > 0
+          ? validatedData.finishedGoods
+          : undefined,
       materials: validatedData.materials,
     }
 

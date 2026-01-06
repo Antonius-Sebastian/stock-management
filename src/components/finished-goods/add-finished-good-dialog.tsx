@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Plus } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 const formSchema = z.object({
   name: z.string().min(1, 'Nama produk harus diisi'),
@@ -72,7 +73,7 @@ export function AddFinishedGoodDialog({
       setOpen(false)
       onSuccess()
     } catch (error) {
-      console.error('Error creating finished good:', error)
+      logger.error('Error creating finished good:', error)
       const message =
         error instanceof Error ? error.message : 'Gagal membuat produk jadi'
       toast.error(message)

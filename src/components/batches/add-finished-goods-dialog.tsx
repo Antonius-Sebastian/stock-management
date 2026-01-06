@@ -23,22 +23,10 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Check, ChevronsUpDown, Plus, Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { addFinishedGoodsSchema } from '@/lib/validations'
+import { ItemSelector } from '@/components/forms'
+import { useFormSubmission } from '@/lib/hooks'
+import type { FinishedGood } from '@/lib/types'
+import { Plus, Trash2 } from 'lucide-react'
 
 const formSchema = z.object({
   finishedGoods: z
@@ -67,11 +55,6 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
-interface FinishedGood {
-  id: string
-  name: string
-}
-
 interface AddFinishedGoodsDialogProps {
   batchId: string
   batchCode: string
@@ -87,7 +70,6 @@ export function AddFinishedGoodsDialog({
   onOpenChange,
   onSuccess,
 }: AddFinishedGoodsDialogProps) {
-  const [isLoading, setIsLoading] = useState(false)
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
 
   const form = useForm<FormData>({
@@ -100,11 +82,7 @@ export function AddFinishedGoodsDialog({
     mode: 'onSubmit',
   })
 
-  const {
-    fields,
-    append,
-    remove,
-  } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'finishedGoods',
   })
@@ -120,7 +98,7 @@ export function AddFinishedGoodsDialog({
           const data = await response.json()
           const goods = Array.isArray(data) ? data : data.data || []
           setFinishedGoods(goods)
-        } catch (error) {
+        } catch (_error) {
           toast.error('Failed to load finished goods')
         }
       }
@@ -128,9 +106,8 @@ export function AddFinishedGoodsDialog({
     }
   }, [open])
 
-  async function onSubmit(data: FormData) {
-    setIsLoading(true)
-    try {
+  const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
+    onSubmit: async (data: FormData) => {
       const response = await fetch(`/api/batches/${batchId}/finished-goods`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,14 +131,10 @@ export function AddFinishedGoodsDialog({
       })
       onOpenChange(false)
       onSuccess()
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to add finished goods'
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    successMessage: undefined, // Custom message handled in onSubmit
+    errorMessage: 'Failed to add finished goods',
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,7 +147,7 @@ export function AddFinishedGoodsDialog({
         </DialogHeader>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(handleFormSubmit)}
             className="space-y-4"
           >
             {fields.map((field, index) => (
@@ -182,74 +155,21 @@ export function AddFinishedGoodsDialog({
                 <FormField
                   control={form.control}
                   name={`finishedGoods.${index}.finishedGoodId`}
-                  render={({ field }) => {
-                    const selectedFinishedGood = finishedGoods.find(
-                      (fg) => fg.id === field.value
-                    )
-
-                    return (
-                      <FormItem className="flex-1">
-                        <FormLabel>Produk Jadi</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                role="combobox"
-                                className={cn(
-                                  'w-full justify-between',
-                                  !field.value && 'text-muted-foreground'
-                                )}
-                              >
-                                <span className="block min-w-0 truncate text-left">
-                                  {field.value && selectedFinishedGood
-                                    ? selectedFinishedGood.name
-                                    : 'Pilih produk jadi'}
-                                </span>
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[400px] p-0">
-                            <Command>
-                              <CommandInput placeholder="Cari produk jadi..." />
-                              <CommandList>
-                                <CommandEmpty>
-                                  Tidak ada produk jadi yang ditemukan.
-                                </CommandEmpty>
-                                <CommandGroup>
-                                  {finishedGoods.map((fg) => (
-                                    <CommandItem
-                                      key={fg.id}
-                                      value={fg.name}
-                                      onSelect={() => {
-                                        form.setValue(
-                                          `finishedGoods.${index}.finishedGoodId`,
-                                          fg.id
-                                        )
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          'mr-2 h-4 w-4 shrink-0',
-                                          fg.id === field.value
-                                            ? 'opacity-100'
-                                            : 'opacity-0'
-                                        )}
-                                      />
-                                      {fg.name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )
-                  }}
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Produk Jadi</FormLabel>
+                      <FormControl>
+                        <ItemSelector
+                          items={finishedGoods}
+                          itemType="finished-good"
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Pilih produk jadi"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
                 <FormField
                   control={form.control}
@@ -285,7 +205,10 @@ export function AddFinishedGoodsDialog({
               type="button"
               variant="outline"
               onClick={() =>
-                append({ finishedGoodId: '', quantity: '' as unknown as number })
+                append({
+                  finishedGoodId: '',
+                  quantity: '' as unknown as number,
+                })
               }
               className="w-full"
             >
@@ -310,4 +233,3 @@ export function AddFinishedGoodsDialog({
     </Dialog>
   )
 }
-

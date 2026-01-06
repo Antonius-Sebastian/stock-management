@@ -3,7 +3,7 @@
  * Provides utilities for creating mock Prisma client instances in tests
  */
 
-import { vi, type MockedFunction } from 'vitest'
+import { vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 
 /**

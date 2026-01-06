@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { FinishedGood } from '@prisma/client'
+import { logger } from '@/lib/logger'
 
 const formSchema = z.object({
   name: z.string().min(1, 'Nama produk harus diisi'),
@@ -85,7 +86,7 @@ export function EditFinishedGoodDialog({
       onOpenChange(false)
       onSuccess()
     } catch (error) {
-      console.error('Error updating finished good:', error)
+      logger.error('Error updating finished good:', error)
       const message =
         error instanceof Error ? error.message : 'Gagal memperbarui produk jadi'
       toast.error(message)

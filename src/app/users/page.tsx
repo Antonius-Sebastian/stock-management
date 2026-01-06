@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { UsersTable } from '@/components/users/users-table'
 import { AddUserDialog } from '@/components/users/add-user-dialog'
+import { HelpButton } from '@/components/help/help-button'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -12,6 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { UserPlus } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 export type User = {
   id: string
@@ -35,7 +37,7 @@ export default function UsersPage() {
         setUsers(data)
       }
     } catch (error) {
-      console.error('Error fetching users:', error)
+      logger.error('Error fetching users:', error)
     } finally {
       setLoading(false)
     }
@@ -48,13 +50,16 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight lg:text-3xl">
-            Manajemen User
-          </h2>
-          <p className="text-muted-foreground">
-            Kelola user sistem dan peran mereka
-          </p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight lg:text-3xl">
+              Manajemen User
+            </h2>
+            <p className="text-muted-foreground">
+              Kelola user sistem dan peran mereka
+            </p>
+          </div>
+          <HelpButton pageId="users" />
         </div>
         <AddUserDialog onSuccess={fetchUsers}>
           <Button>

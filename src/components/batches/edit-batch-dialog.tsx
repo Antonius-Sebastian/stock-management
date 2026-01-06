@@ -4,11 +4,9 @@ import { useEffect, useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format } from 'date-fns'
-import { CalendarIcon, Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -28,20 +26,17 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { DatePickerField } from '@/components/forms'
+import { useFormSubmission } from '@/lib/hooks'
 import { logger } from '@/lib/logger'
-import { Batch, BatchUsage, RawMaterial, FinishedGood } from '@prisma/client'
+import type { RawMaterial, FinishedGood } from '@/lib/types'
+import { Batch, BatchUsage } from '@prisma/client'
 
 type BatchWithUsage = Batch & {
   batchFinishedGoods?: Array<{
@@ -87,7 +82,6 @@ export function EditBatchDialog({
   onOpenChange,
   onSuccess,
 }: EditBatchDialogProps) {
-  const [isLoading, setIsLoading] = useState(false)
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
 
@@ -189,7 +183,9 @@ export function EditBatchDialog({
         code: batch.code,
         date: new Date(batch.date),
         description: batch.description || '',
-        status: (batch.status as 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') || 'IN_PROGRESS',
+        status:
+          (batch.status as 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') ||
+          'IN_PROGRESS',
         finishedGoodId: batch.batchFinishedGoods?.[0]?.finishedGoodId || '',
         materials: batch.batchUsages.map((usage) => ({
           rawMaterialId: usage.rawMaterialId,
@@ -199,11 +195,10 @@ export function EditBatchDialog({
     }
   }, [batch, form])
 
-  async function onSubmit(data: FormData) {
-    if (!batch) return
+  const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
+    onSubmit: async (data: FormData) => {
+      if (!batch) return
 
-    setIsLoading(true)
-    try {
       const response = await fetch(`/api/batches/${batch.id}`, {
         method: 'PUT',
         headers: {
@@ -231,15 +226,10 @@ export function EditBatchDialog({
       toast.success('Batch updated successfully with material changes')
       onOpenChange(false)
       onSuccess()
-    } catch (error) {
-      logger.error('Error updating batch:', error)
-      const message =
-        error instanceof Error ? error.message : 'Failed to update batch'
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    successMessage: undefined, // Custom message handled in onSubmit
+    errorMessage: 'Failed to update batch',
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -252,7 +242,7 @@ export function EditBatchDialog({
         </DialogHeader>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(handleFormSubmit)}
             className="space-y-4 overflow-hidden"
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -275,37 +265,13 @@ export function EditBatchDialog({
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={'outline'}
-                            className={cn(
-                              'w-full pl-3 text-left font-normal',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, 'PPP')
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date('1900-01-01')
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <DatePickerField
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Pick a date"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

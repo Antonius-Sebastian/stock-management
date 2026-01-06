@@ -17,9 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { HelpButton } from '@/components/help/help-button'
 import { Button } from '@/components/ui/button'
 import { Download } from 'lucide-react'
 import { StockReportTable } from '@/components/reports/stock-report-table'
+import { logger } from '@/lib/logger'
 
 interface StockReportData {
   id: string
@@ -92,7 +94,7 @@ export default function ReportsPage() {
       const data = await response.json()
       setReportData(data)
     } catch (error) {
-      console.error('Error fetching report:', error)
+      logger.error('Error fetching report:', error)
       toast.error('Gagal memuat laporan. Silakan coba lagi.')
     } finally {
       setIsLoading(false)
@@ -109,7 +111,7 @@ export default function ReportsPage() {
         }
         const data = await response.json()
         const years = data.years || []
-        
+
         // Filter out future years - only allow current year or earlier
         const currentDate = new Date()
         const currentYear = currentDate.getFullYear()
@@ -130,7 +132,7 @@ export default function ReportsPage() {
 
         setMonth(currentMonth)
       } catch (error) {
-        console.error('Error fetching available years:', error)
+        logger.error('Error fetching available years:', error)
         // Fallback to current year if API fails
         const currentYear = new Date().getFullYear().toString()
         setAvailableYears([currentYear])
@@ -195,7 +197,7 @@ export default function ReportsPage() {
 
       toast.success('Laporan berhasil diekspor')
     } catch (error) {
-      console.error('Error exporting report:', error)
+      logger.error('Error exporting report:', error)
       toast.error('Gagal mengekspor laporan. Silakan coba lagi.')
     } finally {
       setIsExporting(false)
@@ -204,13 +206,16 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-          Laporan Stok
-        </h1>
-        <p className="text-muted-foreground">
-          Laporan pergerakan stok interaktif dengan rincian harian
-        </p>
+      <div className="flex items-center gap-2">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            Laporan Stok
+          </h1>
+          <p className="text-muted-foreground">
+            Laporan pergerakan stok interaktif dengan rincian harian
+          </p>
+        </div>
+        <HelpButton pageId="reports" />
       </div>
 
       <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
@@ -255,17 +260,14 @@ export default function ReportsPage() {
                 const currentDate = new Date()
                 const currentYear = currentDate.getFullYear()
                 const currentMonth = currentDate.getMonth() + 1
-                
+
                 // Disable future months/years
-                const isFuture = yearNum > currentYear || 
+                const isFuture =
+                  yearNum > currentYear ||
                   (yearNum === currentYear && monthNum > currentMonth)
-                
+
                 return (
-                  <SelectItem 
-                    key={m.value} 
-                    value={m.value}
-                    disabled={isFuture}
-                  >
+                  <SelectItem key={m.value} value={m.value} disabled={isFuture}>
                     {m.label}
                   </SelectItem>
                 )

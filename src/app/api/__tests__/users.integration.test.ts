@@ -74,7 +74,6 @@ describe('Users API Integration Tests', () => {
       vi.mocked(canManageUsers).mockReturnValue(false)
 
       const response = await GET()
-      const data = await response.json()
 
       expect(response.status).toBe(403)
       expect(getUsers).not.toHaveBeenCalled()
@@ -153,7 +152,6 @@ describe('Users API Integration Tests', () => {
       })
 
       const response = await POST(request)
-      const data = await response.json()
 
       expect(response.status).toBe(403)
       expect(createUser).not.toHaveBeenCalled()

@@ -4,11 +4,8 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format } from 'date-fns'
-import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
 import {
   Dialog,
   DialogContent,
@@ -27,20 +24,9 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { cn } from '@/lib/utils'
+import { ItemSelector, DatePickerField } from '@/components/forms'
+import { useFormSubmission } from '@/lib/hooks'
+import type { Item } from '@/lib/types'
 import { getWIBDate } from '@/lib/timezone'
 
 const createFormSchema = (items: Item[]) =>
@@ -86,28 +72,19 @@ interface StockAdjustmentDialogProps {
   onOpenChange?: (open: boolean) => void
 }
 
-interface Item {
-  id: string
-  name: string
-  kode?: string
-  sku?: string
-  currentStock?: number
-}
-
 type FormData = z.infer<ReturnType<typeof createFormSchema>>
 
 export function StockAdjustmentDialog({
   itemType,
   entityType,
   entityId,
-  entityName,
+  entityName: _entityName,
   onSuccess,
   children,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: StockAdjustmentDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [items, setItems] = useState<Item[]>([])
 
   // Use controlled or uncontrolled state
@@ -178,9 +155,8 @@ export function StockAdjustmentDialog({
     }
   }, [entityId, open, form])
 
-  async function onSubmit(data: FormData) {
-    setIsLoading(true)
-    try {
+  const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
+    onSubmit: async (data: FormData) => {
       const stockMovementData = {
         type: 'ADJUSTMENT',
         quantity: data.quantity,
@@ -219,15 +195,10 @@ export function StockAdjustmentDialog({
       })
       setOpen(false)
       onSuccess()
-    } catch (error) {
-      console.error('Error adjusting stock:', error)
-      const message =
-        error instanceof Error ? error.message : 'Failed to adjust stock'
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    successMessage: undefined, // Custom message handled in onSubmit
+    errorMessage: 'Failed to adjust stock',
+  })
 
   const selectedItem = items.find((item) => item.id === form.watch('itemId'))
   const currentStock =
@@ -247,115 +218,36 @@ export function StockAdjustmentDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(handleFormSubmit)}
+            className="space-y-4"
+          >
             <FormField
               control={form.control}
               name="itemId"
-              render={({ field }) => {
-                const itemsWithStock = items.filter(
-                  (item) =>
-                    !('currentStock' in item) ||
-                    (item as Item & { currentStock: number }).currentStock >= 0
-                )
-
-                return (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>
-                      {actualItemType === 'raw-material'
-                        ? 'Bahan Baku'
-                        : 'Produk Jadi'}
-                    </FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              'w-full min-w-0 justify-between overflow-hidden',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            <span className="block min-w-0 truncate text-left">
-                              {field.value
-                                ? actualItemType === 'raw-material'
-                                  ? `${selectedItem?.kode} - ${selectedItem?.name}`
-                                  : selectedItem?.name
-                                : `Pilih ${
-                                    actualItemType === 'raw-material'
-                                      ? 'bahan baku'
-                                      : 'produk jadi'
-                                  }`}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput
-                            placeholder={`Cari ${
-                              actualItemType === 'raw-material'
-                                ? 'bahan baku'
-                                : 'produk jadi'
-                            }...`}
-                          />
-                          <CommandList className="max-h-[300px]">
-                            <CommandEmpty>
-                              Tidak ada item yang ditemukan.
-                            </CommandEmpty>
-                            {itemsWithStock.length > 0 && (
-                              <CommandGroup>
-                                {itemsWithStock.map((item) => (
-                                  <CommandItem
-                                    key={item.id}
-                                    value={
-                                      actualItemType === 'raw-material'
-                                        ? `${item.kode} ${item.name}`
-                                        : item.name
-                                    }
-                                    onSelect={() => {
-                                      form.setValue('itemId', item.id)
-                                    }}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        'mr-2 h-4 w-4 shrink-0',
-                                        item.id === field.value
-                                          ? 'opacity-100'
-                                          : 'opacity-0'
-                                      )}
-                                    />
-                                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                                      <span className="block truncate">
-                                        {actualItemType === 'raw-material'
-                                          ? `${item.kode} - ${item.name}`
-                                          : item.name}
-                                      </span>
-                                      {'currentStock' in item && (
-                                        <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                                          (Stock:{' '}
-                                          {(
-                                            item as Item & {
-                                              currentStock: number
-                                            }
-                                          ).currentStock.toLocaleString()}
-                                          )
-                                        </span>
-                                      )}
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )
-              }}
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>
+                    {actualItemType === 'raw-material'
+                      ? 'Bahan Baku'
+                      : 'Produk Jadi'}
+                  </FormLabel>
+                  <FormControl>
+                    <ItemSelector
+                      items={items}
+                      itemType={actualItemType}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      placeholder={`Pilih ${
+                        actualItemType === 'raw-material'
+                          ? 'bahan baku'
+                          : 'produk jadi'
+                      }`}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
 
             {currentStock !== null && (
@@ -405,37 +297,13 @@ export function StockAdjustmentDialog({
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Tanggal</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={'outline'}
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, 'PPP')
-                          ) : (
-                            <span>Pilih tanggal</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date('1900-01-01')
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <FormControl>
+                    <DatePickerField
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Pilih tanggal"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

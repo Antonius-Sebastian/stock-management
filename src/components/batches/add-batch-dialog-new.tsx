@@ -4,11 +4,9 @@ import { useState, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format } from 'date-fns'
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
 import {
   Dialog,
   DialogContent,
@@ -27,24 +25,12 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {} from '@/components/ui/select'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Check, ChevronsUpDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { ItemSelector, DatePickerField } from '@/components/forms'
+import { useFormSubmission } from '@/lib/hooks'
+import type { RawMaterial } from '@/lib/types'
 import { getWIBDate } from '@/lib/timezone'
+import { logger } from '@/lib/logger'
 
 const createFormSchema = (rawMaterials: RawMaterial[]) =>
   z.object({
@@ -53,28 +39,6 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
       required_error: 'Please select a date',
     }),
     description: z.string().optional(),
-    finishedGoods: z
-      .array(
-        z.object({
-          finishedGoodId: z.string().min(1, 'Please select a finished good'),
-          quantity: z.coerce
-            .number({
-              required_error: 'Quantity is required',
-              invalid_type_error: 'Quantity must be a number',
-            })
-            .refine(
-              (val) => !isNaN(val) && val > 0,
-              'Quantity must be greater than zero'
-            ),
-        })
-      )
-      .refine((finishedGoods) => {
-        if (finishedGoods.length === 0) return true
-        const finishedGoodIds = finishedGoods
-          .map((fg) => fg.finishedGoodId)
-          .filter((id) => id !== '')
-        return finishedGoodIds.length === new Set(finishedGoodIds).size
-      }, 'Cannot select the same finished good multiple times'),
     materials: z
       .array(
         z.object({
@@ -116,28 +80,13 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
       ),
   })
 
-interface RawMaterial {
-  id: string
-  name: string
-  kode: string
-  currentStock: number
-}
-
-interface FinishedGood {
-  id: string
-  name: string
-  sku: string
-}
-
 interface AddBatchDialogProps {
   onSuccess: () => void
 }
 
 export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
   const [open, setOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
-  const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
 
   const formSchema = createFormSchema(rawMaterials)
   type FormData = z.infer<typeof formSchema>
@@ -147,18 +96,17 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
       code: '',
       date: getWIBDate(),
       description: '',
-      finishedGoods: [],
       materials: [{ rawMaterialId: '', quantity: '' as unknown as number }],
     },
     mode: 'onSubmit',
   })
 
-  // Update form validation when rawMaterials or finishedGoods change
+  // Update form validation when rawMaterials change
   useEffect(() => {
-    if (rawMaterials.length > 0 && finishedGoods.length > 0) {
+    if (rawMaterials.length > 0) {
       form.clearErrors()
     }
-  }, [rawMaterials, finishedGoods, form])
+  }, [rawMaterials, form])
 
   const {
     fields: materialFields,
@@ -169,23 +117,11 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
     name: 'materials',
   })
 
-  const {
-    fields: finishedGoodFields,
-    append: addFinishedGood,
-    remove: removeFinishedGood,
-  } = useFieldArray({
-    control: form.control,
-    name: 'finishedGoods',
-  })
-
   const fetchData = async () => {
     try {
-      const [rawMaterialsRes, finishedGoodsRes] = await Promise.all([
-        fetch('/api/raw-materials'),
-        fetch('/api/finished-goods'),
-      ])
+      const rawMaterialsRes = await fetch('/api/raw-materials')
 
-      if (!rawMaterialsRes.ok || !finishedGoodsRes.ok) {
+      if (!rawMaterialsRes.ok) {
         throw new Error('Failed to fetch required data')
       }
 
@@ -195,15 +131,8 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
         ? rawMaterialsData
         : rawMaterialsData.data || []
       setRawMaterials(rawMats)
-
-      const finishedGoodsData = await finishedGoodsRes.json()
-      // Handle both array response and paginated response
-      const finishedGoods = Array.isArray(finishedGoodsData)
-        ? finishedGoodsData
-        : finishedGoodsData.data || []
-      setFinishedGoods(finishedGoods)
     } catch (error) {
-      console.error('Error fetching data:', error)
+      logger.error('Error fetching data:', error)
       toast.error('Failed to load required data. Please try again.')
     }
   }
@@ -214,9 +143,8 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
     }
   }, [open])
 
-  async function onSubmit(data: FormData) {
-    setIsLoading(true)
-    try {
+  const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
+    onSubmit: async (data: FormData) => {
       const response = await fetch('/api/batches', {
         method: 'POST',
         headers: {
@@ -226,9 +154,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
           code: data.code,
           date: data.date.toISOString(),
           description: data.description,
-          finishedGoods: data.finishedGoods?.filter(
-            (fg) => fg.finishedGoodId && fg.quantity
-          ) || [],
+          finishedGoods: [],
           materials: data.materials,
         }),
       })
@@ -244,15 +170,10 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
       form.reset()
       setOpen(false)
       onSuccess()
-    } catch (error) {
-      console.error('Error creating batch:', error)
-      const message =
-        error instanceof Error ? error.message : 'Failed to create batch'
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    successMessage: undefined, // Custom message handled in onSubmit
+    errorMessage: 'Failed to create batch',
+  })
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -262,17 +183,17 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
           Catat Pemakaian Baru
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[90vh] max-w-[95vw] flex-col sm:max-w-[600px]">
+      <DialogContent className="flex max-h-[90vh] max-w-[95vw] flex-col sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle>Catat Pemakaian Baru</DialogTitle>
           <DialogDescription>
-            Record a new production batch with multiple raw materials and
-            finished good output.
+            Record a new production batch with raw materials. Finished goods can
+            be added after the batch is created.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(handleFormSubmit)}
             className="flex-1 space-y-6 overflow-y-auto pr-2"
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -295,37 +216,13 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={'outline'}
-                            className={cn(
-                              'w-full pl-3 text-left font-normal',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, 'PPP')
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date('1900-01-01')
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <DatePickerField
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Pick a date"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -346,137 +243,36 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
               )}
             />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
+            <Card className="border-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">
                   Bahan Baku yang Digunakan
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-0">
                 {materialFields.map((field, index) => (
-                  <div key={field.id} className="flex items-end gap-4">
+                  <div
+                    key={field.id}
+                    className="hover:bg-muted/50 flex items-end gap-3 rounded-lg border p-3 transition-colors"
+                  >
                     <FormField
                       control={form.control}
                       name={`materials.${index}.rawMaterialId`}
-                      render={({ field }) => {
-                        const selectedMaterial = rawMaterials.find(
-                          (m) => m.id === field.value
-                        )
-                        const materialsWithStock = rawMaterials.filter(
-                          (m) => m.currentStock > 0
-                        )
-                        const materialsWithoutStock = rawMaterials.filter(
-                          (m) => m.currentStock === 0
-                        )
-
-                        return (
-                          <FormItem className="flex flex-1 flex-col">
-                            <FormLabel>Bahan Baku</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    role="combobox"
-                                    className={cn(
-                                      'w-full min-w-0 justify-between overflow-hidden',
-                                      !field.value && 'text-muted-foreground'
-                                    )}
-                                  >
-                                    <span className="block min-w-0 truncate text-left">
-                                      {field.value && selectedMaterial
-                                        ? `${selectedMaterial.kode} - ${selectedMaterial.name}`
-                                        : 'Pilih bahan baku'}
-                                    </span>
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-[400px] p-0"
-                                align="start"
-                              >
-                                <Command>
-                                  <CommandInput placeholder="Cari bahan baku..." />
-                                  <CommandList className="max-h-[300px]">
-                                    <CommandEmpty>
-                                      Tidak ada bahan baku yang ditemukan.
-                                    </CommandEmpty>
-                                    {materialsWithStock.length > 0 && (
-                                      <CommandGroup heading="Tersedia">
-                                        {materialsWithStock.map((material) => (
-                                          <CommandItem
-                                            key={material.id}
-                                            value={`${material.kode} ${material.name}`}
-                                            onSelect={() => {
-                                              form.setValue(
-                                                `materials.${index}.rawMaterialId`,
-                                                material.id
-                                              )
-                                            }}
-                                          >
-                                            <Check
-                                              className={cn(
-                                                'mr-2 h-4 w-4 shrink-0',
-                                                material.id === field.value
-                                                  ? 'opacity-100'
-                                                  : 'opacity-0'
-                                              )}
-                                            />
-                                            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                                              <span className="block truncate">
-                                                {material.kode} -{' '}
-                                                {material.name}
-                                              </span>
-                                              <span className="shrink-0 text-xs font-medium whitespace-nowrap text-green-600">
-                                                (Stock:{' '}
-                                                {material.currentStock.toLocaleString()}
-                                                )
-                                              </span>
-                                            </div>
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    )}
-                                    {materialsWithoutStock.length > 0 && (
-                                      <CommandGroup heading="Stok Habis">
-                                        {materialsWithoutStock.map(
-                                          (material) => (
-                                            <CommandItem
-                                              key={material.id}
-                                              value={`${material.kode} ${material.name}`}
-                                              disabled
-                                            >
-                                              <Check className="mr-2 h-4 w-4 shrink-0 opacity-0" />
-                                              <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden opacity-50">
-                                                <span className="block truncate">
-                                                  {material.kode} -{' '}
-                                                  {material.name}
-                                                </span>
-                                                <span className="text-destructive shrink-0 text-xs whitespace-nowrap">
-                                                  (Out of Stock)
-                                                </span>
-                                              </div>
-                                            </CommandItem>
-                                          )
-                                        )}
-                                      </CommandGroup>
-                                    )}
-                                    {materialsWithStock.length === 0 &&
-                                      materialsWithoutStock.length === 0 && (
-                                        <div className="text-muted-foreground px-2 py-6 text-center text-sm">
-                                          Tidak ada bahan baku tersedia
-                                        </div>
-                                      )}
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )
-                      }}
+                      render={({ field }) => (
+                        <FormItem className="flex flex-1 flex-col">
+                          <FormLabel>Bahan Baku</FormLabel>
+                          <FormControl>
+                            <ItemSelector
+                              items={rawMaterials}
+                              itemType="raw-material"
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              placeholder="Pilih bahan baku"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                     <FormField
                       control={form.control}
@@ -515,8 +311,9 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                     />
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-destructive/10 hover:text-destructive shrink-0"
                       onClick={() => removeMaterial(index)}
                       disabled={materialFields.length === 1}
                     >
@@ -533,150 +330,26 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                       quantity: '' as unknown as number,
                     })
                   }
-                  className="w-full"
+                  className="hover:bg-muted/50 w-full border-dashed transition-colors hover:border-solid"
+                  disabled={isLoading}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Material
+                  Tambah Bahan Baku
                 </Button>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  Produk Jadi yang Dihasilkan
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {finishedGoodFields.map((field, index) => (
-                  <div key={field.id} className="flex items-end gap-4">
-                    <FormField
-                      control={form.control}
-                      name={`finishedGoods.${index}.finishedGoodId`}
-                      render={({ field: finishedGoodField }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Produk Jadi</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className={cn(
-                                    'w-full justify-between',
-                                    !finishedGoodField.value &&
-                                      'text-muted-foreground'
-                                  )}
-                                >
-                                  {finishedGoodField.value
-                                    ? finishedGoods.find(
-                                        (fg) =>
-                                          fg.id === finishedGoodField.value
-                                      )?.name
-                                    : 'Pilih produk jadi'}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                              <Command>
-                                <CommandInput placeholder="Cari produk jadi..." />
-                                <CommandEmpty>
-                                  Tidak ada produk jadi ditemukan.
-                                </CommandEmpty>
-                                <CommandList>
-                                  <CommandGroup>
-                                    {finishedGoods.map((fg) => (
-                                      <CommandItem
-                                        value={fg.name}
-                                        key={fg.id}
-                                        onSelect={() => {
-                                          form.setValue(
-                                            `finishedGoods.${index}.finishedGoodId`,
-                                            fg.id
-                                          )
-                                          form.trigger(
-                                            `finishedGoods.${index}.finishedGoodId`
-                                          )
-                                        }}
-                                      >
-                                        <Check
-                                          className={cn(
-                                            'mr-2 h-4 w-4',
-                                            fg.id === finishedGoodField.value
-                                              ? 'opacity-100'
-                                              : 'opacity-0'
-                                          )}
-                                        />
-                                        {fg.name}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`finishedGoods.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem className="w-40">
-                          <FormLabel>Quantity</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeFinishedGood(index)}
-                      disabled={finishedGoodFields.length === 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    addFinishedGood({
-                      finishedGoodId: '',
-                      quantity: '' as unknown as number,
-                    })
-                  }
-                  className="w-full"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Tambah Produk Jadi
-                </Button>
-              </CardContent>
-            </Card>
-
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(false)}
+                disabled={isLoading}
               >
-                Cancel
+                Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Creating...' : 'Create Batch'}
+                {isLoading ? 'Membuat...' : 'Buat Batch'}
               </Button>
             </DialogFooter>
           </form>

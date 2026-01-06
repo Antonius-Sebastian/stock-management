@@ -15,9 +15,11 @@ import { FinishedGoodsTable } from '@/components/finished-goods/finished-goods-t
 import { AddFinishedGoodDialog } from '@/components/finished-goods/add-finished-good-dialog'
 import { EditFinishedGoodDialog } from '@/components/finished-goods/edit-finished-good-dialog'
 import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
+import { HelpButton } from '@/components/help/help-button'
 import { Button } from '@/components/ui/button'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { canManageFinishedGoods, canCreateStockMovement } from '@/lib/rbac'
+import { logger } from '@/lib/logger'
 
 export default function FinishedGoodsPage() {
   const { data: session } = useSession()
@@ -40,7 +42,7 @@ export default function FinishedGoodsPage() {
       const goods = Array.isArray(data) ? data : data.data || []
       setFinishedGoods(goods)
     } catch (error) {
-      console.error('Error fetching finished goods:', error)
+      logger.error('Error fetching finished goods:', error)
       toast.error('Gagal memuat produk jadi. Silakan refresh halaman.')
     } finally {
       setIsLoading(false)
@@ -84,7 +86,7 @@ export default function FinishedGoodsPage() {
       toast.success('Produk jadi berhasil dihapus')
       fetchFinishedGoods()
     } catch (error) {
-      console.error('Error deleting finished good:', error)
+      logger.error('Error deleting finished good:', error)
       const message =
         error instanceof Error ? error.message : 'Gagal menghapus produk jadi'
       toast.error(message)
@@ -102,13 +104,16 @@ export default function FinishedGoodsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-            Produk Jadi
-          </h1>
-          <p className="text-muted-foreground text-sm lg:text-base">
-            Kelola inventori produk jadi Anda
-          </p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+              Produk Jadi
+            </h1>
+            <p className="text-muted-foreground text-sm lg:text-base">
+              Kelola inventori produk jadi Anda
+            </p>
+          </div>
+          <HelpButton pageId="finished-goods" />
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {canCreateStockMovement(userRole, 'finished-good', 'IN') && (

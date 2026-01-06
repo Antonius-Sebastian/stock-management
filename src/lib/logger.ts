@@ -1,8 +1,10 @@
 /**
  * Logging Utility
  * Centralized logging with different levels
- * Can be extended to send logs to external services (Sentry, LogRocket, etc.)
+ * Integrated with Sentry for error tracking and logging
  */
+
+import * as Sentry from '@sentry/nextjs'
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
@@ -28,22 +30,39 @@ class Logger {
   }
 
   /**
-   * Send log to external service in production
-   * TODO: Integrate with Sentry, LogRocket, or other service
+   * Send log to Sentry in production
+   * Uses Sentry.logger for structured logging and Sentry.captureException for errors
    */
   private sendToService(
-    _level: LogLevel,
-    _message: string,
-    _context?: LogContext,
-    _error?: Error
+    level: LogLevel,
+    message: string,
+    context?: LogContext,
+    error?: Error
   ) {
     if (!this.isProduction) return
 
-    // TODO: Implement external logging service
-    // Example:
-    // if (level === 'error' && error) {
-    //   Sentry.captureException(error, { extra: context })
-    // }
+    try {
+      if (level === 'error' && error) {
+        // Capture exceptions with context using captureException
+        Sentry.captureException(error, {
+          extra: context,
+          tags: { source: 'logger' },
+        })
+      } else if (level === 'error') {
+        // Use Sentry.logger for error messages (structured logging)
+        Sentry.logger.error(message, context)
+      } else if (level === 'warn') {
+        // Use Sentry.logger for warnings (structured logging)
+        Sentry.logger.warn(message, context)
+      } else if (level === 'info') {
+        // Use Sentry.logger for info messages (structured logging)
+        Sentry.logger.info(message, context)
+      }
+      // Debug logs are only in development, not sent to Sentry
+    } catch (err) {
+      // Fallback to console if Sentry fails
+      console.error('Failed to send log to Sentry:', err)
+    }
   }
 
   /**
@@ -51,6 +70,7 @@ class Logger {
    */
   info(message: string, context?: LogContext) {
     const formatted = this.formatMessage('info', message, context)
+    // eslint-disable-next-line no-console
     console.log(formatted)
     this.sendToService('info', message, context)
   }
@@ -86,6 +106,7 @@ class Logger {
     if (!this.isDevelopment) return
 
     const formatted = this.formatMessage('debug', message, context)
+    // eslint-disable-next-line no-console
     console.debug(formatted)
   }
 

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { Loader2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 
 interface EditableCellProps {
   value: number | string
@@ -64,7 +65,7 @@ export function EditableCell({
       setIsEditing(false)
       setEditValue('')
     } catch (error) {
-      console.error('Error saving value:', error)
+      logger.error('Error saving value:', error)
       // Keep editing mode open on error
     } finally {
       setIsLoading(false)
@@ -99,7 +100,7 @@ export function EditableCell({
     try {
       await onDelete()
     } catch (error) {
-      console.error('Error deleting:', error)
+      logger.error('Error deleting:', error)
     } finally {
       setIsLoading(false)
       setShowDelete(false)

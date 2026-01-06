@@ -16,12 +16,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  HelpCircle,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { useSession } from 'next-auth/react'
 import { canManageUsers } from '@/lib/rbac'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { getSidebarCollapsed, saveSidebarCollapsed } from '@/lib/cookies'
 
 const navigation = [
@@ -50,18 +51,19 @@ const navigation = [
     href: '/users',
     icon: Users,
   },
+  {
+    name: 'Bantuan',
+    href: '/help',
+    icon: HelpCircle,
+  },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  // Initialize state from cookies using lazy initialization
+  const [isCollapsed, setIsCollapsed] = useState(() => getSidebarCollapsed())
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-
-  // Load collapsed state from cookies on mount
-  useEffect(() => {
-    setIsCollapsed(getSidebarCollapsed())
-  }, [])
 
   const toggleCollapse = () => {
     const newState = !isCollapsed

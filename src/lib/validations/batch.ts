@@ -64,13 +64,10 @@ export const addFinishedGoodsSchema = z.object({
       })
     )
     .min(1, 'At least one finished good is required')
-    .refine(
-      (finishedGoods) => {
-        const finishedGoodIds = finishedGoods.map((fg) => fg.finishedGoodId)
-        return finishedGoodIds.length === new Set(finishedGoodIds).size
-      },
-      'Cannot select the same finished good multiple times'
-    ),
+    .refine((finishedGoods) => {
+      const finishedGoodIds = finishedGoods.map((fg) => fg.finishedGoodId)
+      return finishedGoodIds.length === new Set(finishedGoodIds).size
+    }, 'Cannot select the same finished good multiple times'),
 })
 
 export type BatchInput = z.infer<typeof batchSchema>

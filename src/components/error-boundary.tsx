@@ -2,8 +2,10 @@
 
 import React from 'react'
 import { AlertCircle } from 'lucide-react'
+import * as Sentry from '@sentry/nextjs'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { logger } from '@/lib/logger'
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
@@ -35,13 +37,24 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error to console (in production, send to error tracking service)
-    console.error('Error Boundary caught an error:', error, errorInfo)
+    // Log error using logger (which sends to Sentry in production)
+    logger.error('Error Boundary caught an error:', error, {
+      componentStack: errorInfo.componentStack,
+    })
 
-    // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
-    // if (process.env.NODE_ENV === 'production') {
-    //   logErrorToService(error, errorInfo)
-    // }
+    // Also capture directly with Sentry for better error tracking
+    // Using captureException with proper React context
+    Sentry.captureException(error, {
+      contexts: {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      },
+      tags: {
+        errorBoundary: true,
+      },
+      level: 'error',
+    })
   }
 
   resetErrorBoundary = () => {

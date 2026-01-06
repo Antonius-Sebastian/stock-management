@@ -1078,7 +1078,7 @@ describe('Stock Movement Service', () => {
       const itemType = 'finished-good' as const
       const date = new Date('2024-01-15')
       const movementType = 'OUT' as const
-      const newQuantity = 60 // Would result in negative stock
+      // const newQuantity = 60 // Would result in negative stock
       // oldTotal = 10, newTotal = 60, difference = 50
       // stockChange = -50 (OUT), currentStock = 50, newStock = 50 - 50 = 0 (not negative)
       // Need to use a larger quantity to actually go negative

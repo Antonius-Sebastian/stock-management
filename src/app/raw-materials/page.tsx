@@ -15,6 +15,7 @@ import { RawMaterialsTable } from '@/components/raw-materials/raw-materials-tabl
 import { AddRawMaterialDialog } from '@/components/raw-materials/add-raw-material-dialog'
 import { EditRawMaterialDialog } from '@/components/raw-materials/edit-raw-material-dialog'
 import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
+import { HelpButton } from '@/components/help/help-button'
 import { Button } from '@/components/ui/button'
 import { TrendingUp } from 'lucide-react'
 import { logger } from '@/lib/logger'
@@ -135,13 +136,16 @@ export default function RawMaterialsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-            Bahan Baku
-          </h1>
-          <p className="text-muted-foreground text-sm lg:text-base">
-            Kelola inventori bahan baku Anda
-          </p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+              Bahan Baku
+            </h1>
+            <p className="text-muted-foreground text-sm lg:text-base">
+              Kelola inventori bahan baku Anda
+            </p>
+          </div>
+          <HelpButton pageId="raw-materials" />
         </div>
         <div className="flex gap-2">
           {canCreateStockMovement(userRole, 'raw-material', 'IN') && (

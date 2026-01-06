@@ -80,3 +80,20 @@ export const stockMovementByDateUpdateSchema = z.object({
 
 export type StockMovementInput = z.infer<typeof stockMovementSchema>
 export type StockMovementInputAPI = z.infer<typeof stockMovementSchemaAPI>
+
+export const drumStockInSchema = z.object({
+  rawMaterialId: z.string().min(1, 'Please select a raw material'),
+  date: z.date({
+    required_error: 'Please select a date',
+  }),
+  description: z.string().optional(),
+  drums: z.array(
+    z.object({
+      label: z.string().min(1, 'Drum label is required'),
+      quantity: z.coerce.number().positive('Quantity must be positive'),
+    })
+  ).min(1, 'At least one drum is required'),
+})
+
+export type DrumStockInForm = z.infer<typeof drumStockInSchema>
+

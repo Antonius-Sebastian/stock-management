@@ -33,6 +33,7 @@ interface Movement {
   date: string
   description: string | null
   batch: { id: string; code: string } | null
+  drum: { label: string } | null
   runningBalance: number
   createdAt: string
 }

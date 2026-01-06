@@ -22,6 +22,7 @@ interface Movement {
   date: string
   description: string | null
   batch: { id: string; code: string } | null
+  drum: { label: string } | null
   runningBalance: number
   createdAt: string
 }
@@ -150,6 +151,17 @@ export function MovementHistoryTable({
             {batch.code}
           </button>
         )
+      },
+    },
+    {
+      id: 'drum',
+      header: 'Drum',
+      cell: ({ row }) => {
+        const drum = row.original.drum
+        if (!drum) {
+          return <span className="text-muted-foreground">-</span>
+        }
+        return <span className="font-medium">{drum.label}</span>
       },
     },
     {

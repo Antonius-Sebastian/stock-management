@@ -80,6 +80,11 @@ vi.mock('@/lib/db', () => ({
           findUnique: vi.fn(),
           update: vi.fn(),
         },
+        drum: {
+          findUnique: vi.fn(),
+          findMany: vi.fn(),
+          update: vi.fn(),
+        },
         $queryRaw: vi.fn(),
       }
       return callback(txClient)
@@ -251,6 +256,9 @@ describe('Batch Service', () => {
             currentStock: 100,
           },
         ]),
+        drum: {
+          findMany: vi.fn().mockResolvedValue([]), // No drums for legacy/auto test
+        },
       }
 
       vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
@@ -274,15 +282,13 @@ describe('Batch Service', () => {
       })
       expect(mockTx.batchUsage.create).toHaveBeenCalled()
       expect(mockTx.batchFinishedGood.create).toHaveBeenCalled()
-      expect(mockTx.stockMovement.create).toHaveBeenCalledTimes(2) // OUT for material, IN for finished good
+      expect(mockTx.stockMovement.create).toHaveBeenCalledTimes(1) // OUT for material only
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'rm-1' },
         data: { currentStock: { decrement: 10 } },
       })
-      expect(mockTx.finishedGood.update).toHaveBeenCalledWith({
-        where: { id: 'fg-1' },
-        data: { currentStock: { increment: 5 } },
-      })
+      // Decoupled logic: no finished good stock update
+      expect(mockTx.finishedGood.update).not.toHaveBeenCalled()
     })
 
     it('should throw error when duplicate batch code exists', async () => {
@@ -436,6 +442,75 @@ describe('Batch Service', () => {
         'Finished good not found: non-existent'
       )
     })
+
+    it('should distribute material usage across drums FIFO when no drumId provided', async () => {
+      const input = {
+        code: 'BATCH-FIFO',
+        date: new Date('2024-01-15'),
+        materials: [{ rawMaterialId: 'rm-1', quantity: 150 }],
+        finishedGoods: [],
+      }
+
+      const mockBatch = createTestBatch({ code: 'BATCH-FIFO' })
+      const mockRawMaterial = createTestRawMaterial({
+        id: 'rm-1',
+        name: 'Material 1',
+        currentStock: 200,
+      })
+      
+      // Drums sorted by creation (FIFO)
+      const mockDrums = [
+        { id: 'drum-1', label: 'D1', currentQuantity: 100, createdAt: new Date('2024-01-01') },
+        { id: 'drum-2', label: 'D2', currentQuantity: 100, createdAt: new Date('2024-01-02') },
+      ]
+
+      const mockTx = {
+            batch: { create: vi.fn().mockResolvedValue(mockBatch) },
+            batchUsage: { create: vi.fn() },
+            batchFinishedGood: { create: vi.fn() },
+            stockMovement: { create: vi.fn() },
+            rawMaterial: { update: vi.fn() },
+            finishedGood: { findUnique: vi.fn(), update: vi.fn() },
+            drum: { 
+                findMany: vi.fn().mockResolvedValue(mockDrums),
+                findUnique: vi.fn().mockImplementation((args) => Promise.resolve(mockDrums.find(d => d.id === args.where.id))),
+                update: vi.fn()
+            },
+            $queryRaw: vi.fn().mockResolvedValue([mockRawMaterial]),
+      }
+
+      vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(mockTx))
+
+      await createBatch(input)
+
+      // Expect usage to be split: 100 from drum-1, 50 from drum-2
+      expect(mockTx.drum.findMany).toHaveBeenCalled()
+      
+      // Drum 1 Usage (100)
+      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(expect.objectContaining({
+          data: expect.objectContaining({ drumId: 'drum-1', quantity: 100 })
+      }))
+      expect(mockTx.drum.update).toHaveBeenCalledWith(expect.objectContaining({
+          where: { id: 'drum-1' },
+          data: expect.objectContaining({ currentQuantity: { decrement: 100 } })
+      }))
+
+      // Drum 2 Usage (50)
+      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(expect.objectContaining({
+          data: expect.objectContaining({ drumId: 'drum-2', quantity: 50 })
+      }))
+      expect(mockTx.drum.update).toHaveBeenCalledWith(expect.objectContaining({
+          where: { id: 'drum-2' },
+          data: expect.objectContaining({ currentQuantity: { decrement: 50 } })
+      }))
+      
+      // Total Material Deduction (150)
+      expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
+          where: { id: 'rm-1' },
+          data: { currentStock: { decrement: 150 } }
+      })
+    })
   })
 
   describe('updateBatch', () => {
@@ -520,8 +595,7 @@ describe('Batch Service', () => {
             currentStock: 8,
           }),
         },
-        $queryRaw: vi
-          .fn()
+        $queryRaw: vi.fn()
           .mockResolvedValueOnce([
             {
               id: 'fg-1',
@@ -536,6 +610,9 @@ describe('Batch Service', () => {
               currentStock: 100,
             },
           ]),
+        drum: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
       }
 
       vi.mocked(prisma.batch.findUnique).mockResolvedValue(existingBatch as any)
@@ -550,20 +627,15 @@ describe('Batch Service', () => {
       const result = await updateBatch(batchId, input)
 
       expect(result).toEqual(mockUpdatedBatch)
-      // Should restore old stock first
-      expect(mockTx.finishedGood.update).toHaveBeenCalledWith({
-        where: { id: 'fg-1' },
-        data: { currentStock: { decrement: 5 } },
-      })
+      // Should restore raw material stock (increment)
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'rm-1' },
         data: { currentStock: { increment: 10 } },
       })
-      // Then apply new changes
-      expect(mockTx.finishedGood.update).toHaveBeenCalledWith({
-        where: { id: 'fg-1' },
-        data: { currentStock: { increment: 8 } },
-      })
+      // Should NOT restore finished good stock (decoupled)
+      expect(mockTx.finishedGood.update).not.toHaveBeenCalled()
+      
+      // Then apply new changes (materials only)
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'rm-1' },
         data: { currentStock: { decrement: 15 } },
@@ -843,16 +915,13 @@ describe('Batch Service', () => {
 
       await deleteBatch(batchId)
 
-      // Should restore finished good stock (decrement)
-      expect(mockTx.finishedGood.update).toHaveBeenCalledWith({
-        where: { id: 'fg-1' },
-        data: { currentStock: { decrement: 5 } },
-      })
       // Should restore raw material stock (increment)
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'rm-1' },
         data: { currentStock: { increment: 10 } },
       })
+      // Should NOT restore finished good stock (decoupled)
+      expect(mockTx.finishedGood.update).not.toHaveBeenCalled()
       expect(mockTx.stockMovement.deleteMany).toHaveBeenCalledWith({
         where: { batchId },
       })

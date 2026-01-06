@@ -27,6 +27,7 @@ export interface BatchInput {
   materials: Array<{
     rawMaterialId: string
     quantity: number
+    drumId?: string
   }>
 }
 
@@ -284,28 +285,125 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
 
     // Step 4: Process each raw material
     for (const material of data.materials) {
-      // Create batch usage
-      await tx.batchUsage.create({
-        data: {
-          batchId: batch.id,
-          rawMaterialId: material.rawMaterialId,
-          quantity: material.quantity,
-        },
-      })
+      // Validate Raw Material Stock (Aggregate)
+      const rawMaterials = await tx.$queryRaw<
+        Array<{ id: string; name: string; currentStock: number }>
+      >`
+        SELECT id, name, "currentStock"
+        FROM raw_materials
+        WHERE id = ${material.rawMaterialId}
+        FOR UPDATE
+      `
 
-      // Create stock OUT movement for raw material
-      await tx.stockMovement.create({
-        data: {
-          type: 'OUT',
-          quantity: material.quantity,
-          date: data.date,
-          description: `Batch production: ${data.code}`,
-          rawMaterialId: material.rawMaterialId,
-          batchId: batch.id,
-        },
-      })
+      if (rawMaterials.length === 0) {
+        throw new Error(`Raw material not found: ${material.rawMaterialId}`)
+      }
 
-      // Update raw material current stock
+      const rawMaterial = rawMaterials[0]
+
+      if (rawMaterial.currentStock < material.quantity) {
+        throw new Error(
+          `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${material.quantity}`
+        )
+      }
+
+      // Determine Distribution (FIFO vs Explicit)
+      const distribution: Array<{ drumId?: string; quantity: number }> = []
+
+      if (material.drumId) {
+        // Explicit Drum Selection
+        distribution.push({
+          drumId: material.drumId,
+          quantity: material.quantity,
+        })
+      } else {
+        // Auto (FIFO) or Legacy
+        // Fetch active drums for this material
+        const drums = await tx.drum.findMany({
+          where: {
+            rawMaterialId: material.rawMaterialId,
+            isActive: true,
+            currentQuantity: { gt: 0 },
+          },
+          orderBy: { createdAt: 'asc' }, // FIFO
+        })
+
+        if (drums.length === 0) {
+          // No drums available, use general stock (Legacy)
+          distribution.push({ quantity: material.quantity })
+        } else {
+          // Distribute across drums (FIFO)
+          let remainingNeeded = material.quantity
+
+          for (const drum of drums) {
+            if (remainingNeeded <= 0) break
+
+            const takeAmount = Math.min(remainingNeeded, drum.currentQuantity)
+            distribution.push({
+              drumId: drum.id,
+              quantity: takeAmount,
+            })
+
+            remainingNeeded -= takeAmount
+          }
+
+          // If still need more stock (and ran out of drums), take from general
+          if (remainingNeeded > 0) {
+            distribution.push({ quantity: remainingNeeded })
+          }
+        }
+      }
+
+      // Execute Distribution
+      for (const dist of distribution) {
+        // Create batch usage
+        await tx.batchUsage.create({
+          data: {
+            batchId: batch.id,
+            rawMaterialId: material.rawMaterialId,
+            quantity: dist.quantity,
+            drumId: dist.drumId,
+          },
+        })
+
+        // Create stock OUT movement
+        await tx.stockMovement.create({
+          data: {
+            type: 'OUT',
+            quantity: dist.quantity,
+            date: data.date,
+            description: `Batch production: ${data.code}`,
+            rawMaterialId: material.rawMaterialId,
+            batchId: batch.id,
+            drumId: dist.drumId,
+          },
+        })
+
+        // Update Drum Stock if drumId exists
+        if (dist.drumId) {
+          const drum = await tx.drum.findUnique({
+            where: { id: dist.drumId },
+          })
+          if (!drum) throw new Error(`Drum not found: ${dist.drumId}`)
+
+          if (drum.currentQuantity < dist.quantity) {
+             // Should not happen with FIFO logic above, but safety check for explicit selection
+            throw new Error(`Insufficient stock in drum ${drum.label}`)
+          }
+
+          await tx.drum.update({
+            where: { id: dist.drumId },
+            data: {
+              currentQuantity: { decrement: dist.quantity },
+              isActive: {
+                set: drum.currentQuantity - dist.quantity > 0,
+              },
+            },
+          })
+        }
+      }
+
+      // Update Raw Material Aggregate Stock (once per material line)
       await tx.rawMaterial.update({
         where: { id: material.rawMaterialId },
         data: {
@@ -317,36 +415,15 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
     }
 
     // Step 5: Process each finished good (if provided)
+    // NOTE: Decoupled Logic - Do NOT increment Stock or Create Stock Movement
     if (data.finishedGoods && data.finishedGoods.length > 0) {
       for (const finishedGood of data.finishedGoods) {
-        // Create batch finished good record
+        // Create batch finished good record (Record keeping only)
         await tx.batchFinishedGood.create({
           data: {
             batchId: batch.id,
             finishedGoodId: finishedGood.finishedGoodId,
             quantity: finishedGood.quantity,
-          },
-        })
-
-        // Create stock IN movement for finished good
-        await tx.stockMovement.create({
-          data: {
-            type: 'IN',
-            quantity: finishedGood.quantity,
-            date: data.date,
-            description: `Batch production: ${data.code}`,
-            finishedGoodId: finishedGood.finishedGoodId,
-            batchId: batch.id,
-          },
-        })
-
-        // Update finished good current stock
-        await tx.finishedGood.update({
-          where: { id: finishedGood.finishedGoodId },
-          data: {
-            currentStock: {
-              increment: finishedGood.quantity,
-            },
           },
         })
       }
@@ -426,18 +503,11 @@ export async function updateBatch(
 
   // Transaction: Handle batch updates
   return await prisma.$transaction(async (tx) => {
-    // Step 1: Restore stock for all old finished goods
+    // Step 1: Restore stock for all old finished goods - SKIPPED (Decoupled)
     for (const oldFinishedGood of existingBatch.batchFinishedGoods) {
-      await tx.finishedGood.update({
-        where: { id: oldFinishedGood.finishedGoodId },
-        data: {
-          currentStock: {
-            decrement: oldFinishedGood.quantity,
-          },
-        },
-      })
-
-      // Delete old finished good IN stock movements
+      // Logic removed: do not decrement stock as it wasn't incremented
+      
+      // Delete old finished good IN stock movements (if any exist from legacy)
       await tx.stockMovement.deleteMany({
         where: {
           batchId: id,
@@ -505,27 +575,17 @@ export async function updateBatch(
           },
         })
 
-        // Create stock IN movement for finished good
-        await tx.stockMovement.create({
+        // Create batch finished good record
+        await tx.batchFinishedGood.create({
           data: {
-            type: 'IN',
-            quantity: finishedGood.quantity,
-            date: data.date,
-            description: `Batch ${data.code} production`,
-            finishedGoodId: finishedGood.finishedGoodId,
             batchId: id,
+            finishedGoodId: finishedGood.finishedGoodId,
+            quantity: finishedGood.quantity,
           },
         })
 
-        // Update finished good current stock
-        await tx.finishedGood.update({
-          where: { id: finishedGood.finishedGoodId },
-          data: {
-            currentStock: {
-              increment: finishedGood.quantity,
-            },
-          },
-        })
+        // NOTE: Decoupled Logic - Do NOT increment Stock or Create Stock Movement
+        
       }
     }
 
@@ -553,34 +613,105 @@ export async function updateBatch(
         )
       }
 
-      // Create batch usage
-      await tx.batchUsage.create({
-        data: {
-          batchId: id,
-          rawMaterialId: material.rawMaterialId,
-          quantity: material.quantity,
-        },
-      })
+      // Determine Distribution (FIFO vs Explicit)
+      const distribution: Array<{ drumId?: string; quantity: number }> = []
 
-      // Deduct stock
+      if (material.drumId) {
+        // Explicit Drum Selection
+        distribution.push({
+          drumId: material.drumId,
+          quantity: material.quantity,
+        })
+      } else {
+        // Auto (FIFO) or Legacy
+        // Fetch active drums for this material
+        const drums = await tx.drum.findMany({
+          where: {
+            rawMaterialId: material.rawMaterialId,
+            isActive: true,
+            currentQuantity: { gt: 0 },
+          },
+          orderBy: { createdAt: 'asc' }, // FIFO
+        })
+
+        if (drums.length === 0) {
+          // No drums available, use general stock (Legacy)
+          distribution.push({ quantity: material.quantity })
+        } else {
+          // Distribute across drums (FIFO)
+          let remainingNeeded = material.quantity
+
+          for (const drum of drums) {
+            if (remainingNeeded <= 0) break
+
+            const takeAmount = Math.min(remainingNeeded, drum.currentQuantity)
+            distribution.push({
+              drumId: drum.id,
+              quantity: takeAmount,
+            })
+
+            remainingNeeded -= takeAmount
+          }
+
+          // If still need more stock (and ran out of drums), take from general
+          if (remainingNeeded > 0) {
+            distribution.push({ quantity: remainingNeeded })
+          }
+        }
+      }
+
+      // Execute Distribution
+      for (const dist of distribution) {
+        // Create batch usage
+        await tx.batchUsage.create({
+          data: {
+            batchId: id,
+            rawMaterialId: material.rawMaterialId,
+            quantity: dist.quantity,
+            drumId: dist.drumId,
+          },
+        })
+
+        // Create stock movement (OUT)
+        await tx.stockMovement.create({
+          data: {
+            type: 'OUT',
+            quantity: dist.quantity,
+            date: data.date,
+            rawMaterialId: material.rawMaterialId,
+            batchId: id,
+            description: `Batch ${data.code} production`,
+            drumId: dist.drumId,
+          },
+        })
+
+        // Update Dictionary Drum Stock if drumId provided
+        if (dist.drumId) {
+            const drum = await tx.drum.findUnique({ where: { id: dist.drumId }})
+            if (!drum) throw new Error(`Drum not found: ${dist.drumId}`)
+            
+            if (drum.currentQuantity < dist.quantity) {
+                 // Safety check
+                throw new Error(`Insufficient stock in drum ${drum.label}`)
+            }
+
+            await tx.drum.update({
+                where: { id: dist.drumId },
+                data: {
+                    currentQuantity: { decrement: dist.quantity },
+                    isActive: { set: (drum.currentQuantity - dist.quantity) > 0 }
+                }
+            })
+        }
+      }
+
+      // Deduct stock (Aggregate)
       await tx.rawMaterial.update({
         where: { id: material.rawMaterialId },
         data: {
           currentStock: {
             decrement: material.quantity,
           },
-        },
-      })
-
-      // Create stock movement (OUT)
-      await tx.stockMovement.create({
-        data: {
-          type: 'OUT',
-          quantity: material.quantity,
-          date: data.date,
-          rawMaterialId: material.rawMaterialId,
-          batchId: id,
-          description: `Batch ${data.code} production`,
         },
       })
     }
@@ -640,19 +771,10 @@ export async function deleteBatch(id: string): Promise<void> {
 
   // Transaction: Delete batch and restore stock
   await prisma.$transaction(async (tx) => {
-    // Step 1: Restore finished good stock
-    for (const batchFinishedGood of existingBatch.batchFinishedGoods) {
-      await tx.finishedGood.update({
-        where: { id: batchFinishedGood.finishedGoodId },
-        data: {
-          currentStock: {
-            decrement: batchFinishedGood.quantity,
-          },
-        },
-      })
-    }
-
-    // Step 2: Restore raw material stock
+    // Step 1: Restore finished good stock - SKIPPED (Decoupled)
+    // We only delete the BatchFinishedGood record later.
+    
+    // Step 2: Restore raw material stock (and Drum stock)
     for (const batchUsage of existingBatch.batchUsages) {
       await tx.rawMaterial.update({
         where: { id: batchUsage.rawMaterialId },
@@ -662,6 +784,19 @@ export async function deleteBatch(id: string): Promise<void> {
           },
         },
       })
+
+      // Restore Drum Stock if exists
+      if (batchUsage.drumId) {
+          await tx.drum.update({
+              where: { id: batchUsage.drumId },
+              data: {
+                  currentQuantity: {
+                      increment: batchUsage.quantity
+                  },
+                  isActive: true // Reactivate if it was deactivated (simple logic)
+              }
+          })
+      }
     }
 
     // Step 3: Delete stock movements associated with this batch FIRST

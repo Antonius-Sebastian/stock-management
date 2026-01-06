@@ -14,10 +14,8 @@ import {
 import { RawMaterialsTable } from '@/components/raw-materials/raw-materials-table'
 import { AddRawMaterialDialog } from '@/components/raw-materials/add-raw-material-dialog'
 import { EditRawMaterialDialog } from '@/components/raw-materials/edit-raw-material-dialog'
-import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
+import { DrumStockEntryDialog } from '@/components/raw-materials/drum-stock-entry-dialog'
 import { HelpButton } from '@/components/help/help-button'
-import { Button } from '@/components/ui/button'
-import { TrendingUp } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { canManageMaterials, canCreateStockMovement } from '@/lib/rbac'
 import {
@@ -149,16 +147,7 @@ export default function RawMaterialsPage() {
         </div>
         <div className="flex gap-2">
           {canCreateStockMovement(userRole, 'raw-material', 'IN') && (
-            <StockEntryDialog
-              type="IN"
-              itemType="raw-material"
-              onSuccess={handleSuccess}
-            >
-              <Button variant="outline">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Input Stok Masuk
-              </Button>
-            </StockEntryDialog>
+            <DrumStockEntryDialog onSuccess={handleSuccess} />
           )}
           {canManageMaterials(userRole) && (
             <AddRawMaterialDialog onSuccess={handleSuccess} />

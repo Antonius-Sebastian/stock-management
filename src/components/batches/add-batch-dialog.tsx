@@ -25,12 +25,31 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ItemSelector, DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
-import type { RawMaterial } from '@/lib/types'
+import type { RawMaterial as BaseRawMaterial } from '@/lib/types'
 import { getWIBDate } from '@/lib/timezone'
 import { logger } from '@/lib/logger'
+
+// Extended RawMaterial type to include drums
+interface Drum {
+  id: string
+  label: string
+  currentQuantity: number
+  isActive: boolean
+}
+
+interface RawMaterial extends BaseRawMaterial {
+  drums?: Drum[]
+}
 
 const createFormSchema = (rawMaterials: RawMaterial[]) =>
   z.object({
@@ -43,6 +62,7 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
       .array(
         z.object({
           rawMaterialId: z.string().min(1, 'Please select a raw material'),
+          drumId: z.string().optional(),
           quantity: z.coerce
             .number({
               required_error: 'Quantity is required',
@@ -56,11 +76,20 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
       )
       .min(1, 'At least one raw material is required')
       .refine((materials) => {
-        const materialIds = materials
-          .map((m) => m.rawMaterialId)
-          .filter((id) => id !== '')
-        return materialIds.length === new Set(materialIds).size
-      }, 'Cannot select the same raw material multiple times')
+        // Unique combo of rawMaterialId + drumId (or just rawMaterialId if no drum?)
+        // Requirement allows multiple drums for same material? "BatchUsage needs drumId... unique constraint [batchId, rawMaterialId, drumId]"
+        // So yes, we can have multiple lines for same material but different drums.
+        // But the UI might strictly enforce one line per material for simplicity if not requested otherwise.
+        // Re-reading requirements: "Allow selection of specific drums for material usage".
+        // It implies splitting usage across drums.
+        // For now, let's enforce unique rawMaterialId as per original logic, but if users need multi-drum, they'd need multiple rows.
+        // Current logic enforces unique rawMaterialId. I will KEEP this for V1 to simplify UI, assuming 1 batch usually pulls from 1 drum or FIFO.
+        // If they need 2 drums, they might need to create 2 batches or I need to relax this constraint.
+        // Let's relax unique check to allow same material multiple times IF drumId is different.
+        
+        const combos = materials.map(m => `${m.rawMaterialId}:${m.drumId || ''}`)
+        return combos.length === new Set(combos).size
+      }, 'Cannot select the same raw material & drum combination multiple times')
       .refine(
         (materials) => {
           return materials.every((material) => {
@@ -68,13 +97,18 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
             const rawMaterial = rawMaterials.find(
               (rm) => rm.id === material.rawMaterialId
             )
-            return rawMaterial
-              ? material.quantity <= rawMaterial.currentStock
-              : true
+            if (!rawMaterial) return true
+
+            if (material.drumId) {
+                const drum = rawMaterial.drums?.find(d => d.id === material.drumId)
+                return drum ? material.quantity <= drum.currentQuantity : true
+            }
+
+            return material.quantity <= rawMaterial.currentStock
           })
         },
         {
-          message: 'One or more quantities exceed available stock',
+          message: 'One or more quantities exceed available stock (check Drum or Total stock)',
           path: [],
         }
       ),
@@ -119,7 +153,8 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
 
   const fetchData = async () => {
     try {
-      const rawMaterialsRes = await fetch('/api/raw-materials')
+      // Fetch with drums included
+      const rawMaterialsRes = await fetch('/api/raw-materials?include=drums')
 
       if (!rawMaterialsRes.ok) {
         throw new Error('Failed to fetch required data')
@@ -187,8 +222,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
         <DialogHeader>
           <DialogTitle>Catat Pemakaian Baru</DialogTitle>
           <DialogDescription>
-            Record a new production batch with raw materials. Finished goods can
-            be added after the batch is created.
+             Catat batch produksi baru dengan bahan baku. Pilih Drum spesifik jika diperlukan.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -253,72 +287,126 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                 {materialFields.map((field, index) => (
                   <div
                     key={field.id}
-                    className="hover:bg-muted/50 flex items-end gap-3 rounded-lg border p-3 transition-colors"
+                    className="hover:bg-muted/50 flex flex-col gap-3 rounded-lg border p-3 transition-colors"
                   >
-                    <FormField
+                    <div className="flex gap-3">
+                        <FormField
+                        control={form.control}
+                        name={`materials.${index}.rawMaterialId`}
+                        render={({ field }) => (
+                            <FormItem className="flex flex-1 flex-col">
+                            <FormLabel>Bahan Baku</FormLabel>
+                            <FormControl>
+                                <ItemSelector
+                                items={rawMaterials}
+                                itemType="raw-material"
+                                value={field.value}
+                                onValueChange={(val) => {
+                                    field.onChange(val)
+                                    // Reset drum when material changes
+                                    form.setValue(`materials.${index}.drumId`, undefined)
+                                }}
+                                placeholder="Pilih bahan baku"
+                                />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                         <FormField
+                        control={form.control}
+                        name={`materials.${index}.quantity`}
+                        render={({ field }) => {
+                            const selectedMaterialId = form.watch(
+                            `materials.${index}.rawMaterialId`
+                            )
+                             const selectedDrumId = form.watch(
+                            `materials.${index}.drumId`
+                            )
+                            const selectedMaterial = rawMaterials.find(
+                            (m) => m.id === selectedMaterialId
+                            )
+                            
+                            let availableStock = selectedMaterial?.currentStock || 0
+                            if (selectedDrumId && selectedMaterial?.drums) {
+                                const drum = selectedMaterial.drums.find(d => d.id === selectedDrumId)
+                                if (drum) availableStock = drum.currentQuantity
+                            }
+
+                            return (
+                            <FormItem className="w-32">
+                                <FormLabel>Qty (kg)</FormLabel>
+                                <FormControl>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0"
+                                    {...field}
+                                />
+                                </FormControl>
+                                {selectedMaterial && (
+                                <p className="text-muted-foreground text-xs">
+                                    Avail: {availableStock.toLocaleString()}
+                                </p>
+                                )}
+                                <FormMessage />
+                            </FormItem>
+                            )
+                        }}
+                        />
+                         <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="mt-8 hover:bg-destructive/10 hover:text-destructive shrink-0"
+                            onClick={() => removeMaterial(index)}
+                            disabled={materialFields.length === 1}
+                            >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    
+                    {/* Drum Selector Row */}
+                     <FormField
                       control={form.control}
-                      name={`materials.${index}.rawMaterialId`}
-                      render={({ field }) => (
-                        <FormItem className="flex flex-1 flex-col">
-                          <FormLabel>Bahan Baku</FormLabel>
-                          <FormControl>
-                            <ItemSelector
-                              items={rawMaterials}
-                              itemType="raw-material"
-                              value={field.value}
-                              onValueChange={field.onChange}
-                              placeholder="Pilih bahan baku"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`materials.${index}.quantity`}
+                      name={`materials.${index}.drumId`}
                       render={({ field }) => {
-                        const selectedMaterialId = form.watch(
-                          `materials.${index}.rawMaterialId`
-                        )
-                        const selectedMaterial = rawMaterials.find(
-                          (m) => m.id === selectedMaterialId
-                        )
-                        const availableStock =
-                          selectedMaterial?.currentStock || 0
+                         const selectedMaterialId = form.watch(`materials.${index}.rawMaterialId`)
+                         const selectedMaterial = rawMaterials.find(m => m.id === selectedMaterialId)
+                         const hasDrums = selectedMaterial?.drums && selectedMaterial.drums.length > 0
+
+                         if (!selectedMaterialId || !hasDrums) return <></>
 
                         return (
-                          <FormItem className="w-40">
-                            <FormLabel>Quantity</FormLabel>
+                          <FormItem className="flex-1">
                             <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="0"
-                                {...field}
-                              />
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value || "fifo"}
+                              >
+                                <SelectTrigger className="w-full text-xs h-8">
+                                  <SelectValue placeholder="Pilih Drum (Opsional - Auto FIFO)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="fifo">Auto (FIFO)</SelectItem>
+                                    {selectedMaterial?.drums?.map(drum => (
+                                        <SelectItem key={drum.id} value={drum.id}>
+                                            {drum.label} (Sisa: {drum.currentQuantity} kg)
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
                             </FormControl>
-                            {selectedMaterial && (
-                              <p className="text-muted-foreground text-xs">
-                                Available: {availableStock.toLocaleString()}
-                              </p>
-                            )}
+                             <div className="text-[10px] text-muted-foreground">
+                                Pilih drum spesifik atau biarkan Auto untuk menggunakan stok terlama.
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )
                       }}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="hover:bg-destructive/10 hover:text-destructive shrink-0"
-                      onClick={() => removeMaterial(index)}
-                      disabled={materialFields.length === 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
                   </div>
                 ))}
                 <Button

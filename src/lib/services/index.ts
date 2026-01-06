@@ -15,7 +15,15 @@ export * from './finished-good.service'
 export * from './batch.service'
 
 // Stock Movement Services
-export * from './stock-movement.service'
+export {
+  getStockMovementsByDate,
+  createStockMovement,
+  createDrumStockIn,
+  deleteStockMovementsByDate,
+  updateStockMovementsByDate,
+  type StockMovementInput,
+  type DrumStockInInput,
+} from './stock-movement.service'
 
 // User Services
 export * from './user.service'

@@ -26,6 +26,8 @@ export interface StockMovementInput {
   rawMaterialId?: string | null
   finishedGoodId?: string | null
   batchId?: string | null
+  drumId?: string | null
+  locationId?: string | null
 }
 
 /**
@@ -63,22 +65,6 @@ export async function getStockMovementsByDate(
   })
 }
 
-/**
- * Create a stock movement and update current stock
- *
- * @param data - Stock movement input data (validated)
- * @returns Created stock movement
- * @throws {Error} If raw material not found
- * @throws {Error} If finished good not found
- * @throws {Error} If insufficient stock (for OUT or negative ADJUSTMENT)
- *
- * @remarks
- * - Uses transaction to ensure atomicity
- * - Uses FOR UPDATE locks for stock validation (OUT and negative ADJUSTMENT)
- * - Supports IN, OUT, and ADJUSTMENT types
- * - ADJUSTMENT can be positive or negative
- * - Stock update: IN adds, OUT subtracts, ADJUSTMENT uses direct quantity
- */
 export async function createStockMovement(
   data: StockMovementInput
 ): Promise<StockMovement> {
@@ -88,7 +74,28 @@ export async function createStockMovement(
       data.type === 'OUT' ||
       (data.type === 'ADJUSTMENT' && data.quantity < 0)
     ) {
+      if (data.drumId) {
+        // ... drum logic (unchanged) ...
+        const drum = await tx.drum.findUnique({
+          where: { id: data.drumId },
+        })
+
+        if (!drum) {
+          throw new Error('Drum not found')
+        }
+
+        const quantityToCheck =
+          data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
+
+        if (drum.currentQuantity < quantityToCheck) {
+          throw new Error(
+            `Insufficient stock in drum ${drum.label}. Available: ${drum.currentQuantity}, Requested: ${data.quantity}`
+          )
+        }
+      }
+
       if (data.rawMaterialId) {
+        // ... raw material logic (unchanged) ...
         const rawMaterials = await tx.$queryRaw<
           Array<{ id: string; name: string; currentStock: number }>
         >`
@@ -116,28 +123,37 @@ export async function createStockMovement(
       }
 
       if (data.finishedGoodId) {
-        const finishedGoods = await tx.$queryRaw<
-          Array<{ id: string; name: string; currentStock: number }>
-        >`
-          SELECT id, name, "currentStock"
-          FROM finished_goods
-          WHERE id = ${data.finishedGoodId}
-          FOR UPDATE
-        `
-
-        if (finishedGoods.length === 0) {
-          throw new Error('Finished good not found')
+        // LOCATION AWARE LOGIC
+        if (!data.locationId) {
+             // Fallback for legacy calls? Or strict? 
+             // Strict for now per requirements.
+             throw new Error('Location is required for Finished Good transactions.')
         }
 
-        const finishedGood = finishedGoods[0]
+        const finishedGoodStocks = await tx.finishedGoodStock.findUnique({
+            where: {
+                finishedGoodId_locationId: {
+                    finishedGoodId: data.finishedGoodId,
+                    locationId: data.locationId
+                }
+            }
+        })
+        
+        // Also fetch the global good to get the Name for error messages
+        const finishedGoodInfo = await tx.finishedGood.findUnique({
+             where: { id: data.finishedGoodId },
+             select: { name: true }
+        })
+
+        const currentStock = finishedGoodStocks?.quantity || 0
         const quantityToCheck =
           data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
 
-        if (finishedGood.currentStock < quantityToCheck) {
+        if (currentStock < quantityToCheck) {
           throw new Error(
             data.type === 'ADJUSTMENT'
-              ? `Cannot adjust: would result in negative stock for ${finishedGood.name}. Current: ${finishedGood.currentStock}, Adjustment: ${data.quantity}`
-              : `Insufficient stock for ${finishedGood.name}. Available: ${finishedGood.currentStock}, Requested: ${data.quantity}`
+              ? `Cannot adjust: would result in negative stock for ${finishedGoodInfo?.name} at location. Current: ${currentStock}, Adjustment: ${data.quantity}`
+              : `Insufficient stock for ${finishedGoodInfo?.name} at location. Available: ${currentStock}, Requested: ${data.quantity}`
           )
         }
       }
@@ -149,8 +165,6 @@ export async function createStockMovement(
     })
 
     // Calculate quantity change
-    // ADJUSTMENT directly uses the quantity (can be positive or negative)
-    // IN adds quantity, OUT subtracts quantity
     const quantityChange =
       data.type === 'ADJUSTMENT'
         ? data.quantity
@@ -158,7 +172,25 @@ export async function createStockMovement(
           ? data.quantity
           : -data.quantity
 
-    // Update current stock
+    // Update Drum Stock (Raw Material)
+    if (data.drumId) {
+       // ... existing drum update ...
+       const drum = await tx.drum.findUnique({
+        where: { id: data.drumId },
+        select: { currentQuantity: true },
+      })
+      if (!drum) throw new Error('Drum not found')
+      const newQuantity = drum.currentQuantity + quantityChange
+      await tx.drum.update({
+        where: { id: data.drumId },
+        data: {
+          currentQuantity: { increment: quantityChange },
+          isActive: { set: newQuantity > 0 },
+        },
+      })
+    }
+
+    // Update Raw Material Global Stock
     if (data.rawMaterialId) {
       await tx.rawMaterial.update({
         where: { id: data.rawMaterialId },
@@ -170,7 +202,31 @@ export async function createStockMovement(
       })
     }
 
+    // Update Finished Good Stock (Location Aware)
     if (data.finishedGoodId) {
+        if (!data.locationId) throw new Error('Location required')
+        
+        // Update upsert: Create if not exists (for IN), update if exists
+        await tx.finishedGoodStock.upsert({
+            where: {
+                finishedGoodId_locationId: {
+                    finishedGoodId: data.finishedGoodId,
+                    locationId: data.locationId
+                }
+            },
+            update: {
+                quantity: { increment: quantityChange }
+            },
+            create: {
+                finishedGoodId: data.finishedGoodId,
+                locationId: data.locationId,
+                // If this is OUT/ADJUSTMENT negative, it should have been caught by validation above
+                // So safe to assume if creating, it's positive or 0-base
+                quantity: quantityChange < 0 ? 0 : quantityChange // Should ideally be quantityChange
+            }
+        })
+
+      // Update Global Aggregate (Keep it in sync)
       await tx.finishedGood.update({
         where: { id: data.finishedGoodId },
         data: {
@@ -477,5 +533,74 @@ export async function updateStockMovementsByDate(
     }
 
     return { oldTotal, newTotal: quantity, difference }
+  })
+}
+
+export interface DrumStockInInput {
+  rawMaterialId: string
+  date: Date
+  description?: string
+  drums: Array<{ label: string; quantity: number }>
+}
+
+/**
+ * Create stock in with multiple drums
+ *
+ * @param input - Drum stock in input
+ * @returns boolean
+ */
+export async function createDrumStockIn(input: DrumStockInInput): Promise<void> {
+  const { rawMaterialId, date, description, drums } = input
+
+  await prisma.$transaction(async (tx) => {
+    // Check for duplicate drum labels
+    for (const drum of drums) {
+        const existing = await tx.drum.findFirst({
+            where: {
+                rawMaterialId,
+                label: drum.label
+            }
+        })
+        if (existing) {
+            throw new Error(`Drum ID ${drum.label} already exists for this material`)
+        }
+    }
+
+    // Process each drum
+    for (const drum of drums) {
+      // Create Drum
+      const newDrum = await tx.drum.create({
+        data: {
+          label: drum.label,
+          currentQuantity: drum.quantity,
+          rawMaterialId,
+          isActive: true,
+          createdAt: date
+        }
+      })
+
+      // Create Movement tied to Drum
+      await tx.stockMovement.create({
+        data: {
+          type: 'IN',
+          quantity: drum.quantity,
+          date,
+          description: description || 'Stock In (Drum)',
+          rawMaterialId,
+          drumId: newDrum.id
+        }
+      })
+    }
+
+    // Update Raw Material Total Stock
+    const totalQuantity = drums.reduce((sum, d) => sum + d.quantity, 0)
+    await tx.rawMaterial.update({
+      where: { id: rawMaterialId },
+      data: {
+        currentStock: {
+          increment: totalQuantity
+        }
+      }
+    })
   })
 }

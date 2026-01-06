@@ -29,6 +29,11 @@ export async function getFinishedGoods(
   if (!options?.page && !options?.limit) {
     return await prisma.finishedGood.findMany({
       orderBy: { createdAt: 'desc' },
+      include: {
+        stocks: {
+          include: { location: true }
+        }
+      }
     })
   }
 
@@ -41,6 +46,11 @@ export async function getFinishedGoods(
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
+      include: {
+        stocks: {
+          include: { location: true }
+        } 
+      }
     }),
     prisma.finishedGood.count(),
   ])

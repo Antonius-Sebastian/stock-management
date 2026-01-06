@@ -18,7 +18,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { BatchesTable } from '@/components/batches/batches-table'
-import { AddBatchDialog } from '@/components/batches/add-batch-dialog-new'
+import { AddBatchDialog } from '@/components/batches/add-batch-dialog'
 import { EditBatchDialog } from '@/components/batches/edit-batch-dialog'
 import { BatchDetailDialog } from '@/components/batches/batch-detail-dialog'
 import { AddFinishedGoodsDialog } from '@/components/batches/add-finished-goods-dialog'

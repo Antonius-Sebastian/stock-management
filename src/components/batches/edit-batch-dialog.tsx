@@ -35,8 +35,20 @@ import {
 import { DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
 import { logger } from '@/lib/logger'
-import type { RawMaterial, FinishedGood } from '@/lib/types'
+import type { RawMaterial as BaseRawMaterial, FinishedGood } from '@/lib/types'
 import { Batch, BatchUsage } from '@prisma/client'
+
+// Extended RawMaterial type to include drums
+interface Drum {
+  id: string
+  label: string
+  currentQuantity: number
+  isActive: boolean
+}
+
+interface RawMaterial extends BaseRawMaterial {
+  drums?: Drum[]
+}
 
 type BatchWithUsage = Batch & {
   batchFinishedGoods?: Array<{
@@ -46,6 +58,7 @@ type BatchWithUsage = Batch & {
   }>
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
+    drumId?: string | null
   })[]
 }
 
@@ -61,6 +74,7 @@ const formSchema = z.object({
     .array(
       z.object({
         rawMaterialId: z.string().min(1, 'Please select a raw material'),
+        drumId: z.string().optional(),
         quantity: z.coerce.number().positive('Quantity must be greater than 0'),
       })
     )
@@ -102,19 +116,31 @@ export function EditBatchDialog({
     name: 'materials',
   })
 
-  // Calculate available stock for each material (includes stock that will be restored from this batch)
-  const getAvailableStock = (materialId: string): number => {
+  /* 
+   * Calculate available stock. 
+   * NOTE: For complex drum logic (multi-drum usage in one batch), calculation is trickier.
+   * For MVP, we show Total Stock. If drum is selected, we show drum stock in the selector.
+   */
+  const getAvailableStock = (materialId: string, drumId?: string): number => {
     const material = rawMaterials.find((m) => m.id === materialId)
     if (!material) return 0
 
-    // Find how much of this material is currently used in the batch being edited
-    const currentUsage = batch?.batchUsages.find(
-      (u) => u.rawMaterialId === materialId
-    )
-    const usedInBatch = currentUsage?.quantity || 0
+    if (drumId && material.drums) {
+        const drum = material.drums.find(d => d.id === drumId)
+        if (!drum) return 0
+        // Find usage of this specific drum in current batch to add back
+        const currentUsage = batch?.batchUsages.find(u => u.rawMaterialId === materialId && u.drumId === drumId)
+        return drum.currentQuantity + (currentUsage?.quantity || 0)
+    }
 
-    // Available stock = current stock + stock that will be restored from this batch
-    return material.currentStock + usedInBatch
+    // Default to Total Stock logic
+    // Default to Total Stock logic - Logic simplified below
+    // Simply return currentStock + all usage of this material in this batch
+    const allBatchUsage = batch?.batchUsages
+        .filter(u => u.rawMaterialId === materialId)
+        .reduce((sum, u) => sum + u.quantity, 0) || 0
+    
+    return material.currentStock + allBatchUsage
   }
 
   // Get list of material IDs currently used in the batch
@@ -157,7 +183,7 @@ export function EditBatchDialog({
 
   const fetchRawMaterials = async () => {
     try {
-      const response = await fetch('/api/raw-materials')
+      const response = await fetch('/api/raw-materials?include=drums')
       if (!response.ok) {
         throw new Error('Failed to fetch raw materials')
       }
@@ -190,6 +216,7 @@ export function EditBatchDialog({
         materials: batch.batchUsages.map((usage) => ({
           rawMaterialId: usage.rawMaterialId,
           quantity: usage.quantity,
+          drumId: usage.drumId || undefined,
         })),
       })
     }
@@ -354,7 +381,8 @@ export function EditBatchDialog({
               </CardHeader>
               <CardContent className="space-y-4">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex items-start gap-2">
+                  <div key={field.id} className="flex flex-col gap-2 border-b pb-4 mb-4">
+                    <div className="flex items-start gap-2">
                     <FormField
                       control={form.control}
                       name={`materials.${index}.rawMaterialId`}
@@ -448,6 +476,48 @@ export function EditBatchDialog({
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                  </div>
+                   {/* Drum Selector Row */}
+                   <FormField
+                      control={form.control}
+                      name={`materials.${index}.drumId`}
+                      render={({ field }) => {
+                         const selectedMaterialId = form.watch(`materials.${index}.rawMaterialId`)
+                         const selectedMaterial = rawMaterials.find(m => m.id === selectedMaterialId)
+                         const hasDrums = selectedMaterial?.drums && selectedMaterial.drums.length > 0
+
+                         if (!selectedMaterialId || !hasDrums) return <></>
+
+                        return (
+                          <div className="ml-2 pl-4 border-l-2 border-muted mb-4">
+                              <FormItem className="flex-1">
+                                <FormControl>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    value={field.value || "fifo"}
+                                  >
+                                    <SelectTrigger className="w-full text-xs h-8">
+                                      <SelectValue placeholder="Pilih Drum (Opsional - Auto FIFO)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="fifo">Auto (FIFO)</SelectItem>
+                                        {selectedMaterial?.drums?.map(drum => (
+                                            <SelectItem key={drum.id} value={drum.id}>
+                                                {drum.label} (Sisa: {getAvailableStock(selectedMaterialId, drum.id)} kg)
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                                <div className="text-[10px] text-muted-foreground">
+                                    Pilih drum spesifik atau biarkan Auto.
+                                </div>
+                                <FormMessage />
+                              </FormItem>
+                          </div>
+                        )
+                      }}
+                    />
                   </div>
                 ))}
                 <Button

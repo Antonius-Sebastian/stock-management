@@ -68,6 +68,8 @@ export function createTestStockMovement(
     rawMaterialId: 'raw-mat-1',
     finishedGoodId: null,
     batchId: null,
+    locationId: null,
+    drumId: null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     ...overrides,
@@ -94,6 +96,7 @@ export function createTestBatchUsage(
     id: 'usage-1',
     batchId: 'batch-1',
     rawMaterialId: 'raw-mat-1',
+    drumId: null,
     quantity: 5,
     ...overrides,
   }

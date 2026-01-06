@@ -46,6 +46,7 @@ export const batchSchemaAPI = z.object({
       z.object({
         rawMaterialId: z.string().min(1, 'Raw material is required'),
         quantity: z.number().positive('Quantity must be positive'),
+        drumId: z.string().optional(),
       })
     )
     .min(1, 'At least one raw material is required'),

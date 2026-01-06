@@ -23,10 +23,23 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { ItemSelector, DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
 import type { Item } from '@/lib/types'
+
+interface Location {
+  id: string
+  name: string
+  isDefault: boolean
+}
 
 const createFormSchema = (items: Item[], type: 'in' | 'out' | 'IN' | 'OUT') =>
   z
@@ -45,6 +58,12 @@ const createFormSchema = (items: Item[], type: 'in' | 'out' | 'IN' | 'OUT') =>
         required_error: 'Please select a date',
       }),
       description: z.string().optional(),
+      locationId: z.string().optional(),
+      batchCode: z.string().optional(),
+    })
+    .refine((data) => {
+        // Validation logic handled below
+        return true
     })
     .refine(
       (data) => {
@@ -94,6 +113,7 @@ export function StockEntryDialog({
 }: StockEntryDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
 
   // Use controlled or uncontrolled state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen
@@ -113,6 +133,8 @@ export function StockEntryDialog({
       quantity: '' as unknown as number,
       date: new Date(),
       description: '',
+      locationId: '', // Default empty, will be required for FG
+      batchCode: '',
     },
     mode: 'onSubmit',
   })
@@ -140,12 +162,35 @@ export function StockEntryDialog({
     }
   }
 
+  const fetchLocations = async (signal?: AbortSignal) => {
+    try {
+        const res = await fetch('/api/locations', { signal })
+        if (!res.ok) throw new Error('Failed to fetch locations')
+        const data = await res.json()
+        setLocations(data)
+        
+        // Auto-select default location
+        const defaultLoc = data.find((l: Location) => l.isDefault)
+        if (defaultLoc) {
+            form.setValue('locationId', defaultLoc.id)
+        } else if (data.length > 0) {
+            form.setValue('locationId', data[0].id)
+        }
+    } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return
+        console.error('Failed to fetch locations', error)
+    }
+  }
+
   useEffect(() => {
     // Create AbortController for cleanup
     const controller = new AbortController()
 
     if (open) {
       fetchItems(controller.signal)
+      if (actualItemType === 'finished-good') {
+          fetchLocations(controller.signal)
+      }
     }
 
     // Cleanup function to abort fetch on unmount or dependency change
@@ -174,10 +219,13 @@ export function StockEntryDialog({
         type: normalizedType,
         quantity: data.quantity,
         date: data.date.toISOString(),
-        description: data.description,
         ...(actualItemType === 'raw-material'
           ? { rawMaterialId: data.itemId }
-          : { finishedGoodId: data.itemId }),
+          : { finishedGoodId: data.itemId, locationId: data.locationId }),
+        // Append batch code to description if provided
+        description: data.batchCode 
+            ? `${data.description || ''} [Batch: ${data.batchCode}]`.trim() 
+            : data.description
       }
 
       const response = await fetch('/api/stock-movements', {
@@ -334,6 +382,47 @@ export function StockEntryDialog({
                 </FormItem>
               )}
             />
+
+            {actualItemType === 'finished-good' && (
+                <>
+                <FormField
+                control={form.control}
+                name="locationId"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Lokasi</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Pilih lokasi" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {locations.map((loc) => (
+                                    <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="batchCode"
+                    render={({ field }) => (
+                        <FormItem className="min-w-0">
+                        <FormLabel>Kode Batch (Opsional)</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Contoh: BATCH-001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </>
+            )}
+
             <FormField
               control={form.control}
               name="description"

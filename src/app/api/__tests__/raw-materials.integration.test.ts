@@ -82,7 +82,7 @@ describe('Raw Materials API Integration Tests', () => {
       expect(data).toHaveLength(2)
       expect(data[0]).toMatchObject({ id: '1', kode: 'RM-001' })
       expect(data[1]).toMatchObject({ id: '2', kode: 'RM-002' })
-      expect(getRawMaterials).toHaveBeenCalledWith(undefined)
+      expect(getRawMaterials).toHaveBeenCalledWith({ includeDrums: false })
     })
 
     it('should handle pagination parameters', async () => {
@@ -126,6 +126,7 @@ describe('Raw Materials API Integration Tests', () => {
       expect(getRawMaterials).toHaveBeenCalledWith({
         page: 1,
         limit: 10,
+        includeDrums: false,
       })
     })
 

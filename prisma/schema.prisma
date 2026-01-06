@@ -26,8 +26,27 @@ model RawMaterial {
   // Relations
   stockMovements StockMovement[]
   batchUsages    BatchUsage[]
+  drums          Drum[]
 
   @@map("raw_materials")
+}
+
+model Drum {
+  id              String      @id @default(cuid())
+  label           String // User input ID (e.g., "DRUM-001")
+  currentQuantity Float
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  rawMaterialId String
+  rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  stockMovements StockMovement[]
+  batchUsages    BatchUsage[]
+
+  @@unique([rawMaterialId, label]) // Unique label per material
+  @@map("drums")
 }
 
 model FinishedGood {
@@ -40,6 +59,7 @@ model FinishedGood {
   // Relations
   stockMovements     StockMovement[]
   batchFinishedGoods BatchFinishedGood[]
+  stocks             FinishedGoodStock[]
 
   @@map("finished_goods")
 }
@@ -54,19 +74,53 @@ model StockMovement {
   updatedAt   DateTime          @updatedAt
 
   // Relations
+  locationId     String?
+  location       Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   rawMaterialId  String?
   rawMaterial    RawMaterial?  @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+  drumId         String?
+  drum           Drum?         @relation(fields: [drumId], references: [id], onDelete: SetNull)
   finishedGoodId String?
   finishedGood   FinishedGood? @relation(fields: [finishedGoodId], references: [id], onDelete: SetNull)
   batchId        String?
   batch          Batch?        @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   // Performance indexes for common queries
-  @@index([date]) // For date-based filtering in reports
-  @@index([rawMaterialId, date]) // For material movement history
-  @@index([finishedGoodId, date]) // For finished good movement history
-  @@index([type, date]) // For filtering by movement type
+  @@index([date])
+  @@index([rawMaterialId, date])
+  @@index([finishedGoodId, date])
+  @@index([type, date])
   @@map("stock_movements")
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  address     String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  stocks         FinishedGoodStock[]
+  stockMovements StockMovement[]
+
+  @@map("locations")
+}
+
+model FinishedGoodStock {
+  id             String       @id @default(cuid())
+  finishedGoodId String
+  locationId     String
+  quantity       Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  finishedGood   FinishedGood @relation(fields: [finishedGoodId], references: [id])
+  location       Location     @relation(fields: [locationId], references: [id])
+
+  @@unique([finishedGoodId, locationId])
+  @@map("finished_good_stocks")
 }
 
 model Batch {
@@ -84,8 +138,8 @@ model Batch {
   batchFinishedGoods BatchFinishedGood[]
 
   // Performance indexes for common queries
-  @@index([date]) // For date-based filtering
-  @@index([status]) // For status-based filtering
+  @@index([date])
+  @@index([status])
   @@map("batches")
 }
 
@@ -94,12 +148,14 @@ model BatchUsage {
   quantity      Float
   batchId       String
   rawMaterialId String
+  drumId        String? // Made optional for backward compatibility if needed, but best if required for new batches
 
   // Relations
   batch       Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
   rawMaterial RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  drum        Drum?       @relation(fields: [drumId], references: [id])
 
-  @@unique([batchId, rawMaterialId])
+  @@unique([batchId, rawMaterialId, drumId])
   @@map("batch_usages")
 }
 

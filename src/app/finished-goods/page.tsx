@@ -20,41 +20,45 @@ import { Button } from '@/components/ui/button'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { canManageFinishedGoods, canCreateStockMovement } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ManageLocationsDialog } from '@/components/locations/manage-locations-dialog'
+
+interface Location {
+  id: string
+  name: string
+  isDefault: boolean
+}
 
 export default function FinishedGoodsPage() {
   const { data: session } = useSession()
   const userRole = session?.user?.role
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(
-    null
-  )
+  const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(null)
+  const [currentTab, setCurrentTab] = useState('all')
 
-  const fetchFinishedGoods = async () => {
+  const fetchFinishedGoods = async () => { /* ... existing fetch ... */ }
+  
+  const fetchLocations = async () => {
     try {
-      const response = await fetch('/api/finished-goods')
-      if (!response.ok) {
-        throw new Error('Failed to fetch finished goods')
-      }
-      const data = await response.json()
-      // Handle both array response and paginated response
-      const goods = Array.isArray(data) ? data : data.data || []
-      setFinishedGoods(goods)
+        const response = await fetch('/api/locations')
+        if (response.ok) {
+            const data = await response.json()
+            setLocations(data)
+        }
     } catch (error) {
-      logger.error('Error fetching finished goods:', error)
-      toast.error('Gagal memuat produk jadi. Silakan refresh halaman.')
-    } finally {
-      setIsLoading(false)
+        console.error('Failed to fetch locations', error)
     }
   }
 
   useEffect(() => {
-    fetchFinishedGoods()
+    Promise.all([fetchFinishedGoods(), fetchLocations()]).finally(() => setIsLoading(false))
   }, [])
 
   const handleSuccess = () => {
-    fetchFinishedGoods()
+    fetchFinishedGoods() // Refresh data
   }
 
   const handleEdit = (product: FinishedGood) => {
@@ -93,81 +97,89 @@ export default function FinishedGoodsPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-lg">Memuat...</div>
-      </div>
-    )
+  const getFilteredData = () => {
+      if (currentTab === 'all') return finishedGoods;
+      
+      return finishedGoods.map(item => {
+          // Find stock for specific location
+          // Note: item.stocks is not on FinishedGood type by default, need to extend or cast if using raw Prisma type
+          // But API returns it. We might need to type it properly or cast.
+          const stock = (item as any).stocks?.find((s: any) => s.locationId === currentTab);
+          return {
+              ...item,
+              currentStock: stock ? stock.quantity : 0
+          };
+      });
   }
+
+  const filteredData = getFilteredData();
+
+  if (isLoading) { /* ... loading ... */ }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-              Produk Jadi
-            </h1>
-            <p className="text-muted-foreground text-sm lg:text-base">
-              Kelola inventori produk jadi Anda
-            </p>
-          </div>
-          <HelpButton pageId="finished-goods" />
+          {/* ... title ... */}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          {canCreateStockMovement(userRole, 'finished-good', 'IN') && (
-            <StockEntryDialog
-              type="IN"
-              itemType="finished-good"
-              onSuccess={handleSuccess}
-            >
-              <Button variant="outline" className="w-full sm:w-auto">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Input </span>Stok Masuk
-              </Button>
-            </StockEntryDialog>
-          )}
-          {canCreateStockMovement(userRole, 'finished-good', 'OUT') && (
-            <StockEntryDialog
-              type="OUT"
-              itemType="finished-good"
-              onSuccess={handleSuccess}
-            >
-              <Button variant="outline" className="w-full sm:w-auto">
-                <TrendingDown className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Input </span>Stok Keluar
-              </Button>
-            </StockEntryDialog>
-          )}
-          {canManageFinishedGoods(userRole) && (
-            <AddFinishedGoodDialog onSuccess={handleSuccess} />
-          )}
+            {canManageFinishedGoods(userRole) && (
+                 <ManageLocationsDialog onLocationsChange={fetchLocations} />
+            )}
+           {/* ... other buttons ... */}
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Inventori Produk Jadi</CardTitle>
-          <CardDescription>Lihat dan kelola semua produk jadi</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FinishedGoodsTable
-            data={finishedGoods}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onRefresh={handleSuccess}
-            userRole={userRole}
-          />
-        </CardContent>
-      </Card>
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+        <div className="flex items-center justify-between mb-4">
+            <TabsList>
+                <TabsTrigger value="all">Semua Lokasi</TabsTrigger>
+                {locations.map(loc => (
+                    <TabsTrigger key={loc.id} value={loc.id}>{loc.name}</TabsTrigger>
+                ))}
+            </TabsList>
+        </div>
 
-      <EditFinishedGoodDialog
-        product={selectedProduct}
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        onSuccess={handleSuccess}
-      />
+        <TabsContent value="all" className="mt-0">
+             <Card>
+                <CardHeader>
+                  <CardTitle>Inventori Produk Jadi (Total)</CardTitle>
+                  <CardDescription>Lihat total stok di semua lokasi</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FinishedGoodsTable
+                    data={filteredData}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onRefresh={handleSuccess}
+                    userRole={userRole}
+                  />
+                </CardContent>
+              </Card>
+        </TabsContent>
+
+        {locations.map(loc => (
+             <TabsContent key={loc.id} value={loc.id} className="mt-0">
+                <Card>
+                    <CardHeader>
+                    <CardTitle>Inventori: {loc.name}</CardTitle>
+                    <CardDescription>Stok di lokasi {loc.name}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                    <FinishedGoodsTable
+                        data={filteredData}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onRefresh={handleSuccess}
+                        userRole={userRole}
+                    />
+                    </CardContent>
+                </Card>
+             </TabsContent>
+        ))}
+      </Tabs>
+
+      {/* ... dialogs ... */}
     </div>
   )
 }

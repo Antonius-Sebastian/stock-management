@@ -7,7 +7,7 @@
 
 import { prisma } from '@/lib/db'
 import { RawMaterialInput } from '@/lib/validations'
-import { RawMaterial } from '@prisma/client'
+import { RawMaterial, Drum } from '@prisma/client'
 
 /**
  * Pagination options for list queries
@@ -15,6 +15,7 @@ import { RawMaterial } from '@prisma/client'
 export interface PaginationOptions {
   page?: number
   limit?: number
+  includeDrums?: boolean
 }
 
 /**
@@ -42,11 +43,21 @@ export interface PaginationMetadata {
 export async function getRawMaterials(
   options?: PaginationOptions
 ): Promise<
-  RawMaterial[] | { data: RawMaterial[]; pagination: PaginationMetadata }
+  (RawMaterial & { drums?: Drum[] })[] | { data: (RawMaterial & { drums?: Drum[] })[]; pagination: PaginationMetadata }
 > {
+  const include = options?.includeDrums
+    ? {
+        drums: {
+          where: { isActive: true, currentQuantity: { gt: 0 } },
+          orderBy: { createdAt: 'asc' as const },
+        },
+      }
+    : undefined
+
   if (!options?.page && !options?.limit) {
     return await prisma.rawMaterial.findMany({
       orderBy: { createdAt: 'desc' },
+      include,
     })
   }
 
@@ -59,6 +70,7 @@ export async function getRawMaterials(
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
+      include,
     }),
     prisma.rawMaterial.count(),
   ])
@@ -212,6 +224,7 @@ export async function getRawMaterialMovements(id: string): Promise<{
     date: Date
     description: string | null
     batch: { id: string; code: string } | null
+    drum: { label: string } | null
     runningBalance: number
     createdAt: Date
   }>
@@ -242,6 +255,11 @@ export async function getRawMaterialMovements(id: string): Promise<{
           code: true,
         },
       },
+      drum: {
+        select: {
+          label: true
+        }
+      }
     },
     orderBy: {
       date: 'asc', // Start from oldest to calculate running balance
@@ -265,6 +283,7 @@ export async function getRawMaterialMovements(id: string): Promise<{
       date: movement.date,
       description: movement.description,
       batch: movement.batch,
+      drum: movement.drum,
       runningBalance: Math.round(runningBalance * 100) / 100, // Round to 2 decimal places
       createdAt: movement.createdAt,
     }
@@ -277,4 +296,25 @@ export async function getRawMaterialMovements(id: string): Promise<{
     material,
     movements: movementsWithBalance,
   }
+}
+
+/**
+ * Get active drums for a raw material
+ *
+ * @param rawMaterialId - Raw material ID
+ * @returns List of active drums with current quantity
+ */
+export async function getDrumsByRawMaterialId(
+  rawMaterialId: string
+): Promise<Drum[]> {
+  return await prisma.drum.findMany({
+    where: {
+      rawMaterialId,
+      isActive: true,
+      currentQuantity: { gt: 0 },
+    },
+    orderBy: {
+      createdAt: 'asc', // FIFO by default likely preferred
+    },
+  })
 }

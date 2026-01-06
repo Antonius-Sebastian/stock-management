@@ -25,8 +25,9 @@ export async function GET(request: NextRequest) {
         ? {
             page: pageParam ? parseInt(pageParam) : undefined,
             limit: limitParam ? parseInt(limitParam) : undefined,
+            includeDrums: searchParams.get('include') === 'drums'
           }
-        : undefined
+        : { includeDrums: searchParams.get('include') === 'drums' }
 
     // Get raw materials using service
     const result = await getRawMaterials(options)

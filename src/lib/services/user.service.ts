@@ -19,7 +19,7 @@ export interface UpdateUserInput {
   email?: string | null
   password?: string
   name?: string
-  role?: 'ADMIN' | 'FACTORY' | 'OFFICE'
+  role?: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
   isActive?: boolean
 }
 
@@ -200,7 +200,7 @@ export async function updateUser(
     username?: string
     email?: string | null
     name?: string
-    role?: 'ADMIN' | 'FACTORY' | 'OFFICE'
+    role?: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
     isActive?: boolean
     password?: string
   } = {}

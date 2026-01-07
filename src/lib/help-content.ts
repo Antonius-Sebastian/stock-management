@@ -211,7 +211,7 @@ Gunakan fitur ini ketika Anda ingin menambahkan bahan baku baru ke sistem.
 - MOQ membantu sistem memberikan peringatan ketika stok menipis
 - Stok awal akan digunakan sebagai baseline untuk perhitungan selanjutnya`,
         screenshot: SCREENSHOT_PLACEHOLDER,
-        requiredRole: 'OFFICE', // Only OFFICE and ADMIN can add materials
+        requiredRole: 'OFFICE_PURCHASING', // Only OFFICE and ADMIN can add materials
       },
       {
         id: 'stock-movements',
@@ -325,7 +325,7 @@ Halaman ini menampilkan semua produk jadi yang ada di sistem.
    - MOQ
    - Stok awal
 3. Klik **"Buat"**`,
-        requiredRole: 'OFFICE',
+        requiredRole: 'OFFICE_PURCHASING',
       },
     ],
   },
@@ -355,7 +355,7 @@ Halaman ini menampilkan semua produk jadi yang ada di sistem.
         content:
           'Klik tombol ini untuk membuat batch produksi baru. Sistem akan otomatis mengurangi stok bahan baku yang digunakan.',
         placement: 'bottom',
-        requiredRole: 'FACTORY', // Only show to FACTORY and ADMIN
+        requiredRole: 'OFFICE_WAREHOUSE', // Only show to FACTORY and ADMIN
       },
       {
         target: '[data-tour="batches-table"]',
@@ -368,7 +368,7 @@ Halaman ini menampilkan semua produk jadi yang ada di sistem.
         content:
           'Setelah batch dibuat, klik tombol ini untuk menambahkan produk jadi yang dihasilkan dari batch tersebut.',
         placement: 'left',
-        requiredRole: 'FACTORY',
+        requiredRole: 'OFFICE_WAREHOUSE',
       },
     ],
     video: {
@@ -409,7 +409,7 @@ Halaman ini menampilkan semua produk jadi yang ada di sistem.
 - ✅ Produk jadi dapat ditambahkan setelah batch dibuat (langkah terpisah)
 - ⚠️ Batch tidak dapat diubah setelah dibuat (kecuali oleh Admin)`,
         screenshot: SCREENSHOT_PLACEHOLDER,
-        requiredRole: 'FACTORY',
+        requiredRole: 'OFFICE_WAREHOUSE',
       },
       {
         id: 'adding-finished-goods',
@@ -433,7 +433,7 @@ Setelah batch dibuat, Anda perlu menambahkan produk jadi yang dihasilkan.
 - Anda dapat menambahkan lebih dari satu produk jadi per batch
 - Pastikan produk jadi sudah terdaftar di sistem sebelumnya`,
         screenshot: SCREENSHOT_PLACEHOLDER,
-        requiredRole: 'FACTORY',
+        requiredRole: 'OFFICE_WAREHOUSE',
       },
       {
         id: 'viewing-batch-details',

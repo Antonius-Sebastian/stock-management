@@ -25,21 +25,21 @@ async function main() {
   console.log('✅ Admin user created:', admin.username)
 
   // Create Factory user
-  const factory = await prisma.user.upsert({
+  const factoryUser = await prisma.user.upsert({
     where: { username: 'factory' },
     update: {},
     create: {
       username: 'factory',
-      email: 'factory@stockmanagement.local',
+      email: 'factory@example.com',
       password: defaultPassword,
-      name: 'Factory Staff',
-      role: 'FACTORY',
+      name: 'Warehouse Staff',
+      role: 'OFFICE_WAREHOUSE',
       isActive: true,
     },
   })
-  console.log('✅ Factory user created:', factory.username)
+  console.log('✅ Warehouse user created:', factoryUser.username)
 
-  // Create Office user
+  // Create Office Purchasing user
   const office = await prisma.user.upsert({
     where: { username: 'office' },
     update: {},
@@ -47,12 +47,12 @@ async function main() {
       username: 'office',
       email: 'office@stockmanagement.local',
       password: defaultPassword,
-      name: 'Office Staff',
-      role: 'OFFICE',
+      name: 'Office Purchasing Staff',
+      role: 'OFFICE_PURCHASING',
       isActive: true,
     },
   })
-  console.log('✅ Office user created:', office.username)
+  console.log('✅ Office Purchasing user created:', office.username)
 
   console.log('🎉 Seed completed!')
   console.log('')
@@ -64,10 +64,10 @@ async function main() {
     '   - Username: admin   | Role: ADMIN   | Email: admin@stockmanagement.local'
   )
   console.log(
-    '   - Username: factory | Role: FACTORY | Email: factory@stockmanagement.local'
+    '   - Username: factory | Role: OFFICE_WAREHOUSE | Email: factory@example.com'
   )
   console.log(
-    '   - Username: office  | Role: OFFICE  | Email: office@stockmanagement.local'
+    '   - Username: office  | Role: OFFICE_PURCHASING | Email: office@stockmanagement.local'
   )
 }
 

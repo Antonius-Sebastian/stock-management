@@ -35,7 +35,7 @@ import {
 import { DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
 import { logger } from '@/lib/logger'
-import type { RawMaterial as BaseRawMaterial, FinishedGood } from '@/lib/types'
+import type { RawMaterial as BaseRawMaterial } from '@/lib/types'
 import { Batch, BatchUsage } from '@prisma/client'
 
 // Extended RawMaterial type to include drums
@@ -51,11 +51,6 @@ interface RawMaterial extends BaseRawMaterial {
 }
 
 type BatchWithUsage = Batch & {
-  batchFinishedGoods?: Array<{
-    finishedGood: FinishedGood
-    finishedGoodId: string
-    quantity: number
-  }>
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
     drumId?: string | null
@@ -69,7 +64,6 @@ const formSchema = z.object({
   }),
   description: z.string().optional(),
   status: z.enum(['IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
-  finishedGoodId: z.string().min(1, 'Please select a finished good'),
   materials: z
     .array(
       z.object({
@@ -96,7 +90,6 @@ export function EditBatchDialog({
   onOpenChange,
   onSuccess,
 }: EditBatchDialogProps) {
-  const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
 
   const form = useForm<FormData>({
@@ -106,7 +99,6 @@ export function EditBatchDialog({
       date: new Date(),
       description: '',
       status: 'IN_PROGRESS',
-      finishedGoodId: '',
       materials: [],
     },
   })
@@ -116,8 +108,8 @@ export function EditBatchDialog({
     name: 'materials',
   })
 
-  /* 
-   * Calculate available stock. 
+  /*
+   * Calculate available stock.
    * NOTE: For complex drum logic (multi-drum usage in one batch), calculation is trickier.
    * For MVP, we show Total Stock. If drum is selected, we show drum stock in the selector.
    */
@@ -126,20 +118,23 @@ export function EditBatchDialog({
     if (!material) return 0
 
     if (drumId && material.drums) {
-        const drum = material.drums.find(d => d.id === drumId)
-        if (!drum) return 0
-        // Find usage of this specific drum in current batch to add back
-        const currentUsage = batch?.batchUsages.find(u => u.rawMaterialId === materialId && u.drumId === drumId)
-        return drum.currentQuantity + (currentUsage?.quantity || 0)
+      const drum = material.drums.find((d) => d.id === drumId)
+      if (!drum) return 0
+      // Find usage of this specific drum in current batch to add back
+      const currentUsage = batch?.batchUsages.find(
+        (u) => u.rawMaterialId === materialId && u.drumId === drumId
+      )
+      return drum.currentQuantity + (currentUsage?.quantity || 0)
     }
 
     // Default to Total Stock logic
     // Default to Total Stock logic - Logic simplified below
     // Simply return currentStock + all usage of this material in this batch
-    const allBatchUsage = batch?.batchUsages
-        .filter(u => u.rawMaterialId === materialId)
+    const allBatchUsage =
+      batch?.batchUsages
+        .filter((u) => u.rawMaterialId === materialId)
         .reduce((sum, u) => sum + u.quantity, 0) || 0
-    
+
     return material.currentStock + allBatchUsage
   }
 
@@ -165,22 +160,6 @@ export function EditBatchDialog({
     return a.name.localeCompare(b.name)
   })
 
-  const fetchFinishedGoods = async () => {
-    try {
-      const response = await fetch('/api/finished-goods')
-      if (!response.ok) {
-        throw new Error('Failed to fetch finished goods')
-      }
-      const json = await response.json()
-      // API returns { success: true, data: [...] }
-      const data = json.data || json
-      setFinishedGoods(Array.isArray(data) ? data : [])
-    } catch (error) {
-      logger.error('Error fetching finished goods:', error)
-      toast.error('Failed to load finished goods')
-    }
-  }
-
   const fetchRawMaterials = async () => {
     try {
       const response = await fetch('/api/raw-materials?include=drums')
@@ -198,7 +177,6 @@ export function EditBatchDialog({
 
   useEffect(() => {
     if (open) {
-      fetchFinishedGoods()
       fetchRawMaterials()
     }
   }, [open])
@@ -212,7 +190,6 @@ export function EditBatchDialog({
         status:
           (batch.status as 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') ||
           'IN_PROGRESS',
-        finishedGoodId: batch.batchFinishedGoods?.[0]?.finishedGoodId || '',
         materials: batch.batchUsages.map((usage) => ({
           rawMaterialId: usage.rawMaterialId,
           quantity: usage.quantity,
@@ -236,9 +213,6 @@ export function EditBatchDialog({
           date: data.date.toISOString(),
           description: data.description,
           status: data.status,
-          finishedGoods: data.finishedGoodId
-            ? [{ finishedGoodId: data.finishedGoodId, quantity: 0 }]
-            : [],
           materials: data.materials,
         }),
       })
@@ -345,34 +319,6 @@ export function EditBatchDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="finishedGoodId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Produk Jadi</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ''}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih produk jadi" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {finishedGoods.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -381,138 +327,168 @@ export function EditBatchDialog({
               </CardHeader>
               <CardContent className="space-y-4">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex flex-col gap-2 border-b pb-4 mb-4">
+                  <div
+                    key={field.id}
+                    className="mb-4 flex flex-col gap-2 border-b pb-4"
+                  >
                     <div className="flex items-start gap-2">
-                    <FormField
-                      control={form.control}
-                      name={`materials.${index}.rawMaterialId`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Bahan Baku</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="w-full [&>span]:truncate">
-                                <SelectValue placeholder="Pilih bahan baku" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {sortedRawMaterials.length === 0 ? (
-                                <div className="text-muted-foreground px-2 py-6 text-center text-sm">
-                                  Tidak ada bahan baku tersedia
-                                </div>
-                              ) : (
-                                <>
-                                  {sortedRawMaterials.map((material) => {
-                                    const availableStock = getAvailableStock(
-                                      material.id
-                                    )
-                                    const isInBatch = materialsInBatch.includes(
-                                      material.id
-                                    )
-                                    const isDisabled =
-                                      availableStock === 0 && !isInBatch
+                      <FormField
+                        control={form.control}
+                        name={`materials.${index}.rawMaterialId`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Bahan Baku</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="w-full [&>span]:truncate">
+                                  <SelectValue placeholder="Pilih bahan baku" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {sortedRawMaterials.length === 0 ? (
+                                  <div className="text-muted-foreground px-2 py-6 text-center text-sm">
+                                    Tidak ada bahan baku tersedia
+                                  </div>
+                                ) : (
+                                  <>
+                                    {sortedRawMaterials.map((material) => {
+                                      const availableStock = getAvailableStock(
+                                        material.id
+                                      )
+                                      const isInBatch =
+                                        materialsInBatch.includes(material.id)
+                                      const isDisabled =
+                                        availableStock === 0 && !isInBatch
 
-                                    return (
-                                      <SelectItem
-                                        key={material.id}
-                                        value={material.id}
-                                        disabled={isDisabled}
-                                      >
-                                        <div className="flex max-w-[400px] items-center gap-2">
-                                          <span className="truncate">
-                                            {material.kode} - {material.name}
-                                          </span>
-                                          {availableStock > 0 ? (
-                                            <span className="shrink-0 font-medium whitespace-nowrap text-green-600">
-                                              (Available:{' '}
-                                              {availableStock.toLocaleString()})
+                                      return (
+                                        <SelectItem
+                                          key={material.id}
+                                          value={material.id}
+                                          disabled={isDisabled}
+                                        >
+                                          <div className="flex max-w-[400px] items-center gap-2">
+                                            <span className="truncate">
+                                              {material.kode} - {material.name}
                                             </span>
-                                          ) : (
-                                            <span className="text-destructive shrink-0 whitespace-nowrap">
-                                              (No Stock)
-                                            </span>
-                                          )}
-                                        </div>
-                                      </SelectItem>
-                                    )
-                                  })}
-                                </>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                                            {availableStock > 0 ? (
+                                              <span className="shrink-0 font-medium whitespace-nowrap text-green-600">
+                                                (Available:{' '}
+                                                {availableStock.toLocaleString()}
+                                                )
+                                              </span>
+                                            ) : (
+                                              <span className="text-destructive shrink-0 whitespace-nowrap">
+                                                (No Stock)
+                                              </span>
+                                            )}
+                                          </div>
+                                        </SelectItem>
+                                      )
+                                    })}
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`materials.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem className="w-32">
+                            <FormLabel>Quantity</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mt-8"
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {/* Drum Selector Row */}
                     <FormField
-                      control={form.control}
-                      name={`materials.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem className="w-32">
-                          <FormLabel>Quantity</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="mt-8"
-                      onClick={() => remove(index)}
-                      disabled={fields.length === 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                   {/* Drum Selector Row */}
-                   <FormField
                       control={form.control}
                       name={`materials.${index}.drumId`}
                       render={({ field }) => {
-                         const selectedMaterialId = form.watch(`materials.${index}.rawMaterialId`)
-                         const selectedMaterial = rawMaterials.find(m => m.id === selectedMaterialId)
-                         const hasDrums = selectedMaterial?.drums && selectedMaterial.drums.length > 0
+                        const selectedMaterialId = form.watch(
+                          `materials.${index}.rawMaterialId`
+                        )
+                        const selectedMaterial = rawMaterials.find(
+                          (m) => m.id === selectedMaterialId
+                        )
+                        const hasDrums =
+                          selectedMaterial?.drums &&
+                          selectedMaterial.drums.length > 0
 
-                         if (!selectedMaterialId || !hasDrums) return <></>
+                        if (!selectedMaterialId || !hasDrums) return <></>
 
                         return (
-                          <div className="ml-2 pl-4 border-l-2 border-muted mb-4">
-                              <FormItem className="flex-1">
-                                <FormControl>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                  >
-                                    <SelectTrigger className="w-full text-xs h-8">
-                                      <SelectValue placeholder="Pilih Drum" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {selectedMaterial?.drums?.map(drum => (
-                                            <SelectItem key={drum.id} value={drum.id} disabled={getAvailableStock(selectedMaterialId, drum.id) <= 0}>
-                                                {drum.label} (Sisa: {getAvailableStock(selectedMaterialId, drum.id)} kg) {getAvailableStock(selectedMaterialId, drum.id) <= 0 ? '(Habis)' : ''}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                </FormControl>
-                                <div className="text-[10px] text-muted-foreground">
-                                    Pilih drum yang akan digunakan untuk bahan baku ini.
-                                </div>
-                                <FormMessage />
-                              </FormItem>
+                          <div className="border-muted mb-4 ml-2 border-l-2 pl-4">
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <SelectTrigger className="h-8 w-full text-xs">
+                                    <SelectValue placeholder="Pilih Drum" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {selectedMaterial?.drums?.map((drum) => (
+                                      <SelectItem
+                                        key={drum.id}
+                                        value={drum.id}
+                                        disabled={
+                                          getAvailableStock(
+                                            selectedMaterialId,
+                                            drum.id
+                                          ) <= 0
+                                        }
+                                      >
+                                        {drum.label} (Sisa:{' '}
+                                        {getAvailableStock(
+                                          selectedMaterialId,
+                                          drum.id
+                                        )}{' '}
+                                        kg){' '}
+                                        {getAvailableStock(
+                                          selectedMaterialId,
+                                          drum.id
+                                        ) <= 0
+                                          ? '(Habis)'
+                                          : ''}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <div className="text-muted-foreground text-[10px]">
+                                Pilih drum yang akan digunakan untuk bahan baku
+                                ini.
+                              </div>
+                              <FormMessage />
+                            </FormItem>
                           </div>
                         )
                       }}

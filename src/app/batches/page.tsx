@@ -21,7 +21,6 @@ import { BatchesTable } from '@/components/batches/batches-table'
 import { AddBatchDialog } from '@/components/batches/add-batch-dialog'
 import { EditBatchDialog } from '@/components/batches/edit-batch-dialog'
 import { BatchDetailDialog } from '@/components/batches/batch-detail-dialog'
-import { AddFinishedGoodsDialog } from '@/components/batches/add-finished-goods-dialog'
 import { HelpButton } from '@/components/help/help-button'
 import { canCreateBatches } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
@@ -42,8 +41,6 @@ export default function BatchesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [addFinishedGoodsDialogOpen, setAddFinishedGoodsDialogOpen] =
-    useState(false)
   const [selectedBatch, setSelectedBatch] = useState<BatchWithUsage | null>(
     null
   )
@@ -82,11 +79,6 @@ export default function BatchesPage() {
   const handleEdit = (batch: BatchWithUsage) => {
     setSelectedBatch(batch)
     setEditDialogOpen(true)
-  }
-
-  const handleAddFinishedGoods = (batch: BatchWithUsage) => {
-    setSelectedBatch(batch)
-    setAddFinishedGoodsDialogOpen(true)
   }
 
   const handleDelete = async (batch: BatchWithUsage) => {
@@ -163,7 +155,6 @@ export default function BatchesPage() {
               onView={handleView}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              onAddFinishedGoods={handleAddFinishedGoods}
               userRole={userRole}
             />
           </div>
@@ -182,16 +173,6 @@ export default function BatchesPage() {
         onOpenChange={setEditDialogOpen}
         onSuccess={handleSuccess}
       />
-
-      {selectedBatch && (
-        <AddFinishedGoodsDialog
-          batchId={selectedBatch.id}
-          batchCode={selectedBatch.code}
-          open={addFinishedGoodsDialogOpen}
-          onOpenChange={setAddFinishedGoodsDialogOpen}
-          onSuccess={handleSuccess}
-        />
-      )}
     </div>
   )
 }

@@ -2,13 +2,7 @@
 
 import { format } from 'date-fns'
 import Link from 'next/link'
-import {
-  Batch,
-  BatchUsage,
-  RawMaterial,
-  FinishedGood,
-  BatchFinishedGood,
-} from '@prisma/client'
+import { Batch, BatchUsage, RawMaterial } from '@prisma/client'
 import {
   Dialog,
   DialogContent,
@@ -28,9 +22,6 @@ import { Badge } from '@/components/ui/badge'
 import { Calendar, Package, FileText } from 'lucide-react'
 
 type BatchWithUsage = Batch & {
-  batchFinishedGoods?: (BatchFinishedGood & {
-    finishedGood: FinishedGood
-  })[]
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
   })[]
@@ -85,34 +76,6 @@ export function BatchDetailDialog({
               <div className="text-lg font-semibold">
                 {format(new Date(batch.date), 'MMMM dd, yyyy')}
               </div>
-            </div>
-
-            <div className="space-y-1 sm:col-span-2">
-              <div className="text-muted-foreground text-sm">
-                Produk Jadi yang Dihasilkan
-              </div>
-              {batch.batchFinishedGoods &&
-              batch.batchFinishedGoods.length > 0 ? (
-                <div className="space-y-2">
-                  {batch.batchFinishedGoods.map((bfg, index) => (
-                    <div
-                      key={index}
-                      className="bg-muted flex items-center justify-between rounded-md p-2"
-                    >
-                      <span className="text-lg font-semibold">
-                        {bfg.finishedGood.name}
-                      </span>
-                      <Badge variant="secondary">
-                        {bfg.quantity.toLocaleString()} unit
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-muted-foreground text-lg font-semibold">
-                  -
-                </div>
-              )}
             </div>
 
             {batch.description && (

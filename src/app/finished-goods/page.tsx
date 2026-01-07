@@ -14,43 +14,41 @@ import {
 import { FinishedGoodsTable } from '@/components/finished-goods/finished-goods-table'
 import { AddFinishedGoodDialog } from '@/components/finished-goods/add-finished-good-dialog'
 import { EditFinishedGoodDialog } from '@/components/finished-goods/edit-finished-good-dialog'
-import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
 import { HelpButton } from '@/components/help/help-button'
 import { canManageFinishedGoods } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { ManageLocationsDialog } from '@/components/locations/manage-locations-dialog'
 
-interface Location {
-  id: string
-  name: string
-  isDefault: boolean
-}
-
 export default function FinishedGoodsPage() {
   const { data: session } = useSession()
   const userRole = session?.user?.role
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(
+    null
+  )
 
-  const fetchFinishedGoods = async () => { /* ... existing fetch ... */ }
-  
-  const fetchLocations = async () => {
+  const fetchFinishedGoods = async () => {
     try {
-        const response = await fetch('/api/locations')
-        if (response.ok) {
-            const data = await response.json()
-            setLocations(data)
-        }
+      const response = await fetch('/api/finished-goods')
+      if (!response.ok) {
+        throw new Error('Failed to fetch finished goods')
+      }
+      const data = await response.json()
+      // Handle both array response and paginated response
+      const goods = Array.isArray(data) ? data : data.data || []
+      setFinishedGoods(goods)
     } catch (error) {
-        console.error('Failed to fetch locations', error)
+      logger.error('Error fetching finished goods:', error)
+      toast.error('Gagal memuat produk jadi. Silakan refresh halaman.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    Promise.all([fetchFinishedGoods(), fetchLocations()]).finally(() => setIsLoading(false))
+    fetchFinishedGoods()
   }, [])
 
   const handleSuccess = () => {
@@ -93,29 +91,44 @@ export default function FinishedGoodsPage() {
     }
   }
 
-
-  if (isLoading) { /* ... loading ... */ }
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-lg">Memuat...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          {/* ... title ... */}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+              Produk Jadi
+            </h1>
+            <p className="text-muted-foreground text-sm lg:text-base">
+              Kelola inventori produk jadi Anda
+            </p>
+          </div>
+          <HelpButton pageId="finished-goods" />
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            {canManageFinishedGoods(userRole) && (
-                 <ManageLocationsDialog onLocationsChange={fetchLocations} />
-            )}
-           {/* ... other buttons ... */}
+          {canManageFinishedGoods(userRole) && (
+            <>
+              <ManageLocationsDialog />
+              <AddFinishedGoodDialog onSuccess={handleSuccess} />
+            </>
+          )}
         </div>
       </div>
-
 
       <Card>
         <CardHeader>
           <CardTitle>Inventori Produk Jadi</CardTitle>
           <CardDescription>
-            Kelola semua produk jadi. Stok per lokasi dikelola melalui dialog stok masuk/keluar.
+            Kelola semua produk jadi. Stok per lokasi dikelola melalui dialog
+            stok masuk/keluar.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -129,7 +142,12 @@ export default function FinishedGoodsPage() {
         </CardContent>
       </Card>
 
-      {/* ... dialogs ... */}
+      <EditFinishedGoodDialog
+        product={selectedProduct}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={handleSuccess}
+      />
     </div>
   )
 }

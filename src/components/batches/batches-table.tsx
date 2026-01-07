@@ -28,11 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { format } from 'date-fns'
-import {
-  canEditBatches,
-  canDeleteBatches,
-  canAddFinishedGoodsToBatch,
-} from '@/lib/rbac'
+import { canEditBatches, canDeleteBatches } from '@/lib/rbac'
 
 type BatchWithUsage = Batch & {
   batchFinishedGoods?: (BatchFinishedGood & {
@@ -48,7 +44,6 @@ interface BatchesTableProps {
   onView?: (batch: BatchWithUsage) => void
   onEdit?: (batch: BatchWithUsage) => void
   onDelete?: (batch: BatchWithUsage) => void
-  onAddFinishedGoods?: (batch: BatchWithUsage) => void
   userRole?: string
 }
 
@@ -57,7 +52,6 @@ export function BatchesTable({
   onView,
   onEdit,
   onDelete,
-  onAddFinishedGoods,
   userRole,
 }: BatchesTableProps) {
   const columns: ColumnDef<BatchWithUsage>[] = [
@@ -137,33 +131,6 @@ export function BatchesTable({
       },
     },
     {
-      id: 'output',
-      header: 'Produk Jadi',
-      cell: ({ row }) => {
-        const batch = row.original
-        if (!batch.batchFinishedGoods || batch.batchFinishedGoods.length === 0)
-          return '-'
-
-        return (
-          <div className="max-w-xs space-y-1">
-            {batch.batchFinishedGoods.map((bfg, index) => (
-              <div
-                key={index}
-                className="truncate text-sm"
-                title={`${bfg.finishedGood.name} - ${bfg.quantity.toLocaleString()} unit`}
-              >
-                <span className="font-medium">{bfg.finishedGood.name}</span>
-                <span className="text-muted-foreground">
-                  {' '}
-                  - {bfg.quantity.toLocaleString()} unit
-                </span>
-              </div>
-            ))}
-          </div>
-        )
-      },
-    },
-    {
       accessorKey: 'description',
       header: 'Deskripsi',
       cell: ({ row }) => {
@@ -196,15 +163,6 @@ export function BatchesTable({
                 <Eye className="mr-2 h-4 w-4" />
                 Lihat Detail
               </DropdownMenuItem>
-              {canAddFinishedGoodsToBatch(userRole) &&
-                (!batch.batchFinishedGoods ||
-                  batch.batchFinishedGoods.length === 0) &&
-                batch.status === 'IN_PROGRESS' && (
-                  <DropdownMenuItem onClick={() => onAddFinishedGoods?.(batch)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Tambah Produk Jadi
-                  </DropdownMenuItem>
-                )}
               {canEditBatches(userRole) && (
                 <DropdownMenuItem onClick={() => onEdit?.(batch)}>
                   <Edit className="mr-2 h-4 w-4" />

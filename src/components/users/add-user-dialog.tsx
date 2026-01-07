@@ -157,9 +157,36 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="role">
-                Role <span className="text-red-500">*</span>
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="role">
+                  Role <span className="text-red-500">*</span>
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <div className="space-y-2">
+                        <div>
+                          <p className="font-semibold">Admin</p>
+                          <p className="text-xs mt-1">Akses Penuh - Dapat mengakses semua fitur sistem</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold">Office Purchasing</p>
+                          <p className="text-xs mt-1">• Stok Masuk Bahan Baku</p>
+                          <p className="text-xs">• Stok Keluar Produk Jadi</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold">Office Warehouse</p>
+                          <p className="text-xs mt-1">• Stok Masuk Produk Jadi</p>
+                          <p className="text-xs">• Stok Keluar Bahan Baku</p>
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <Select
                 value={formData.role}
                 onValueChange={(value: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE') =>
@@ -170,56 +197,9 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ADMIN">
-                    <div className="flex items-center gap-2">
-                      <span>Admin</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p className="font-semibold">Akses Penuh</p>
-                            <p className="text-xs mt-1">Dapat mengakses semua fitur sistem</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="OFFICE_PURCHASING">
-                    <div className="flex items-center gap-2">
-                      <span>Office Purchasing</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p className="font-semibold">Pembelian & Penjualan</p>
-                            <p className="text-xs mt-1">• Stok Masuk Bahan Baku</p>
-                            <p className="text-xs">• Stok Keluar Produk Jadi</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="OFFICE_WAREHOUSE">
-                    <div className="flex items-center gap-2">
-                      <span>Office Warehouse</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p className="font-semibold">Gudang & Produksi</p>
-                            <p className="text-xs mt-1">• Stok Masuk Produk Jadi</p>
-                            <p className="text-xs">• Stok Keluar Bahan Baku</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="OFFICE_PURCHASING">Office Purchasing</SelectItem>
+                  <SelectItem value="OFFICE_WAREHOUSE">Office Warehouse</SelectItem>
                 </SelectContent>
               </Select>
             </div>

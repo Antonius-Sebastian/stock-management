@@ -83,7 +83,7 @@ export default function ReportsPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [isLoadingYears, setIsLoadingYears] = useState(true)
   const [locations, setLocations] = useState<Location[]>([])
-  const [selectedLocation, setSelectedLocation] = useState<string>('all')
+  const [selectedLocation, setSelectedLocation] = useState<string>('')
 
   const fetchReport = async () => {
     setIsLoading(true)
@@ -95,8 +95,13 @@ export default function ReportsPage() {
         dataType,
       })
 
-      // Add location filter for finished goods
-      if (reportType === 'finished-goods' && selectedLocation !== 'all') {
+      // Add location filter for finished goods (required)
+      if (reportType === 'finished-goods') {
+        if (!selectedLocation) {
+          toast.error('Silakan pilih lokasi terlebih dahulu')
+          setIsLoading(false)
+          return
+        }
         params.append('locationId', selectedLocation)
       }
 
@@ -167,16 +172,30 @@ export default function ReportsPage() {
         if (response.ok) {
           const data = await response.json()
           setLocations(data)
+          // Set default to first location if available and no location selected
+          if (data.length > 0 && !selectedLocation) {
+            setSelectedLocation(data[0].id)
+          }
         }
       } catch (error) {
         logger.error('Error fetching locations:', error)
       }
     }
-    fetchLocations()
-  }, [])
+    if (reportType === 'finished-goods') {
+      fetchLocations()
+    } else {
+      // Clear location when switching to raw materials
+      setSelectedLocation('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportType])
 
   useEffect(() => {
     if (!isLoadingYears && year && month) {
+      // For finished goods, require location to be selected
+      if (reportType === 'finished-goods' && !selectedLocation) {
+        return
+      }
       fetchReport()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,12 +330,17 @@ export default function ReportsPage() {
                 <SelectValue placeholder="Lokasi" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Semua Lokasi</SelectItem>
-                {locations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id}>
-                    {loc.name}
+                {locations.length === 0 ? (
+                  <SelectItem value="no-location" disabled>
+                    Tidak ada lokasi
                   </SelectItem>
-                ))}
+                ) : (
+                  locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           )}

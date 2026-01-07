@@ -297,6 +297,7 @@ describe('Raw Material Service', () => {
             date: new Date('2024-01-01'),
           }),
           batch: null,
+          drum: null,
         },
         {
           ...createTestStockMovement({
@@ -306,6 +307,7 @@ describe('Raw Material Service', () => {
             date: new Date('2024-01-02'),
           }),
           batch: null,
+          drum: null,
         },
         {
           ...createTestStockMovement({
@@ -315,24 +317,33 @@ describe('Raw Material Service', () => {
             date: new Date('2024-01-03'),
           }),
           batch: null,
+          drum: null,
         },
       ]
 
       vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(
         mockMaterial as any
       )
+
+      // Mock returns DESC (Newest First) as per new implementation expectation
+      const mockMovementsDesc = [...mockMovements].reverse()
+
       vi.mocked(prisma.stockMovement.findMany).mockResolvedValue(
-        mockMovements as any
+        mockMovementsDesc as any
       )
 
       const result = await getRawMaterialMovements(materialId)
 
       expect(result.material).toEqual(mockMaterial)
       expect(result.movements).toHaveLength(3)
-      // Results are reversed (newest first)
-      expect(result.movements[2].runningBalance).toBe(10) // First IN: 10
-      expect(result.movements[1].runningBalance).toBe(5) // OUT: 10 - 5 = 5
-      expect(result.movements[0].runningBalance).toBe(25) // IN: 5 + 20 = 25
+
+      // Newest (Move 3)
+      expect(result.movements[0].runningBalance).toBe(25)
+      // Middle (Move 2)
+      expect(result.movements[1].runningBalance).toBe(5)
+      // Oldest (Move 1)
+      expect(result.movements[2].runningBalance).toBe(10)
+
       expect(prisma.stockMovement.findMany).toHaveBeenCalledWith({
         where: { rawMaterialId: materialId },
         include: {
@@ -342,8 +353,14 @@ describe('Raw Material Service', () => {
               code: true,
             },
           },
+          drum: {
+            select: {
+              label: true,
+            },
+          },
         },
-        orderBy: { date: 'asc' },
+        orderBy: { date: 'desc' },
+        take: 500,
       })
     })
 
@@ -372,6 +389,7 @@ describe('Raw Material Service', () => {
             quantity: 10,
           }),
           batch: null,
+          drum: null,
         },
         {
           ...createTestStockMovement({
@@ -380,21 +398,26 @@ describe('Raw Material Service', () => {
             quantity: -3, // Negative adjustment
           }),
           batch: null,
+          drum: null,
         },
       ]
+
+      // Mock returns DESC
+      const mockMovementsDesc = [...mockMovements].reverse()
 
       vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(
         mockMaterial as any
       )
       vi.mocked(prisma.stockMovement.findMany).mockResolvedValue(
-        mockMovements as any
+        mockMovementsDesc as any
       )
 
       const result = await getRawMaterialMovements(materialId)
 
-      // Results are reversed (newest first)
+      // 0: Move 2 (ADJ -3). After = 7. Before = 10.
+      expect(result.movements[0].runningBalance).toBe(7)
+      // 1: Move 1 (IN 10). After = 10. Before = 0.
       expect(result.movements[1].runningBalance).toBe(10)
-      expect(result.movements[0].runningBalance).toBe(7) // 10 - 3 = 7
     })
   })
 })

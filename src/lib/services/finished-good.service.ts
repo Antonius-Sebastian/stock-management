@@ -31,9 +31,9 @@ export async function getFinishedGoods(
       orderBy: { createdAt: 'desc' },
       include: {
         stocks: {
-          include: { location: true }
-        }
-      }
+          include: { location: true },
+        },
+      },
     })
   }
 
@@ -48,9 +48,9 @@ export async function getFinishedGoods(
       orderBy: { createdAt: 'desc' },
       include: {
         stocks: {
-          include: { location: true }
-        } 
-      }
+          include: { location: true },
+        },
+      },
     }),
     prisma.finishedGood.count(),
   ])
@@ -167,7 +167,7 @@ export async function updateFinishedGood(
  * @throws {Error} If finished good has transaction history
  *
  * @remarks
- * - Checks for stock movements and batch usage before deletion
+ * - Checks for stock movements before deletion
  * - Prevents deletion if used in transactions
  */
 export async function deleteFinishedGood(id: string): Promise<void> {
@@ -177,7 +177,6 @@ export async function deleteFinishedGood(id: string): Promise<void> {
       _count: {
         select: {
           stockMovements: true,
-          batchFinishedGoods: true,
         },
       },
     },
@@ -187,13 +186,8 @@ export async function deleteFinishedGood(id: string): Promise<void> {
     throw new Error('Finished good not found')
   }
 
-  if (
-    existing._count.stockMovements > 0 ||
-    existing._count.batchFinishedGoods > 0
-  ) {
-    throw new Error(
-      'Cannot delete finished good that has stock movements or has been produced in batches'
-    )
+  if (existing._count.stockMovements > 0) {
+    throw new Error('Cannot delete finished good that has stock movements')
   }
 
   await prisma.finishedGood.delete({

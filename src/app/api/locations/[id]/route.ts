@@ -11,12 +11,12 @@ const updateLocationSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const json = await req.json()
     const body = updateLocationSchema.parse(json)
-    const { id } = params
+    const { id } = await params
 
     const location = await updateLocation(id, body)
     return NextResponse.json(location)
@@ -36,10 +36,10 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     await deleteLocation(id)
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -15,7 +15,7 @@ export const createUserSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number'),
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email').optional().nullable(),
-  role: z.enum(['ADMIN', 'FACTORY', 'OFFICE']),
+  role: z.enum(['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE']),
 })
 
 /**
@@ -36,7 +36,7 @@ export const updateUserSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number')
     .optional(),
   name: z.string().min(1, 'Name is required').optional(),
-  role: z.enum(['ADMIN', 'FACTORY', 'OFFICE']).optional(),
+  role: z.enum(['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE']).optional(),
   isActive: z.boolean().optional(),
 })
 

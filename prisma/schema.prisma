@@ -187,8 +187,8 @@ enum BatchStatus {
 
 enum UserRole {
   ADMIN
-  FACTORY
-  OFFICE
+  OFFICE_PURCHASING
+  OFFICE_WAREHOUSE
 }
 
 model User {
@@ -197,7 +197,7 @@ model User {
   email     String?  @unique
   password  String // Hashed with bcrypt
   name      String
-  role      UserRole @default(OFFICE)
+  role      UserRole @default(OFFICE_PURCHASING)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -13,7 +13,7 @@
  * - Finished good OUT: Only OFFICE (when sending to distributor)
  */
 
-export type UserRole = 'ADMIN' | 'FACTORY' | 'OFFICE'
+export type UserRole = 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
 
 /**
  * Check if user can create/edit raw materials
@@ -22,7 +22,7 @@ export type UserRole = 'ADMIN' | 'FACTORY' | 'OFFICE'
  */
 export function canManageMaterials(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'OFFICE'].includes(role)
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
@@ -42,7 +42,7 @@ export function canDeleteMaterials(role: string | undefined): boolean {
  */
 export function canManageFinishedGoods(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'OFFICE'].includes(role)
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
@@ -58,17 +58,17 @@ export function canDeleteFinishedGoods(role: string | undefined): boolean {
 /**
  * Check if user can create batches
  * @param role - User's role
- * @returns true if ADMIN or FACTORY
+ * @returns true if ADMIN or OFFICE
  */
 export function canCreateBatches(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'FACTORY'].includes(role)
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
  * Check if user can edit batches
  * @param role - User's role
- * @returns true if ADMIN only (FACTORY can only create, not edit)
+ * @returns true if ADMIN only
  */
 export function canEditBatches(role: string | undefined): boolean {
   if (!role) return false
@@ -88,11 +88,11 @@ export function canDeleteBatches(role: string | undefined): boolean {
 /**
  * Check if user can add finished goods to batches
  * @param role - User's role
- * @returns true if ADMIN or FACTORY
+ * @returns true if ADMIN or OFFICE
  */
 export function canAddFinishedGoodsToBatch(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'FACTORY'].includes(role)
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
@@ -103,7 +103,7 @@ export function canAddFinishedGoodsToBatch(role: string | undefined): boolean {
  */
 export function canCreateStockEntries(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'FACTORY', 'OFFICE'].includes(role)
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
@@ -116,16 +116,16 @@ export function canCreateStockEntries(role: string | undefined): boolean {
  * @remarks
  * Business Rules (for data integrity and transparency):
  * - ADMIN: Can create all types of movements (full access)
- * - FACTORY:
- *   - Raw material OUT: Automatic via batch creation (cannot manually create)
- *   - Finished good IN: Only via batch workflow (automatic), cannot manually create
- *   - Raw material IN: No (only OFFICE can input purchases)
- *   - Finished good OUT: No (only OFFICE handles distribution)
- * - OFFICE:
+ * - OFFICE_PURCHASING:
  *   - Raw material IN: Yes (when purchasing from supplier)
  *   - Finished good OUT: Yes (when sending to distributor)
- *   - Raw material OUT: No (only via batch - automatic)
- *   - Finished good IN: No (only via batch workflow - automatic)
+ *   - Raw material OUT: No
+ *   - Finished good IN: No
+ * - OFFICE_WAREHOUSE:
+ *   - Finished good IN: Yes (when receiving from production)
+ *   - Raw material OUT: Yes (when using for production)
+ *   - Raw material IN: No
+ *   - Finished good OUT: No
  */
 export function canCreateStockMovement(
   role: string | undefined,
@@ -140,24 +140,17 @@ export function canCreateStockMovement(
   // ADJUSTMENT type is only for ADMIN
   if (movementType === 'ADJUSTMENT') return false
 
-  // FACTORY permissions
-  if (role === 'FACTORY') {
-    // Finished good IN: not allowed (only via batch workflow now)
-    // Raw material OUT: not allowed (only automatic via batch creation)
-    // All other movements: not allowed
+  // OFFICE_PURCHASING: Raw IN, Finished OUT
+  if (role === 'OFFICE_PURCHASING') {
+    if (itemType === 'raw-material' && movementType === 'IN') return true
+    if (itemType === 'finished-good' && movementType === 'OUT') return true
     return false
   }
 
-  // OFFICE permissions
-  if (role === 'OFFICE') {
-    // Raw material IN: allowed (when purchasing from supplier)
-    if (itemType === 'raw-material' && movementType === 'IN') return true
-
-    // Finished good OUT: allowed (when sending to distributor)
-    if (itemType === 'finished-good' && movementType === 'OUT') return true
-
-    // Raw material OUT: not allowed (only via batch - automatic)
-    // Finished good IN: not allowed (only FACTORY inputs production results)
+  // OFFICE_WAREHOUSE: Finished IN, Raw OUT
+  if (role === 'OFFICE_WAREHOUSE') {
+    if (itemType === 'finished-good' && movementType === 'IN') return true
+    if (itemType === 'raw-material' && movementType === 'OUT') return true
     return false
   }
 
@@ -258,31 +251,31 @@ export const PERMISSIONS = {
     canExportReports: true,
     canManageUsers: true,
   },
-  FACTORY: {
-    canManageMaterials: false, // Cannot create/edit materials
-    canDeleteMaterials: false, // Cannot delete materials
-    canManageFinishedGoods: false, // Cannot create/edit products
-    canDeleteFinishedGoods: false, // Cannot delete products
-    canCreateBatches: true, // ✅ Can create batches (auto-creates raw material OUT)
-    canEditBatches: false, // Cannot edit batches
-    canDeleteBatches: false, // Cannot delete batches
-    canCreateStockMovements: false, // ❌ Cannot create any stock movements (only via batch)
-    canCreateStockAdjustment: false, // Cannot adjust stock
-    canEditStockMovements: false, // Cannot edit movements
-    canDeleteStockMovements: false, // Cannot delete movements
-    canViewReports: true,
-    canExportReports: true,
-    canManageUsers: false,
-  },
-  OFFICE: {
+  OFFICE_PURCHASING: {
     canManageMaterials: true, // ✅ Can create/edit materials
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products
     canDeleteFinishedGoods: false, // ❌ Cannot delete products
-    canCreateBatches: false, // Cannot create batches
+    canCreateBatches: true, // ✅ Can create batches
     canEditBatches: false, // ❌ Cannot edit batches
     canDeleteBatches: false, // ❌ Cannot delete batches
     canCreateStockMovements: true, // ✅ Can create: Raw material IN, Finished good OUT
+    canCreateStockAdjustment: false, // Cannot adjust stock
+    canEditStockMovements: false, // ❌ Cannot edit movements
+    canDeleteStockMovements: false, // ❌ Cannot delete movements
+    canViewReports: true,
+    canExportReports: true,
+    canManageUsers: false,
+  },
+  OFFICE_WAREHOUSE: {
+    canManageMaterials: true, // ✅ Can create/edit materials
+    canDeleteMaterials: false, // ❌ Cannot delete materials
+    canManageFinishedGoods: true, // ✅ Can create/edit products
+    canDeleteFinishedGoods: false, // ❌ Cannot delete products
+    canCreateBatches: true, // ✅ Can create batches
+    canEditBatches: false, // ❌ Cannot edit batches
+    canDeleteBatches: false, // ❌ Cannot delete batches
+    canCreateStockMovements: true, // ✅ Can create: Finished good IN, Raw material OUT
     canCreateStockAdjustment: false, // Cannot adjust stock
     canEditStockMovements: false, // ❌ Cannot edit movements
     canDeleteStockMovements: false, // ❌ Cannot delete movements

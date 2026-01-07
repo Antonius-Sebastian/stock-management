@@ -73,6 +73,21 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
               'Quantity must be greater than zero'
             ),
         })
+        .refine(
+          (material) => {
+            // If material has drums, drumId is required
+            if (!material.rawMaterialId) return true
+            const rawMaterial = rawMaterials.find(rm => rm.id === material.rawMaterialId)
+            if (rawMaterial?.drums && rawMaterial.drums.length > 0) {
+              return !!material.drumId
+            }
+            return true
+          },
+          {
+            message: 'Pilih drum untuk bahan baku ini',
+            path: ['drumId'],
+          }
+        )
       )
       .min(1, 'At least one raw material is required')
       .refine((materials) => {
@@ -222,7 +237,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
         <DialogHeader>
           <DialogTitle>Catat Pemakaian Baru</DialogTitle>
           <DialogDescription>
-             Catat batch produksi baru dengan bahan baku. Pilih Drum spesifik jika diperlukan.
+            Catat batch produksi baru dengan bahan baku. Pilih drum spesifik untuk setiap bahan.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -384,23 +399,22 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                             <FormControl>
                               <Select
                                 onValueChange={field.onChange}
-                                value={field.value || "fifo"}
+                                value={field.value}
                               >
                                 <SelectTrigger className="w-full text-xs h-8">
-                                  <SelectValue placeholder="Pilih Drum (Opsional - Auto FIFO)" />
+                                  <SelectValue placeholder="Pilih Drum" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="fifo">Auto (FIFO)</SelectItem>
                                     {selectedMaterial?.drums?.map(drum => (
-                                        <SelectItem key={drum.id} value={drum.id}>
-                                            {drum.label} (Sisa: {drum.currentQuantity} kg)
+                                        <SelectItem key={drum.id} value={drum.id} disabled={drum.currentQuantity <= 0}>
+                                            {drum.label} (Sisa: {drum.currentQuantity} kg) {drum.currentQuantity <= 0 ? '(Habis)' : ''}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                               </Select>
                             </FormControl>
                              <div className="text-[10px] text-muted-foreground">
-                                Pilih drum spesifik atau biarkan Auto untuk menggunakan stok terlama.
+                                Pilih drum yang akan digunakan untuk bahan baku ini.
                             </div>
                             <FormMessage />
                           </FormItem>

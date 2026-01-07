@@ -494,23 +494,22 @@ export function EditBatchDialog({
                                 <FormControl>
                                   <Select
                                     onValueChange={field.onChange}
-                                    value={field.value || "fifo"}
+                                    value={field.value}
                                   >
                                     <SelectTrigger className="w-full text-xs h-8">
-                                      <SelectValue placeholder="Pilih Drum (Opsional - Auto FIFO)" />
+                                      <SelectValue placeholder="Pilih Drum" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="fifo">Auto (FIFO)</SelectItem>
                                         {selectedMaterial?.drums?.map(drum => (
-                                            <SelectItem key={drum.id} value={drum.id}>
-                                                {drum.label} (Sisa: {getAvailableStock(selectedMaterialId, drum.id)} kg)
+                                            <SelectItem key={drum.id} value={drum.id} disabled={getAvailableStock(selectedMaterialId, drum.id) <= 0}>
+                                                {drum.label} (Sisa: {getAvailableStock(selectedMaterialId, drum.id)} kg) {getAvailableStock(selectedMaterialId, drum.id) <= 0 ? '(Habis)' : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                   </Select>
                                 </FormControl>
                                 <div className="text-[10px] text-muted-foreground">
-                                    Pilih drum spesifik atau biarkan Auto.
+                                    Pilih drum yang akan digunakan untuk bahan baku ini.
                                 </div>
                                 <FormMessage />
                               </FormItem>

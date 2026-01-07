@@ -35,7 +35,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
     email: '',
     password: '',
     name: '',
-    role: 'OFFICE' as 'ADMIN' | 'FACTORY' | 'OFFICE',
+    role: 'OFFICE_PURCHASING' as 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,7 +65,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
           email: '',
           password: '',
           name: '',
-          role: 'OFFICE',
+          role: 'OFFICE_PURCHASING',
         })
         onSuccess()
       } else {
@@ -155,19 +155,23 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               </Label>
               <Select
                 value={formData.role}
-                onValueChange={(value: 'ADMIN' | 'FACTORY' | 'OFFICE') =>
+                onValueChange={(value: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE') =>
                   setFormData({ ...formData, role: value })
                 }
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ADMIN">Admin - Full Access</SelectItem>
-                  <SelectItem value="FACTORY">
-                    Factory - Factory Staff
+                  <SelectItem value="ADMIN">
+                    Admin - Full access
                   </SelectItem>
-                  <SelectItem value="OFFICE">Office - Office Staff</SelectItem>
+                  <SelectItem value="OFFICE_PURCHASING">
+                    Office Purchasing - Raw IN, Finished OUT
+                  </SelectItem>
+                  <SelectItem value="OFFICE_WAREHOUSE">
+                    Office Warehouse - Finished IN, Raw OUT
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

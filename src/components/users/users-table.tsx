@@ -72,9 +72,9 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
     switch (role) {
       case 'ADMIN':
         return 'default'
-      case 'FACTORY':
+      case 'OFFICE_PURCHASING':
         return 'secondary'
-      case 'OFFICE':
+      case 'OFFICE_WAREHOUSE':
         return 'outline'
       default:
         return 'outline'

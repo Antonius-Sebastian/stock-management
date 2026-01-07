@@ -20,7 +20,7 @@ export type User = {
   username: string
   email: string | null
   name: string
-  role: 'ADMIN' | 'FACTORY' | 'OFFICE'
+  role: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
   isActive: boolean
   createdAt: string
 }

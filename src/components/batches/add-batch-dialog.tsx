@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -362,6 +362,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                             className="mt-8 hover:bg-destructive/10 hover:text-destructive shrink-0"
                             onClick={() => removeMaterial(index)}
                             disabled={materialFields.length === 1}
+                            aria-label="Remove material"
                             >
                             <Trash2 className="h-4 w-4" />
                         </Button>
@@ -437,6 +438,7 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
+                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isLoading ? 'Membuat...' : 'Buat Batch'}
               </Button>
             </DialogFooter>

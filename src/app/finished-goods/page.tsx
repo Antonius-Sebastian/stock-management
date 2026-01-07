@@ -16,11 +16,8 @@ import { AddFinishedGoodDialog } from '@/components/finished-goods/add-finished-
 import { EditFinishedGoodDialog } from '@/components/finished-goods/edit-finished-good-dialog'
 import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
 import { HelpButton } from '@/components/help/help-button'
-import { Button } from '@/components/ui/button'
-import { TrendingUp, TrendingDown } from 'lucide-react'
-import { canManageFinishedGoods, canCreateStockMovement } from '@/lib/rbac'
+import { canManageFinishedGoods } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ManageLocationsDialog } from '@/components/locations/manage-locations-dialog'
 
 interface Location {
@@ -37,7 +34,6 @@ export default function FinishedGoodsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(null)
-  const [currentTab, setCurrentTab] = useState('all')
 
   const fetchFinishedGoods = async () => { /* ... existing fetch ... */ }
   
@@ -97,22 +93,6 @@ export default function FinishedGoodsPage() {
     }
   }
 
-  const getFilteredData = () => {
-      if (currentTab === 'all') return finishedGoods;
-      
-      return finishedGoods.map(item => {
-          // Find stock for specific location
-          // Note: item.stocks is not on FinishedGood type by default, need to extend or cast if using raw Prisma type
-          // But API returns it. We might need to type it properly or cast.
-          const stock = (item as any).stocks?.find((s: any) => s.locationId === currentTab);
-          return {
-              ...item,
-              currentStock: stock ? stock.quantity : 0
-          };
-      });
-  }
-
-  const filteredData = getFilteredData();
 
   if (isLoading) { /* ... loading ... */ }
 
@@ -130,54 +110,24 @@ export default function FinishedGoodsPage() {
         </div>
       </div>
 
-      <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-        <div className="flex items-center justify-between mb-4">
-            <TabsList>
-                <TabsTrigger value="all">Semua Lokasi</TabsTrigger>
-                {locations.map(loc => (
-                    <TabsTrigger key={loc.id} value={loc.id}>{loc.name}</TabsTrigger>
-                ))}
-            </TabsList>
-        </div>
 
-        <TabsContent value="all" className="mt-0">
-             <Card>
-                <CardHeader>
-                  <CardTitle>Inventori Produk Jadi (Total)</CardTitle>
-                  <CardDescription>Lihat total stok di semua lokasi</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FinishedGoodsTable
-                    data={filteredData}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onRefresh={handleSuccess}
-                    userRole={userRole}
-                  />
-                </CardContent>
-              </Card>
-        </TabsContent>
-
-        {locations.map(loc => (
-             <TabsContent key={loc.id} value={loc.id} className="mt-0">
-                <Card>
-                    <CardHeader>
-                    <CardTitle>Inventori: {loc.name}</CardTitle>
-                    <CardDescription>Stok di lokasi {loc.name}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                    <FinishedGoodsTable
-                        data={filteredData}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        onRefresh={handleSuccess}
-                        userRole={userRole}
-                    />
-                    </CardContent>
-                </Card>
-             </TabsContent>
-        ))}
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle>Inventori Produk Jadi</CardTitle>
+          <CardDescription>
+            Kelola semua produk jadi. Stok per lokasi dikelola melalui dialog stok masuk/keluar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FinishedGoodsTable
+            data={finishedGoods}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onRefresh={handleSuccess}
+            userRole={userRole}
+          />
+        </CardContent>
+      </Card>
 
       {/* ... dialogs ... */}
     </div>

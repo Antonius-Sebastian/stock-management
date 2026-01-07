@@ -58,7 +58,6 @@ model FinishedGood {
 
   // Relations
   stockMovements     StockMovement[]
-  batchFinishedGoods BatchFinishedGood[]
   stocks             FinishedGoodStock[]
 
   @@map("finished_goods")
@@ -135,7 +134,6 @@ model Batch {
   // Relations
   stockMovements     StockMovement[]
   batchUsages        BatchUsage[]
-  batchFinishedGoods BatchFinishedGood[]
 
   // Performance indexes for common queries
   @@index([date])
@@ -159,19 +157,7 @@ model BatchUsage {
   @@map("batch_usages")
 }
 
-model BatchFinishedGood {
-  id             String @id @default(cuid())
-  quantity       Float
-  batchId        String
-  finishedGoodId String
 
-  // Relations
-  batch        Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  finishedGood FinishedGood @relation(fields: [finishedGoodId], references: [id])
-
-  @@unique([batchId, finishedGoodId])
-  @@map("batch_finished_goods")
-}
 
 enum StockMovementType {
   IN

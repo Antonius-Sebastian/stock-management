@@ -42,6 +42,12 @@ interface StockReportResponse {
   }
 }
 
+interface Location {
+  id: string
+  name: string
+  isDefault: boolean
+}
+
 const MONTHS = [
   { value: '1', label: 'Januari' },
   { value: '2', label: 'Februari' },
@@ -76,6 +82,8 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [isLoadingYears, setIsLoadingYears] = useState(true)
+  const [locations, setLocations] = useState<Location[]>([])
+  const [selectedLocation, setSelectedLocation] = useState<string>('all')
 
   const fetchReport = async () => {
     setIsLoading(true)
@@ -86,6 +94,11 @@ export default function ReportsPage() {
         type: reportType,
         dataType,
       })
+
+      // Add location filter for finished goods
+      if (reportType === 'finished-goods' && selectedLocation !== 'all') {
+        params.append('locationId', selectedLocation)
+      }
 
       const response = await fetch(`/api/reports/stock?${params}`)
       if (!response.ok) {
@@ -146,12 +159,28 @@ export default function ReportsPage() {
     fetchAvailableYears()
   }, [])
 
+  // Fetch locations for finished goods filter
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const response = await fetch('/api/locations')
+        if (response.ok) {
+          const data = await response.json()
+          setLocations(data)
+        }
+      } catch (error) {
+        logger.error('Error fetching locations:', error)
+      }
+    }
+    fetchLocations()
+  }, [])
+
   useEffect(() => {
     if (!isLoadingYears && year && month) {
       fetchReport()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, dataType, year, month, isLoadingYears])
+  }, [reportType, dataType, year, month, isLoadingYears, selectedLocation])
 
   const getReportTitle = () => {
     const typeLabel =
@@ -274,6 +303,23 @@ export default function ReportsPage() {
               })}
             </SelectContent>
           </Select>
+
+          {/* Location filter for finished goods */}
+          {reportType === 'finished-goods' && (
+            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+              <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectValue placeholder="Lokasi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Lokasi</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <Button

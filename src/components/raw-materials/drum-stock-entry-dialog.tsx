@@ -196,7 +196,7 @@ export function DrumStockEntryDialog({
                             render={({ field }) => (
                                 <FormItem className="w-32">
                                     <FormControl>
-                                        <Input type="number" placeholder="Qty (kg)" step="0.01" {...field} />
+                                        <Input type="number" placeholder="Qty" step="0.01" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -209,7 +209,7 @@ export function DrumStockEntryDialog({
                 ))}
                 
                 <div className="text-right text-sm font-medium mt-2">
-                    Total: {totalQuantity.toLocaleString()} kg
+                    Total: {totalQuantity.toLocaleString()}
                 </div>
             </div>
 

@@ -1,5 +1,13 @@
 'use client'
 
+import { Info } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -188,12 +196,55 @@ export function EditUserDialog({
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ADMIN">Admin - Full access</SelectItem>
+                  <SelectItem value="ADMIN">
+                    <div className="flex items-center gap-2">
+                      <span>Admin</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p className="font-semibold">Akses Penuh</p>
+                            <p className="text-xs mt-1">Dapat mengakses semua fitur sistem</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="OFFICE_PURCHASING">
-                    Office Purchasing - Raw IN, Finished OUT
+                    <div className="flex items-center gap-2">
+                      <span>Office Purchasing</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p className="font-semibold">Pembelian & Penjualan</p>
+                            <p className="text-xs mt-1">• Stok Masuk Bahan Baku</p>
+                            <p className="text-xs">• Stok Keluar Produk Jadi</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </SelectItem>
                   <SelectItem value="OFFICE_WAREHOUSE">
-                    Office Warehouse - Finished IN, Raw OUT
+                    <div className="flex items-center gap-2">
+                      <span>Office Warehouse</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p className="font-semibold">Gudang & Produksi</p>
+                            <p className="text-xs mt-1">• Stok Masuk Produk Jadi</p>
+                            <p className="text-xs">• Stok Keluar Bahan Baku</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </SelectItem>
                 </SelectContent>
               </Select>

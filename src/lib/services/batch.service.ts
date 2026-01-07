@@ -13,17 +13,12 @@ import { PaginationOptions, PaginationMetadata } from './raw-material.service'
 
 /**
  * Batch input type for service layer
- * Matches API route structure with finishedGoods array
  */
 export interface BatchInput {
   code: string
   date: Date
   description?: string | null
   status?: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
-  finishedGoods?: Array<{
-    finishedGoodId: string
-    quantity: number
-  }>
   materials: Array<{
     rawMaterialId: string
     quantity: number
@@ -35,14 +30,6 @@ export interface BatchInput {
  * Batch with full details including relations
  */
 export type BatchWithDetails = Batch & {
-  batchFinishedGoods: Array<{
-    id: string
-    quantity: number
-    finishedGood: {
-      id: string
-      name: string
-    }
-  }>
   batchUsages: Array<{
     id: string
     quantity: number
@@ -65,18 +52,6 @@ const batchSelect = {
   status: true,
   createdAt: true,
   updatedAt: true,
-  batchFinishedGoods: {
-    select: {
-      id: true,
-      quantity: true,
-      finishedGood: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-  },
   batchUsages: {
     select: {
       id: true,
@@ -100,7 +75,7 @@ const batchSelect = {
  *
  * @remarks
  * - If no pagination options provided, returns all batches
- * - Includes batchFinishedGoods and batchUsages with nested relations
+ * - Includes batchUsages with nested relations
  * - Results ordered by creation date (newest first)
  */
 export async function getBatches(
@@ -154,11 +129,6 @@ export async function getBatchById(id: string): Promise<BatchWithDetails> {
   const batch = await prisma.batch.findUnique({
     where: { id },
     include: {
-      batchFinishedGoods: {
-        include: {
-          finishedGood: true,
-        },
-      },
       batchUsages: {
         include: {
           rawMaterial: true,
@@ -181,9 +151,7 @@ export async function getBatchById(id: string): Promise<BatchWithDetails> {
  * @returns Created batch
  * @throws {Error} If duplicate batch code
  * @throws {Error} If duplicate materials in batch
- * @throws {Error} If duplicate finished goods in batch
  * @throws {Error} If raw material not found
- * @throws {Error} If finished good not found
  * @throws {Error} If insufficient stock for any raw material
  *
  * @remarks
@@ -192,9 +160,8 @@ export async function getBatchById(id: string): Promise<BatchWithDetails> {
  * - Automatically creates:
  *   - Batch record
  *   - BatchUsage records (one per raw material)
- *   - BatchFinishedGood records (one per finished good)
- *   - StockMovement records (OUT for materials, IN for finished goods)
- * - Automatically updates stock (decrements materials, increments finished goods)
+ *   - StockMovement records (OUT for materials)
+ * - Automatically updates stock (decrements materials)
  * - Validates sufficient stock before creating batch
  */
 export async function createBatch(data: BatchInput): Promise<Batch> {
@@ -214,17 +181,6 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
     throw new Error(
       'Duplicate materials found in batch. Each material can only be used once per batch.'
     )
-  }
-
-  // Pre-transaction: Check for duplicate finished goods (if provided)
-  if (data.finishedGoods && data.finishedGoods.length > 0) {
-    const finishedGoodIds = data.finishedGoods.map((fg) => fg.finishedGoodId)
-    const uniqueFinishedGoodIds = new Set(finishedGoodIds)
-    if (finishedGoodIds.length !== uniqueFinishedGoodIds.size) {
-      throw new Error(
-        'Duplicate finished goods found in batch. Each finished good can only be used once per batch.'
-      )
-    }
   }
 
   // Transaction: Create batch and all related records
@@ -253,26 +209,8 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       }
     }
 
-    // Step 2: Validate all finished goods exist (if provided)
-    if (data.finishedGoods && data.finishedGoods.length > 0) {
-      for (const fg of data.finishedGoods) {
-        const finishedGood = await tx.finishedGood.findUnique({
-          where: { id: fg.finishedGoodId },
-        })
-
-        if (!finishedGood) {
-          throw new Error(`Finished good not found: ${fg.finishedGoodId}`)
-        }
-      }
-    }
-
-    // Step 3: Create the batch
-    // If finished goods are provided, status should be COMPLETED, otherwise IN_PROGRESS
-    const batchStatus =
-      data.status ||
-      (data.finishedGoods && data.finishedGoods.length > 0
-        ? 'COMPLETED'
-        : 'IN_PROGRESS')
+    // Step 2: Create the batch
+    const batchStatus = data.status || 'IN_PROGRESS'
 
     const batch = await tx.batch.create({
       data: {
@@ -283,7 +221,7 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       },
     })
 
-    // Step 4: Process each raw material
+    // Step 3: Process each raw material
     for (const material of data.materials) {
       // Validate Raw Material Stock (Aggregate)
       const rawMaterials = await tx.$queryRaw<
@@ -387,7 +325,7 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
           if (!drum) throw new Error(`Drum not found: ${dist.drumId}`)
 
           if (drum.currentQuantity < dist.quantity) {
-             // Should not happen with FIFO logic above, but safety check for explicit selection
+            // Should not happen with FIFO logic above, but safety check for explicit selection
             throw new Error(`Insufficient stock in drum ${drum.label}`)
           }
 
@@ -414,21 +352,6 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       })
     }
 
-    // Step 5: Process each finished good (if provided)
-    // NOTE: Decoupled Logic - Do NOT increment Stock or Create Stock Movement
-    if (data.finishedGoods && data.finishedGoods.length > 0) {
-      for (const finishedGood of data.finishedGoods) {
-        // Create batch finished good record (Record keeping only)
-        await tx.batchFinishedGood.create({
-          data: {
-            batchId: batch.id,
-            finishedGoodId: finishedGood.finishedGoodId,
-            quantity: finishedGood.quantity,
-          },
-        })
-      }
-    }
-
     return batch
   })
 }
@@ -441,9 +364,8 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
  * @returns Updated batch with relations
  * @throws {Error} If batch not found
  * @throws {Error} If duplicate code (excluding current batch)
- * @throws {Error} If duplicate materials/finished goods
+ * @throws {Error} If duplicate materials
  * @throws {Error} If raw material not found
- * @throws {Error} If finished good not found
  * @throws {Error} If insufficient stock
  *
  * @remarks
@@ -461,7 +383,6 @@ export async function updateBatch(
     where: { id },
     include: {
       batchUsages: true,
-      batchFinishedGoods: true,
     },
   })
 
@@ -481,17 +402,6 @@ export async function updateBatch(
     throw new Error(`Batch code "${data.code}" already exists`)
   }
 
-  // Pre-transaction: Check for duplicate finished goods (if provided)
-  if (data.finishedGoods && data.finishedGoods.length > 0) {
-    const finishedGoodIds = data.finishedGoods.map((fg) => fg.finishedGoodId)
-    const uniqueFinishedGoodIds = new Set(finishedGoodIds)
-    if (finishedGoodIds.length !== uniqueFinishedGoodIds.size) {
-      throw new Error(
-        'Duplicate finished goods found in batch. Each finished good can only be used once per batch.'
-      )
-    }
-  }
-
   // Pre-transaction: Check for duplicate materials
   const materialIds = data.materials.map((m) => m.rawMaterialId)
   const uniqueMaterialIds = new Set(materialIds)
@@ -503,26 +413,7 @@ export async function updateBatch(
 
   // Transaction: Handle batch updates
   return await prisma.$transaction(async (tx) => {
-    // Step 1: Restore stock for all old finished goods - SKIPPED (Decoupled)
-    for (const oldFinishedGood of existingBatch.batchFinishedGoods) {
-      // Logic removed: do not decrement stock as it wasn't incremented
-      
-      // Delete old finished good IN stock movements (if any exist from legacy)
-      await tx.stockMovement.deleteMany({
-        where: {
-          batchId: id,
-          finishedGoodId: oldFinishedGood.finishedGoodId,
-          type: 'IN',
-        },
-      })
-    }
-
-    // Step 2: Delete all old batch finished goods
-    await tx.batchFinishedGood.deleteMany({
-      where: { batchId: id },
-    })
-
-    // Step 3: Restore stock for all old materials
+    // Step 1: Restore stock for all old materials
     for (const oldUsage of existingBatch.batchUsages) {
       await tx.rawMaterial.update({
         where: { id: oldUsage.rawMaterialId },
@@ -542,54 +433,12 @@ export async function updateBatch(
       })
     }
 
-    // Step 4: Delete all old batch usages
+    // Step 2: Delete all old batch usages
     await tx.batchUsage.deleteMany({
       where: { batchId: id },
     })
 
-    // Step 5: Create new finished goods and add stock (if provided)
-    if (data.finishedGoods && data.finishedGoods.length > 0) {
-      for (const finishedGood of data.finishedGoods) {
-        // Verify finished good exists with row locking for consistency
-        const finishedGoods = await tx.$queryRaw<
-          Array<{ id: string; name: string; currentStock: number }>
-        >`
-        SELECT id, name, "currentStock"
-        FROM finished_goods
-        WHERE id = ${finishedGood.finishedGoodId}
-        FOR UPDATE
-      `
-
-        if (finishedGoods.length === 0) {
-          throw new Error(
-            `Finished good not found: ${finishedGood.finishedGoodId}`
-          )
-        }
-
-        // Create batch finished good record
-        await tx.batchFinishedGood.create({
-          data: {
-            batchId: id,
-            finishedGoodId: finishedGood.finishedGoodId,
-            quantity: finishedGood.quantity,
-          },
-        })
-
-        // Create batch finished good record
-        await tx.batchFinishedGood.create({
-          data: {
-            batchId: id,
-            finishedGoodId: finishedGood.finishedGoodId,
-            quantity: finishedGood.quantity,
-          },
-        })
-
-        // NOTE: Decoupled Logic - Do NOT increment Stock or Create Stock Movement
-        
-      }
-    }
-
-    // Step 6: Create new batch usages and deduct stock
+    // Step 3: Create new batch usages and deduct stock
     for (const material of data.materials) {
       // Check if raw material has enough stock with row locking
       const rawMaterials = await tx.$queryRaw<
@@ -687,21 +536,21 @@ export async function updateBatch(
 
         // Update Dictionary Drum Stock if drumId provided
         if (dist.drumId) {
-            const drum = await tx.drum.findUnique({ where: { id: dist.drumId }})
-            if (!drum) throw new Error(`Drum not found: ${dist.drumId}`)
-            
-            if (drum.currentQuantity < dist.quantity) {
-                 // Safety check
-                throw new Error(`Insufficient stock in drum ${drum.label}`)
-            }
+          const drum = await tx.drum.findUnique({ where: { id: dist.drumId } })
+          if (!drum) throw new Error(`Drum not found: ${dist.drumId}`)
 
-            await tx.drum.update({
-                where: { id: dist.drumId },
-                data: {
-                    currentQuantity: { decrement: dist.quantity },
-                    isActive: { set: (drum.currentQuantity - dist.quantity) > 0 }
-                }
-            })
+          if (drum.currentQuantity < dist.quantity) {
+            // Safety check
+            throw new Error(`Insufficient stock in drum ${drum.label}`)
+          }
+
+          await tx.drum.update({
+            where: { id: dist.drumId },
+            data: {
+              currentQuantity: { decrement: dist.quantity },
+              isActive: { set: drum.currentQuantity - dist.quantity > 0 },
+            },
+          })
         }
       }
 
@@ -716,7 +565,7 @@ export async function updateBatch(
       })
     }
 
-    // Step 7: Update batch info
+    // Step 4: Update batch info
     const updatedBatch = await tx.batch.update({
       where: { id },
       data: {
@@ -726,11 +575,6 @@ export async function updateBatch(
         ...(data.status && { status: data.status }),
       },
       include: {
-        batchFinishedGoods: {
-          include: {
-            finishedGood: true,
-          },
-        },
         batchUsages: {
           include: {
             rawMaterial: true,
@@ -761,7 +605,6 @@ export async function deleteBatch(id: string): Promise<void> {
     where: { id },
     include: {
       batchUsages: true,
-      batchFinishedGoods: true,
     },
   })
 
@@ -771,10 +614,7 @@ export async function deleteBatch(id: string): Promise<void> {
 
   // Transaction: Delete batch and restore stock
   await prisma.$transaction(async (tx) => {
-    // Step 1: Restore finished good stock - SKIPPED (Decoupled)
-    // We only delete the BatchFinishedGood record later.
-    
-    // Step 2: Restore raw material stock (and Drum stock)
+    // Step 1: Restore raw material stock (and Drum stock)
     for (const batchUsage of existingBatch.batchUsages) {
       await tx.rawMaterial.update({
         where: { id: batchUsage.rawMaterialId },
@@ -787,35 +627,30 @@ export async function deleteBatch(id: string): Promise<void> {
 
       // Restore Drum Stock if exists
       if (batchUsage.drumId) {
-          await tx.drum.update({
-              where: { id: batchUsage.drumId },
-              data: {
-                  currentQuantity: {
-                      increment: batchUsage.quantity
-                  },
-                  isActive: true // Reactivate if it was deactivated (simple logic)
-              }
-          })
+        await tx.drum.update({
+          where: { id: batchUsage.drumId },
+          data: {
+            currentQuantity: {
+              increment: batchUsage.quantity,
+            },
+            isActive: true, // Reactivate if it was deactivated (simple logic)
+          },
+        })
       }
     }
 
-    // Step 3: Delete stock movements associated with this batch FIRST
+    // Step 2: Delete stock movements associated with this batch FIRST
     // This prevents orphaned movements with NULL batchId
     await tx.stockMovement.deleteMany({
       where: { batchId: id },
     })
 
-    // Step 4: Delete all batch finished goods
-    await tx.batchFinishedGood.deleteMany({
-      where: { batchId: id },
-    })
-
-    // Step 5: Delete all batch usages
+    // Step 3: Delete all batch usages
     await tx.batchUsage.deleteMany({
       where: { batchId: id },
     })
 
-    // Step 6: Delete the batch
+    // Step 4: Delete the batch
     await tx.batch.delete({
       where: { id },
     })

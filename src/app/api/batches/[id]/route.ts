@@ -75,10 +75,6 @@ export async function PUT(
       date: validatedData.date,
       description: validatedData.description || null,
       status: validatedData.status,
-      finishedGoods:
-        validatedData.finishedGoods.length > 0
-          ? validatedData.finishedGoods
-          : undefined,
       materials: validatedData.materials,
     }
 
@@ -137,13 +133,9 @@ export async function DELETE(
     await deleteBatch(id)
 
     // Audit log
-    const finishedGoods = existingBatch.batchFinishedGoods.map(
-      (bfg) => bfg.finishedGood.name
-    )
-
     await AuditHelpers.batchDeleted(
       existingBatch.code,
-      finishedGoods.join(', '),
+      '',
       {
         id: session.user.id,
         name: session.user.name || session.user.username,

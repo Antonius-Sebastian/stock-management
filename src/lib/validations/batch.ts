@@ -11,7 +11,6 @@ export const batchSchema = z.object({
     required_error: 'Please select a date',
   }),
   description: z.string().optional(),
-  finishedGoodId: z.string().min(1, 'Please select a finished good'),
   materials: z
     .array(
       z.object({
@@ -24,23 +23,13 @@ export const batchSchema = z.object({
 
 /**
  * Validation schema for batch API routes
- * Uses string date with WIB transform and supports multiple finished goods
- * Finished goods are optional during creation - can be added later via update
+ * Uses string date with WIB transform
  */
 export const batchSchemaAPI = z.object({
   code: z.string().min(1, 'Batch code is required'),
   date: z.string().transform((str) => parseToWIB(str)),
   description: z.string().optional(),
   status: z.enum(['IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
-  finishedGoods: z
-    .array(
-      z.object({
-        finishedGoodId: z.string().min(1, 'Finished good is required'),
-        quantity: z.number().positive('Quantity must be positive'),
-      })
-    )
-    .optional()
-    .default([]),
   materials: z
     .array(
       z.object({

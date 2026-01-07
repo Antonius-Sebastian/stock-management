@@ -207,15 +207,19 @@ export async function deleteRawMaterial(id: string): Promise<void> {
  * Get stock movement history for a raw material with running balance
  *
  * @param id - Raw material ID
+ * @param limit - Optional limit of movements to fetch (default: 500)
  * @returns Material info and movements with running balance
  * @throws {Error} If raw material not found
  *
  * @remarks
- * - Calculates running balance starting from 0
- * - Movements ordered by date ascending for balance calculation
- * - Returns movements in reverse order (newest first) for display
+ * - Optimized to work backwards from current stock
+ * - Fetches newest movements first (DESC)
+ * - Defaults to limiting to latest 500 movements to prevent performance issues with large history
  */
-export async function getRawMaterialMovements(id: string): Promise<{
+export async function getRawMaterialMovements(
+  id: string,
+  limit: number = 500
+): Promise<{
   material: Pick<RawMaterial, 'id' | 'kode' | 'name' | 'currentStock' | 'moq'>
   movements: Array<{
     id: string
@@ -244,6 +248,7 @@ export async function getRawMaterialMovements(id: string): Promise<{
     throw new Error('Raw material not found')
   }
 
+  // Fetch movements Newest -> Oldest
   const movements = await prisma.stockMovement.findMany({
     where: {
       rawMaterialId: id,
@@ -257,24 +262,37 @@ export async function getRawMaterialMovements(id: string): Promise<{
       },
       drum: {
         select: {
-          label: true
-        }
-      }
+          label: true,
+        },
+      },
     },
     orderBy: {
-      date: 'asc', // Start from oldest to calculate running balance
+      date: 'desc',
     },
+    take: limit,
   })
 
-  // Calculate running balance for each movement
-  let runningBalance = 0
+  // Calculate running balance working backwards from current stock
+  let runningBalance = material.currentStock
+
   const movementsWithBalance = movements.map((movement) => {
-    // Apply this movement
-    if (movement.type === 'IN' || movement.type === 'ADJUSTMENT') {
-      runningBalance += movement.quantity
-    } else {
-      runningBalance -= movement.quantity
+    // The balance displayed for this movement is the stock level AFTER this movement occurred.
+    // Which, for the most recent movement, starts at current stock.
+    const balanceForThisRow = runningBalance
+
+    // Calculate the balance BEFORE this movement, which will be the "After Balance" for the NEXT (older) row.
+    let change = 0
+    if (movement.type === 'IN') {
+      change = -movement.quantity
+    } else if (movement.type === 'OUT') {
+      change = movement.quantity
+    } else if (movement.type === 'ADJUSTMENT') {
+      // Adjustment quantity is signed (+ or -)
+      // If we added Q, reverse is -Q
+      change = -movement.quantity
     }
+
+    runningBalance = Math.round((runningBalance + change) * 100) / 100
 
     return {
       id: movement.id,
@@ -284,14 +302,12 @@ export async function getRawMaterialMovements(id: string): Promise<{
       description: movement.description,
       batch: movement.batch,
       drum: movement.drum,
-      runningBalance: Math.round(runningBalance * 100) / 100, // Round to 2 decimal places
+      runningBalance: Math.round(balanceForThisRow * 100) / 100, // Round to 2 decimal places
       createdAt: movement.createdAt,
     }
   })
 
-  // Reverse to show newest first
-  movementsWithBalance.reverse()
-
+  // movements are already DESC (Newest First)
   return {
     material,
     movements: movementsWithBalance,

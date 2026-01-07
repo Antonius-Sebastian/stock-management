@@ -20,8 +20,14 @@ export async function GET(
     // Validate ID format to prevent SQL injection
     const validatedId = z.string().cuid().parse(id)
 
+    // Parse limit from query params
+    const { searchParams } = new URL(request.url)
+    const limitParam = searchParams.get('limit')
+    const limit = limitParam ? parseInt(limitParam, 10) : 500
+
     // Get material movements using service
-    const result = await getRawMaterialMovements(validatedId)
+    // Use limit to prevent fetching huge datasets
+    const result = await getRawMaterialMovements(validatedId, limit)
 
     return NextResponse.json(result)
   } catch (error) {

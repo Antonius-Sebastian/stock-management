@@ -53,9 +53,4 @@ export interface BatchWithUsage {
     rawMaterialId: string
     quantity: number
   }>
-  batchFinishedGoods?: Array<{
-    finishedGood: FinishedGood
-    finishedGoodId: string
-    quantity: number
-  }>
 }

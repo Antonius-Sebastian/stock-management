@@ -1,13 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  Batch,
-  BatchUsage,
-  RawMaterial,
-  FinishedGood,
-  BatchFinishedGood,
-} from '@prisma/client'
+import { Batch, BatchUsage, RawMaterial } from '@prisma/client'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import {
@@ -26,9 +20,6 @@ import { canCreateBatches } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 
 type BatchWithUsage = Batch & {
-  batchFinishedGoods?: (BatchFinishedGood & {
-    finishedGood: FinishedGood
-  })[]
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
   })[]

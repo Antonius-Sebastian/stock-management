@@ -1,24 +1,11 @@
 'use client'
 
 import { ColumnDef } from '@tanstack/react-table'
-import {
-  Batch,
-  BatchUsage,
-  RawMaterial,
-  FinishedGood,
-  BatchFinishedGood,
-} from '@prisma/client'
+import { Batch, BatchUsage, RawMaterial } from '@prisma/client'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  ArrowUpDown,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Eye,
-  Plus,
-} from 'lucide-react'
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +18,6 @@ import { format } from 'date-fns'
 import { canEditBatches, canDeleteBatches } from '@/lib/rbac'
 
 type BatchWithUsage = Batch & {
-  batchFinishedGoods?: (BatchFinishedGood & {
-    finishedGood: FinishedGood
-  })[]
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
   })[]

@@ -89,12 +89,10 @@ describe('Batches API Integration Tests', () => {
       const mockBatches = [
         {
           ...createTestBatch({ id: '1', code: 'BATCH-001' }),
-          batchFinishedGoods: [],
           batchUsages: [],
         },
         {
           ...createTestBatch({ id: '2', code: 'BATCH-002' }),
-          batchFinishedGoods: [],
           batchUsages: [],
         },
       ]
@@ -124,7 +122,6 @@ describe('Batches API Integration Tests', () => {
         data: [
           {
             ...createTestBatch({ id: '1' }),
-            batchFinishedGoods: [],
             batchUsages: [],
           },
         ],
@@ -176,7 +173,6 @@ describe('Batches API Integration Tests', () => {
           code: 'BATCH-001',
           date: '2024-01-15',
           materials: [],
-          finishedGoods: [],
         }),
       })
 
@@ -205,7 +201,6 @@ describe('Batches API Integration Tests', () => {
           code: 'BATCH-001',
           date: '2024-01-15',
           materials: [],
-          finishedGoods: [],
         }),
       })
 
@@ -228,7 +223,6 @@ describe('Batches API Integration Tests', () => {
         date: '2024-01-15',
         description: 'Test batch',
         materials: [{ rawMaterialId: 'rm-1', quantity: 10 }],
-        finishedGoods: [{ finishedGoodId: 'fg-1', quantity: 5 }],
       }
 
       const mockCreated = createTestBatch({ code: 'BATCH-001' })
@@ -277,7 +271,6 @@ describe('Batches API Integration Tests', () => {
 
       const mockBatch = {
         ...createTestBatch({ id: '123' }),
-        batchFinishedGoods: [],
         batchUsages: [],
       }
 
@@ -308,7 +301,6 @@ describe('Batches API Integration Tests', () => {
           code: 'BATCH-001',
           date: '2024-01-15',
           materials: [],
-          finishedGoods: [],
         }),
       })
 
@@ -338,7 +330,6 @@ describe('Batches API Integration Tests', () => {
           code: 'BATCH-001',
           date: '2024-01-15',
           materials: [],
-          finishedGoods: [],
         }),
       })
 
@@ -362,12 +353,10 @@ describe('Batches API Integration Tests', () => {
         code: 'BATCH-001-UPDATED',
         date: '2024-01-16',
         materials: [{ rawMaterialId: 'rm-1', quantity: 15 }],
-        finishedGoods: [{ finishedGoodId: 'fg-1', quantity: 8 }],
       }
 
       const mockUpdated = {
         ...createTestBatch({ id: '123', code: 'BATCH-001-UPDATED' }),
-        batchFinishedGoods: [],
         batchUsages: [],
       }
 
@@ -452,11 +441,6 @@ describe('Batches API Integration Tests', () => {
 
       const mockBatch = {
         ...createTestBatch({ id: '123' }),
-        batchFinishedGoods: [
-          {
-            finishedGood: { name: 'Test FG' },
-          },
-        ],
       }
 
       vi.mocked(getBatchById).mockResolvedValue(mockBatch as any)

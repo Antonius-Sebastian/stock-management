@@ -145,12 +145,11 @@ describe('Finished Good Service', () => {
   })
 
   describe('deleteFinishedGood', () => {
-    it('should delete finished good when no movements or batches', async () => {
+    it('should delete finished good when no movements', async () => {
       const mockGood = {
         ...createTestFinishedGood({ id: 'test-id' }),
         _count: {
           stockMovements: 0,
-          batchFinishedGoods: 0,
         },
       }
       vi.mocked(prisma.finishedGood.findUnique).mockResolvedValue(
@@ -178,7 +177,6 @@ describe('Finished Good Service', () => {
         ...createTestFinishedGood({ id: 'test-id' }),
         _count: {
           stockMovements: 1,
-          batchFinishedGoods: 0,
         },
       }
       vi.mocked(prisma.finishedGood.findUnique).mockResolvedValue(
@@ -186,7 +184,7 @@ describe('Finished Good Service', () => {
       )
 
       await expect(deleteFinishedGood('test-id')).rejects.toThrow(
-        'Cannot delete finished good that has stock movements or has been produced in batches'
+        'Cannot delete finished good that has stock movements'
       )
     })
   })

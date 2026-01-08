@@ -19,7 +19,6 @@ import {
   createTestRawMaterial,
   createTestFinishedGood,
   createTestBatchUsage,
-  createTestBatchFinishedGood,
 } from '../../../../test/helpers/test-data'
 
 // Mock Prisma
@@ -35,10 +34,6 @@ vi.mock('@/lib/db', () => ({
       count: vi.fn(),
     },
     batchUsage: {
-      create: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    batchFinishedGood: {
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
@@ -62,10 +57,6 @@ vi.mock('@/lib/db', () => ({
           delete: vi.fn(),
         },
         batchUsage: {
-          create: vi.fn(),
-          deleteMany: vi.fn(),
-        },
-        batchFinishedGood: {
           create: vi.fn(),
           deleteMany: vi.fn(),
         },
@@ -103,12 +94,10 @@ describe('Batch Service', () => {
       const mockBatches = [
         {
           ...createTestBatch({ id: '1', code: 'BATCH-001' }),
-          batchFinishedGoods: [],
           batchUsages: [],
         },
         {
           ...createTestBatch({ id: '2', code: 'BATCH-002' }),
-          batchFinishedGoods: [],
           batchUsages: [],
         },
       ]
@@ -128,7 +117,6 @@ describe('Batch Service', () => {
       const mockBatches = [
         {
           ...createTestBatch({ id: '1' }),
-          batchFinishedGoods: [],
           batchUsages: [],
         },
       ]
@@ -155,13 +143,6 @@ describe('Batch Service', () => {
     it('should return batch with relations when found', async () => {
       const mockBatch = {
         ...createTestBatch({ id: 'test-id' }),
-        batchFinishedGoods: [
-          {
-            id: 'bfg-1',
-            quantity: 10,
-            finishedGood: createTestFinishedGood({ id: 'fg-1' }),
-          },
-        ],
         batchUsages: [
           {
             id: 'usage-1',
@@ -192,7 +173,7 @@ describe('Batch Service', () => {
   })
 
   describe('createBatch', () => {
-    it('should create batch with materials and finished goods', async () => {
+    it('should create batch with materials', async () => {
       const input = {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
@@ -201,12 +182,6 @@ describe('Batch Service', () => {
           {
             rawMaterialId: 'rm-1',
             quantity: 10,
-          },
-        ],
-        finishedGoods: [
-          {
-            finishedGoodId: 'fg-1',
-            quantity: 5,
           },
         ],
       }
@@ -225,9 +200,6 @@ describe('Batch Service', () => {
         },
         batchUsage: {
           create: vi.fn().mockResolvedValue(createTestBatchUsage()),
-        },
-        batchFinishedGood: {
-          create: vi.fn().mockResolvedValue(createTestBatchFinishedGood()),
         },
         stockMovement: {
           create: vi.fn().mockResolvedValue({
@@ -277,11 +249,10 @@ describe('Batch Service', () => {
           code: input.code,
           date: input.date,
           description: input.description,
-          status: 'COMPLETED', // Status is COMPLETED when finished goods are provided
+          status: 'IN_PROGRESS',
         },
       })
       expect(mockTx.batchUsage.create).toHaveBeenCalled()
-      expect(mockTx.batchFinishedGood.create).toHaveBeenCalled()
       expect(mockTx.stockMovement.create).toHaveBeenCalledTimes(1) // OUT for material only
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'rm-1' },
@@ -296,7 +267,6 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [],
-        finishedGoods: [],
       }
 
       const existingBatch = createTestBatch({ code: 'BATCH-001' })
@@ -315,7 +285,6 @@ describe('Batch Service', () => {
           { rawMaterialId: 'rm-1', quantity: 10 },
           { rawMaterialId: 'rm-1', quantity: 5 }, // Duplicate
         ],
-        finishedGoods: [],
       }
 
       vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
@@ -325,36 +294,17 @@ describe('Batch Service', () => {
       )
     })
 
-    it('should throw error when duplicate finished goods in batch', async () => {
-      const input = {
-        code: 'BATCH-001',
-        date: new Date('2024-01-15'),
-        materials: [],
-        finishedGoods: [
-          { finishedGoodId: 'fg-1', quantity: 10 },
-          { finishedGoodId: 'fg-1', quantity: 5 }, // Duplicate
-        ],
-      }
-
-      vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
-
-      await expect(createBatch(input)).rejects.toThrow(
-        'Duplicate finished goods found in batch'
-      )
-    })
 
     it('should throw error when raw material not found', async () => {
       const input = {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [{ rawMaterialId: 'non-existent', quantity: 10 }],
-        finishedGoods: [],
       }
 
       const mockTx = {
         batch: { create: vi.fn() },
         batchUsage: { create: vi.fn() },
-        batchFinishedGood: { create: vi.fn() },
         stockMovement: { create: vi.fn() },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
@@ -379,13 +329,11 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [{ rawMaterialId: 'rm-1', quantity: 150 }],
-        finishedGoods: [],
       }
 
       const mockTx = {
         batch: { create: vi.fn() },
         batchUsage: { create: vi.fn() },
-        batchFinishedGood: { create: vi.fn() },
         stockMovement: { create: vi.fn() },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
@@ -409,46 +357,12 @@ describe('Batch Service', () => {
       await expect(createBatch(input)).rejects.toThrow('Insufficient stock')
     })
 
-    it('should throw error when finished good not found', async () => {
-      const input = {
-        code: 'BATCH-001',
-        date: new Date('2024-01-15'),
-        materials: [],
-        finishedGoods: [{ finishedGoodId: 'non-existent', quantity: 10 }],
-      }
-
-      const mockTx = {
-        batch: { create: vi.fn() },
-        batchUsage: { create: vi.fn() },
-        batchFinishedGood: { create: vi.fn() },
-        stockMovement: { create: vi.fn() },
-        rawMaterial: { update: vi.fn() },
-        finishedGood: {
-          findUnique: vi.fn().mockResolvedValue(null), // Not found
-          update: vi.fn(),
-        },
-        $queryRaw: vi.fn(),
-      }
-
-      vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
-      vi.mocked(prisma.$transaction).mockImplementation(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async (callback: any) => {
-          return callback(mockTx)
-        }
-      )
-
-      await expect(createBatch(input)).rejects.toThrow(
-        'Finished good not found: non-existent'
-      )
-    })
 
     it('should distribute material usage across drums FIFO when no drumId provided', async () => {
       const input = {
         code: 'BATCH-FIFO',
         date: new Date('2024-01-15'),
         materials: [{ rawMaterialId: 'rm-1', quantity: 150 }],
-        finishedGoods: [],
       }
 
       const mockBatch = createTestBatch({ code: 'BATCH-FIFO' })
@@ -467,7 +381,6 @@ describe('Batch Service', () => {
       const mockTx = {
             batch: { create: vi.fn().mockResolvedValue(mockBatch) },
             batchUsage: { create: vi.fn() },
-            batchFinishedGood: { create: vi.fn() },
             stockMovement: { create: vi.fn() },
             rawMaterial: { update: vi.fn() },
             finishedGood: { findUnique: vi.fn(), update: vi.fn() },
@@ -523,9 +436,6 @@ describe('Batch Service', () => {
         materials: [
           { rawMaterialId: 'rm-1', quantity: 15 }, // Changed from 10 to 15
         ],
-        finishedGoods: [
-          { finishedGoodId: 'fg-1', quantity: 8 }, // Changed from 5 to 8
-        ],
       }
 
       const existingBatch = {
@@ -538,25 +448,10 @@ describe('Batch Service', () => {
             quantity: 10,
           }),
         ],
-        batchFinishedGoods: [
-          createTestBatchFinishedGood({
-            id: 'bfg-1',
-            batchId,
-            finishedGoodId: 'fg-1',
-            quantity: 5,
-          }),
-        ],
       }
 
       const mockUpdatedBatch = {
         ...createTestBatch({ id: batchId, code: 'BATCH-001-UPDATED' }),
-        batchFinishedGoods: [
-          {
-            id: 'bfg-1',
-            quantity: 8,
-            finishedGood: createTestFinishedGood({ id: 'fg-1' }),
-          },
-        ],
         batchUsages: [
           {
             id: 'usage-1',
@@ -572,10 +467,6 @@ describe('Batch Service', () => {
         },
         batchUsage: {
           create: vi.fn().mockResolvedValue(createTestBatchUsage()),
-          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        },
-        batchFinishedGood: {
-          create: vi.fn().mockResolvedValue(createTestBatchFinishedGood()),
           deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         stockMovement: {
@@ -647,7 +538,6 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [],
-        finishedGoods: [],
       }
 
       vi.mocked(prisma.batch.findUnique).mockResolvedValue(null)
@@ -663,7 +553,6 @@ describe('Batch Service', () => {
         code: 'BATCH-002',
         date: new Date('2024-01-15'),
         materials: [],
-        finishedGoods: [],
       }
 
       const existingBatch = createTestBatch({ id: batchId })
@@ -680,31 +569,6 @@ describe('Batch Service', () => {
       )
     })
 
-    it('should throw error when duplicate finished goods in update', async () => {
-      const batchId = 'batch-1'
-      const input = {
-        code: 'BATCH-001',
-        date: new Date('2024-01-15'),
-        materials: [],
-        finishedGoods: [
-          { finishedGoodId: 'fg-1', quantity: 10 },
-          { finishedGoodId: 'fg-1', quantity: 5 }, // Duplicate
-        ],
-      }
-
-      const existingBatch = {
-        ...createTestBatch({ id: batchId }),
-        batchUsages: [],
-        batchFinishedGoods: [],
-      }
-
-      vi.mocked(prisma.batch.findUnique).mockResolvedValue(existingBatch as any)
-      vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
-
-      await expect(updateBatch(batchId, input)).rejects.toThrow(
-        'Duplicate finished goods found in batch'
-      )
-    })
 
     it('should throw error when duplicate materials in update', async () => {
       const batchId = 'batch-1'
@@ -715,13 +579,11 @@ describe('Batch Service', () => {
           { rawMaterialId: 'rm-1', quantity: 10 },
           { rawMaterialId: 'rm-1', quantity: 5 }, // Duplicate
         ],
-        finishedGoods: [],
       }
 
       const existingBatch = {
         ...createTestBatch({ id: batchId }),
         batchUsages: [],
-        batchFinishedGoods: [],
       }
 
       vi.mocked(prisma.batch.findUnique).mockResolvedValue(existingBatch as any)
@@ -732,44 +594,6 @@ describe('Batch Service', () => {
       )
     })
 
-    it('should throw error when finished good not found in update', async () => {
-      const batchId = 'batch-1'
-      const input = {
-        code: 'BATCH-001',
-        date: new Date('2024-01-15'),
-        materials: [],
-        finishedGoods: [{ finishedGoodId: 'non-existent', quantity: 10 }],
-      }
-
-      const existingBatch = {
-        ...createTestBatch({ id: batchId }),
-        batchUsages: [],
-        batchFinishedGoods: [],
-      }
-
-      const mockTx = {
-        batch: { update: vi.fn() },
-        batchUsage: { create: vi.fn(), deleteMany: vi.fn() },
-        batchFinishedGood: { create: vi.fn(), deleteMany: vi.fn() },
-        stockMovement: { create: vi.fn(), deleteMany: vi.fn() },
-        rawMaterial: { update: vi.fn() },
-        finishedGood: { findUnique: vi.fn(), update: vi.fn() },
-        $queryRaw: vi.fn().mockResolvedValue([]), // Not found
-      }
-
-      vi.mocked(prisma.batch.findUnique).mockResolvedValue(existingBatch as any)
-      vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
-      vi.mocked(prisma.$transaction).mockImplementation(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async (callback: any) => {
-          return callback(mockTx)
-        }
-      )
-
-      await expect(updateBatch(batchId, input)).rejects.toThrow(
-        'Finished good not found: non-existent'
-      )
-    })
 
     it('should throw error when raw material not found in update', async () => {
       const batchId = 'batch-1'
@@ -777,19 +601,16 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [{ rawMaterialId: 'non-existent', quantity: 10 }],
-        finishedGoods: [],
       }
 
       const existingBatch = {
         ...createTestBatch({ id: batchId }),
         batchUsages: [],
-        batchFinishedGoods: [],
       }
 
       const mockTx = {
         batch: { update: vi.fn() },
         batchUsage: { create: vi.fn(), deleteMany: vi.fn() },
-        batchFinishedGood: { create: vi.fn(), deleteMany: vi.fn() },
         stockMovement: { create: vi.fn(), deleteMany: vi.fn() },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
@@ -816,19 +637,16 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [{ rawMaterialId: 'rm-1', quantity: 150 }],
-        finishedGoods: [],
       }
 
       const existingBatch = {
         ...createTestBatch({ id: batchId }),
         batchUsages: [],
-        batchFinishedGoods: [],
       }
 
       const mockTx = {
         batch: { update: vi.fn() },
         batchUsage: { create: vi.fn(), deleteMany: vi.fn() },
-        batchFinishedGood: { create: vi.fn(), deleteMany: vi.fn() },
         stockMovement: { create: vi.fn(), deleteMany: vi.fn() },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
@@ -868,13 +686,6 @@ describe('Batch Service', () => {
             quantity: 10,
           }),
         ],
-        batchFinishedGoods: [
-          createTestBatchFinishedGood({
-            batchId,
-            finishedGoodId: 'fg-1',
-            quantity: 5,
-          }),
-        ],
       }
 
       const mockTx = {
@@ -882,9 +693,6 @@ describe('Batch Service', () => {
           delete: vi.fn().mockResolvedValue(existingBatch),
         },
         batchUsage: {
-          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        },
-        batchFinishedGood: {
           deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         stockMovement: {

@@ -57,10 +57,6 @@ export function createMockPrismaClient() {
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
-    batchFinishedGood: {
-      create: vi.fn(),
-      deleteMany: vi.fn(),
-    },
     $transaction: vi.fn((callback) => {
       // Return a transaction client that has the same structure
       const txClient = createMockPrismaClient()

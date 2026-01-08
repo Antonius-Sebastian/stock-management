@@ -62,10 +62,6 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
-    batchFinishedGood: {
-      create: vi.fn(),
-      deleteMany: vi.fn(),
-    },
     $transaction: vi.fn((callback) => callback(vi.fn())),
     $queryRaw: vi.fn(),
   },

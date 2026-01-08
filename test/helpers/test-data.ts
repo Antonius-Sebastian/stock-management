@@ -10,7 +10,6 @@ import type {
   StockMovement,
   Batch,
   BatchUsage,
-  BatchFinishedGood,
 } from '@prisma/client'
 
 export function createTestRawMaterial(
@@ -102,14 +101,3 @@ export function createTestBatchUsage(
   }
 }
 
-export function createTestBatchFinishedGood(
-  overrides?: Partial<BatchFinishedGood>
-): BatchFinishedGood {
-  return {
-    id: 'bfg-1',
-    batchId: 'batch-1',
-    finishedGoodId: 'fg-1',
-    quantity: 10,
-    ...overrides,
-  }
-}

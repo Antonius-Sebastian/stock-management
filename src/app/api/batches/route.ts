@@ -12,9 +12,14 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { AuditHelpers } from '@/lib/audit'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 
 /**
  * GET /api/batches
@@ -98,6 +103,21 @@ export async function POST(request: NextRequest) {
           error: getPermissionErrorMessage('create batches', session.user.role),
         },
         { status: 403 }
+      )
+    }
+
+    // Rate limit batch creation to prevent spam/DoS
+    const ip = getIpAddress(request.headers) || 'unknown'
+    const rateLimit = await checkRateLimit(ip, RateLimits.BATCH_CREATION)
+
+    if (!rateLimit.allowed) {
+      logger.warn('Batch creation rate limit exceeded', { ip })
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
       )
     }
 

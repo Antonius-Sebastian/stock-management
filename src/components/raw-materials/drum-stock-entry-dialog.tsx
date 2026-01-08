@@ -40,62 +40,64 @@ export function DrumStockEntryDialog({
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
 
   const fetchRawMaterials = async () => {
-      try {
-          const response = await fetch('/api/raw-materials')
-          if (!response.ok) throw new Error('Failed to fetch raw materials')
-          const data = await response.json()
-          setRawMaterials(Array.isArray(data) ? data : data.data || [])
-      } catch (_err) {
-          toast.error('Gagal memuat bahan baku')
-      }
+    try {
+      const response = await fetch('/api/raw-materials')
+      if (!response.ok) throw new Error('Failed to fetch raw materials')
+      const data = await response.json()
+      setRawMaterials(Array.isArray(data) ? data : data.data || [])
+    } catch (_err) {
+      toast.error('Gagal memuat bahan baku')
+    }
   }
 
   // Fetch when dialog opens
   if (open && rawMaterials.length === 0) {
-      fetchRawMaterials()
+    fetchRawMaterials()
   }
 
   const form = useForm<DrumStockInForm>({
     resolver: zodResolver(drumStockInSchema),
     defaultValues: {
-        rawMaterialId: '',
-        date: new Date(),
-        description: '',
-        drums: [{ label: '', quantity: 0 }]
-    }
+      rawMaterialId: '',
+      date: new Date(),
+      description: '',
+      drums: [{ label: '', quantity: 0 }],
+    },
   })
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'drums'
+    name: 'drums',
   })
 
   const onSubmit = async (data: DrumStockInForm) => {
     try {
-        const response = await fetch('/api/stock-movements/drum-in', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...data,
-                date: data.date.toISOString() // Serialize date
-            })
-        })
+      const response = await fetch('/api/stock-movements/drum-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          date: data.date.toISOString(), // Serialize date
+        }),
+      })
 
-        if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to create stock entry')
-        }
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create stock entry')
+      }
 
-        toast.success('Stok masuk (Drum) berhasil dicatat')
-        setOpen(false)
-        form.reset()
-        onSuccess()
+      toast.success('Stok masuk (Drum) berhasil dicatat')
+      setOpen(false)
+      form.reset()
+      onSuccess()
     } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Unknown error')
+      toast.error(error instanceof Error ? error.message : 'Unknown error')
     }
   }
 
-  const totalQuantity = form.watch('drums').reduce((sum, d) => sum + (Number(d.quantity) || 0), 0)
+  const totalQuantity = form
+    .watch('drums')
+    .reduce((sum, d) => sum + (Number(d.quantity) || 0), 0)
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -107,7 +109,7 @@ export function DrumStockEntryDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-h-[80vh] max-w-[600px] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Input Stok Masuk (Drum)</DialogTitle>
           <DialogDescription>
@@ -122,7 +124,7 @@ export function DrumStockEntryDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bahan Baku</FormLabel>
-                   <FormControl>
+                  <FormControl>
                     <ItemSelector
                       items={rawMaterials}
                       itemType="raw-material"
@@ -154,67 +156,90 @@ export function DrumStockEntryDialog({
               )}
             />
 
-             <FormField
+            <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Deskripsi (Opsional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Contoh: Penerimaan Supplier A" {...field} />
+                    <Input
+                      placeholder="Contoh: Penerimaan Supplier A"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="space-y-2 border rounded p-3">
-                <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-semibold text-sm">Daftar Drum</h4>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => append({ label: '', quantity: 0 })}>
-                        <Plus className="h-4 w-4 mr-1" /> Tambah Drum
-                    </Button>
+            <div className="space-y-2 rounded border p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-sm font-semibold">Daftar Drum</h4>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => append({ label: '', quantity: 0 })}
+                >
+                  <Plus className="mr-1 h-4 w-4" /> Tambah Drum
+                </Button>
+              </div>
+
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-start gap-2">
+                  <FormField
+                    control={form.control}
+                    name={`drums.${index}.label`}
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormControl>
+                          <Input placeholder="Label / Kode Drum" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`drums.${index}.quantity`}
+                    render={({ field }) => (
+                      <FormItem className="w-32">
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            step="0.01"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                
-                {fields.map((field, index) => (
-                    <div key={field.id} className="flex gap-2 items-start">
-                         <FormField
-                            control={form.control}
-                            name={`drums.${index}.label`}
-                            render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <FormControl>
-                                        <Input placeholder="Label / Kode Drum" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={form.control}
-                            name={`drums.${index}.quantity`}
-                            render={({ field }) => (
-                                <FormItem className="w-32">
-                                    <FormControl>
-                                        <Input type="number" placeholder="Qty" step="0.01" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => remove(index)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                ))}
-                
-                <div className="text-right text-sm font-medium mt-2">
-                    Total: {totalQuantity.toLocaleString()}
-                </div>
+              ))}
+
+              <div className="mt-2 text-right text-sm font-medium">
+                Total: {totalQuantity.toLocaleString()}
+              </div>
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
                 Batal
               </Button>
               <Button type="submit">Simpan</Button>

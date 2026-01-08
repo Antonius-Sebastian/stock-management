@@ -74,7 +74,6 @@ export async function PUT(
       code: validatedData.code,
       date: validatedData.date,
       description: validatedData.description || null,
-      status: validatedData.status,
       materials: validatedData.materials,
     }
 
@@ -133,15 +132,11 @@ export async function DELETE(
     await deleteBatch(id)
 
     // Audit log
-    await AuditHelpers.batchDeleted(
-      existingBatch.code,
-      '',
-      {
-        id: session.user.id,
-        name: session.user.name || session.user.username,
-        role: session.user.role,
-      }
-    )
+    await AuditHelpers.batchDeleted(existingBatch.code, '', {
+      id: session.user.id,
+      name: session.user.name || session.user.username,
+      role: session.user.role,
+    })
 
     return NextResponse.json({
       message: 'Batch deleted successfully and stock restored',

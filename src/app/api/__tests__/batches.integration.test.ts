@@ -185,7 +185,7 @@ describe('Batches API Integration Tests', () => {
     })
 
     it('should return 403 when user lacks permission', async () => {
-      const mockUser = createTestUser({ role: 'FACTORY' })
+      const mockUser = createTestUser({ role: 'OFFICE_WAREHOUSE' })
       const mockSession = {
         user: mockUser,
         expires: new Date(Date.now() + 86400000).toISOString(),
@@ -314,7 +314,7 @@ describe('Batches API Integration Tests', () => {
     })
 
     it('should return 403 when user lacks permission', async () => {
-      const mockUser = createTestUser({ role: 'FACTORY' })
+      const mockUser = createTestUser({ role: 'OFFICE_WAREHOUSE' })
       const mockSession = {
         user: mockUser,
         expires: new Date(Date.now() + 86400000).toISOString(),
@@ -400,7 +400,7 @@ describe('Batches API Integration Tests', () => {
     })
 
     it('should return 403 when user lacks permission', async () => {
-      const mockUser = createTestUser({ role: 'FACTORY' })
+      const mockUser = createTestUser({ role: 'OFFICE_WAREHOUSE' })
       const mockSession = {
         user: mockUser,
         expires: new Date(Date.now() + 86400000).toISOString(),

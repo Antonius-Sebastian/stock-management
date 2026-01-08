@@ -64,7 +64,7 @@ describe('User Service', () => {
           username: 'user2',
           email: 'user2@example.com',
           name: 'User 2',
-          role: 'FACTORY' as const,
+          role: 'OFFICE_PURCHASING' as const,
           isActive: true,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -119,7 +119,7 @@ describe('User Service', () => {
         password: 'Password123',
         name: 'New User',
         email: 'new@example.com',
-        role: 'FACTORY' as const,
+        role: 'OFFICE_PURCHASING' as const,
       }
       const mockCreated = createTestUser(input)
       const hashedPassword = 'hashedpassword123'
@@ -154,7 +154,7 @@ describe('User Service', () => {
         username: 'existing',
         password: 'Password123',
         name: 'User',
-        role: 'FACTORY' as const,
+        role: 'OFFICE_PURCHASING' as const,
       }
       const existing = createTestUser({ username: 'existing' })
       vi.mocked(prisma.user.findUnique).mockResolvedValue(existing)
@@ -264,7 +264,10 @@ describe('User Service', () => {
 
   describe('deleteUser', () => {
     it('should delete user', async () => {
-      const mockUser = createTestUser({ id: 'test-id', role: 'FACTORY' })
+      const mockUser = createTestUser({
+        id: 'test-id',
+        role: 'OFFICE_PURCHASING',
+      })
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser)
       vi.mocked(prisma.user.delete).mockResolvedValue(mockUser)
 

@@ -18,7 +18,6 @@ export interface BatchInput {
   code: string
   date: Date
   description?: string | null
-  status?: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
   materials: Array<{
     rawMaterialId: string
     quantity: number
@@ -49,7 +48,6 @@ const batchSelect = {
   code: true,
   date: true,
   description: true,
-  status: true,
   createdAt: true,
   updatedAt: true,
   batchUsages: {
@@ -210,14 +208,11 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
     }
 
     // Step 2: Create the batch
-    const batchStatus = data.status || 'IN_PROGRESS'
-
     const batch = await tx.batch.create({
       data: {
         code: data.code,
         date: data.date,
         description: data.description,
-        status: batchStatus,
       },
     })
 
@@ -572,7 +567,6 @@ export async function updateBatch(
         code: data.code,
         date: data.date,
         description: data.description,
-        ...(data.status && { status: data.status }),
       },
       include: {
         batchUsages: {

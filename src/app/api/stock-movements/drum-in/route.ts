@@ -16,10 +16,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     // Parse date string back to Date object for schema validation
     const dataWithDate = {
-        ...body,
-        date: new Date(body.date)
+      ...body,
+      date: new Date(body.date),
     }
-    
+
     const validatedData = drumStockInSchema.parse(dataWithDate)
 
     // Check permission

@@ -249,7 +249,6 @@ describe('Batch Service', () => {
           code: input.code,
           date: input.date,
           description: input.description,
-          status: 'IN_PROGRESS',
         },
       })
       expect(mockTx.batchUsage.create).toHaveBeenCalled()
@@ -293,7 +292,6 @@ describe('Batch Service', () => {
         'Duplicate materials found in batch'
       )
     })
-
 
     it('should throw error when raw material not found', async () => {
       const input = {
@@ -357,7 +355,6 @@ describe('Batch Service', () => {
       await expect(createBatch(input)).rejects.toThrow('Insufficient stock')
     })
 
-
     it('should distribute material usage across drums FIFO when no drumId provided', async () => {
       const input = {
         code: 'BATCH-FIFO',
@@ -371,57 +368,83 @@ describe('Batch Service', () => {
         name: 'Material 1',
         currentStock: 200,
       })
-      
+
       // Drums sorted by creation (FIFO)
       const mockDrums = [
-        { id: 'drum-1', label: 'D1', currentQuantity: 100, createdAt: new Date('2024-01-01') },
-        { id: 'drum-2', label: 'D2', currentQuantity: 100, createdAt: new Date('2024-01-02') },
+        {
+          id: 'drum-1',
+          label: 'D1',
+          currentQuantity: 100,
+          createdAt: new Date('2024-01-01'),
+        },
+        {
+          id: 'drum-2',
+          label: 'D2',
+          currentQuantity: 100,
+          createdAt: new Date('2024-01-02'),
+        },
       ]
 
       const mockTx = {
-            batch: { create: vi.fn().mockResolvedValue(mockBatch) },
-            batchUsage: { create: vi.fn() },
-            stockMovement: { create: vi.fn() },
-            rawMaterial: { update: vi.fn() },
-            finishedGood: { findUnique: vi.fn(), update: vi.fn() },
-            drum: { 
-                findMany: vi.fn().mockResolvedValue(mockDrums),
-                findUnique: vi.fn().mockImplementation((args) => Promise.resolve(mockDrums.find(d => d.id === args.where.id))),
-                update: vi.fn()
-            },
-            $queryRaw: vi.fn().mockResolvedValue([mockRawMaterial]),
+        batch: { create: vi.fn().mockResolvedValue(mockBatch) },
+        batchUsage: { create: vi.fn() },
+        stockMovement: { create: vi.fn() },
+        rawMaterial: { update: vi.fn() },
+        finishedGood: { findUnique: vi.fn(), update: vi.fn() },
+        drum: {
+          findMany: vi.fn().mockResolvedValue(mockDrums),
+          findUnique: vi
+            .fn()
+            .mockImplementation((args) =>
+              Promise.resolve(mockDrums.find((d) => d.id === args.where.id))
+            ),
+          update: vi.fn(),
+        },
+        $queryRaw: vi.fn().mockResolvedValue([mockRawMaterial]),
       }
 
       vi.mocked(prisma.batch.findFirst).mockResolvedValue(null)
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(mockTx))
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+        callback(mockTx)
+      )
 
       await createBatch(input)
 
       // Expect usage to be split: 100 from drum-1, 50 from drum-2
       expect(mockTx.drum.findMany).toHaveBeenCalled()
-      
+
       // Drum 1 Usage (100)
-      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(expect.objectContaining({
-          data: expect.objectContaining({ drumId: 'drum-1', quantity: 100 })
-      }))
-      expect(mockTx.drum.update).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ drumId: 'drum-1', quantity: 100 }),
+        })
+      )
+      expect(mockTx.drum.update).toHaveBeenCalledWith(
+        expect.objectContaining({
           where: { id: 'drum-1' },
-          data: expect.objectContaining({ currentQuantity: { decrement: 100 } })
-      }))
+          data: expect.objectContaining({
+            currentQuantity: { decrement: 100 },
+          }),
+        })
+      )
 
       // Drum 2 Usage (50)
-      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(expect.objectContaining({
-          data: expect.objectContaining({ drumId: 'drum-2', quantity: 50 })
-      }))
-      expect(mockTx.drum.update).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ drumId: 'drum-2', quantity: 50 }),
+        })
+      )
+      expect(mockTx.drum.update).toHaveBeenCalledWith(
+        expect.objectContaining({
           where: { id: 'drum-2' },
-          data: expect.objectContaining({ currentQuantity: { decrement: 50 } })
-      }))
-      
+          data: expect.objectContaining({ currentQuantity: { decrement: 50 } }),
+        })
+      )
+
       // Total Material Deduction (150)
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
-          where: { id: 'rm-1' },
-          data: { currentStock: { decrement: 150 } }
+        where: { id: 'rm-1' },
+        data: { currentStock: { decrement: 150 } },
       })
     })
   })
@@ -486,7 +509,8 @@ describe('Batch Service', () => {
             currentStock: 8,
           }),
         },
-        $queryRaw: vi.fn()
+        $queryRaw: vi
+          .fn()
           .mockResolvedValueOnce([
             {
               id: 'fg-1',
@@ -525,7 +549,7 @@ describe('Batch Service', () => {
       })
       // Should NOT restore finished good stock (decoupled)
       expect(mockTx.finishedGood.update).not.toHaveBeenCalled()
-      
+
       // Then apply new changes (materials only)
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'rm-1' },
@@ -569,7 +593,6 @@ describe('Batch Service', () => {
       )
     })
 
-
     it('should throw error when duplicate materials in update', async () => {
       const batchId = 'batch-1'
       const input = {
@@ -593,7 +616,6 @@ describe('Batch Service', () => {
         'Duplicate materials found in batch'
       )
     })
-
 
     it('should throw error when raw material not found in update', async () => {
       const batchId = 'batch-1'

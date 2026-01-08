@@ -17,7 +17,10 @@ function createReadlineInterface() {
 /**
  * Prompt user for confirmation
  */
-function askQuestion(rl: readline.Interface, question: string): Promise<string> {
+function askQuestion(
+  rl: readline.Interface,
+  question: string
+): Promise<string> {
   return new Promise((resolve) => {
     rl.question(question, (answer) => {
       resolve(answer)
@@ -72,10 +75,7 @@ async function main() {
   console.log(`  - Locations: ${locationsCount}`)
   console.log('')
 
-  const confirmation = await askQuestion(
-    rl,
-    'Type "RESET" to confirm: '
-  )
+  const confirmation = await askQuestion(rl, 'Type "RESET" to confirm: ')
 
   rl.close()
 
@@ -155,4 +155,3 @@ main()
     await prisma.$disconnect()
     process.exit(1)
   })
-

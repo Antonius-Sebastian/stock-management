@@ -39,7 +39,7 @@ vi.mock('@/lib/rbac', () => ({
   canDeleteFinishedGoods: vi.fn(),
   getPermissionErrorMessage: vi.fn(
     (action: string, role: string) =>
-      `${role} role cannot ${action}. ADMIN or OFFICE required.`
+      `${role} role cannot ${action}. ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE required.`
   ),
 }))
 
@@ -124,7 +124,7 @@ describe('Finished Goods API Integration Tests', () => {
     })
 
     it('should return 403 when user lacks permission', async () => {
-      const mockUser = createTestUser({ role: 'FACTORY' })
+      const mockUser = createTestUser({ role: 'OFFICE_WAREHOUSE' })
       const mockSession = {
         user: mockUser,
         expires: new Date(Date.now() + 86400000).toISOString(),

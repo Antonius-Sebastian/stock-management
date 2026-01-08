@@ -79,23 +79,6 @@ export function BatchesTable({
         },
       },
       {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: ({ row }) => {
-          const status = row.getValue('status') as string
-          if (status === 'COMPLETED') {
-            return <Badge variant="default">Selesai</Badge>
-          }
-          if (status === 'IN_PROGRESS') {
-            return <Badge variant="secondary">Dalam Proses</Badge>
-          }
-          if (status === 'CANCELLED') {
-            return <Badge variant="destructive">Dibatalkan</Badge>
-          }
-          return <Badge variant="secondary">-</Badge>
-        },
-      },
-      {
         id: 'materials',
         header: 'Bahan Baku Digunakan',
         cell: ({ row }) => {

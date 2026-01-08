@@ -47,7 +47,6 @@ export interface BatchWithUsage {
   code: string
   date: Date | string
   description?: string | null
-  status: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
   batchUsages: Array<{
     rawMaterial: RawMaterial
     rawMaterialId: string

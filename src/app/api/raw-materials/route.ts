@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         ? {
             page: pageParam ? parseInt(pageParam) : undefined,
             limit: limitParam ? parseInt(limitParam) : undefined,
-            includeDrums: searchParams.get('include') === 'drums'
+            includeDrums: searchParams.get('include') === 'drums',
           }
         : { includeDrums: searchParams.get('include') === 'drums' }
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentication and authorization required (ADMIN or OFFICE only)
+    // Authentication and authorization required (ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE)
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

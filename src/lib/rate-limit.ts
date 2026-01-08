@@ -154,49 +154,58 @@ export async function checkRateLimit(
 
 /**
  * Preset rate limit configurations
+ *
+ * Configured for internal application use - very lenient limits
+ * to avoid disrupting normal business operations while still providing
+ * basic protection against accidental abuse or misconfiguration.
  */
 export const RateLimits = {
   /**
-   * Login attempts: 5 per 15 minutes
+   * Login attempts: 50 per 15 minutes
+   * Very lenient for internal users
    */
   LOGIN: {
-    limit: 5,
+    limit: 50,
     windowMs: 15 * 60 * 1000,
     keyPrefix: 'login',
   },
 
   /**
-   * User creation: 10 per hour
+   * User creation: 50 per hour
+   * Very lenient for internal admin operations
    */
   USER_CREATION: {
-    limit: 10,
+    limit: 50,
     windowMs: 60 * 60 * 1000,
     keyPrefix: 'user:create',
   },
 
   /**
-   * Batch creation: 50 per hour
+   * Batch creation: 200 per hour
+   * Very high limit for active production workflows
    */
   BATCH_CREATION: {
-    limit: 50,
+    limit: 200,
     windowMs: 60 * 60 * 1000,
     keyPrefix: 'batch:create',
   },
 
   /**
-   * General API: 100 requests per minute
+   * General API: 500 requests per minute
+   * Very high limit for internal application usage patterns
    */
   API_GENERAL: {
-    limit: 100,
+    limit: 500,
     windowMs: 60 * 1000,
     keyPrefix: 'api:general',
   },
 
   /**
-   * Report export: 10 per hour (expensive operation)
+   * Report export: 50 per hour (expensive operation)
+   * Very lenient for internal reporting needs
    */
   REPORT_EXPORT: {
-    limit: 10,
+    limit: 50,
     windowMs: 60 * 60 * 1000,
     keyPrefix: 'report:export',
   },

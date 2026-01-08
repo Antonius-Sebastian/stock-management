@@ -1,4 +1,3 @@
-
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
@@ -26,7 +25,9 @@ async function main() {
 
   // 2. Migrate Finished Good Stock
   const finishedGoods = await prisma.finishedGood.findMany()
-  console.log(`Found ${finishedGoods.length} finished goods. reconciling stock...`)
+  console.log(
+    `Found ${finishedGoods.length} finished goods. reconciling stock...`
+  )
 
   for (const fg of finishedGoods) {
     if (fg.currentStock > 0) {
@@ -48,9 +49,13 @@ async function main() {
             quantity: fg.currentStock,
           },
         })
-        console.log(`Migrated ${fg.currentStock} stock for ${fg.name} to ${defaultLocation.name}`)
+        console.log(
+          `Migrated ${fg.currentStock} stock for ${fg.name} to ${defaultLocation.name}`
+        )
       } else {
-        console.log(`Stock for ${fg.name} already exists in ${defaultLocation.name}. Skipping.`)
+        console.log(
+          `Stock for ${fg.name} already exists in ${defaultLocation.name}. Skipping.`
+        )
       }
     }
   }

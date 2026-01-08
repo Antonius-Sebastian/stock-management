@@ -1,4 +1,3 @@
-
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 
@@ -82,15 +81,15 @@ export async function updateLocation(id: string, data: Partial<LocationInput>) {
   // If setting as default, unset others (transaction)
   if (data.isDefault) {
     return await prisma.$transaction(async (tx) => {
-        await tx.location.updateMany({
-            where: { isDefault: true, id: { not: id } },
-            data: { isDefault: false }
-        })
+      await tx.location.updateMany({
+        where: { isDefault: true, id: { not: id } },
+        data: { isDefault: false },
+      })
 
-        return await tx.location.update({
-            where: { id },
-            data
-        })
+      return await tx.location.update({
+        where: { id },
+        data,
+      })
     })
   }
 
@@ -120,10 +119,10 @@ export async function deleteLocation(id: string) {
   })
 
   if (movementCount > 0) {
-     // Soft delete or block?
-     // Requirements say "Audit Trail", so maybe we shouldn't delete locations with history.
-     // For now, strict block.
-     throw new Error('Cannot delete location with associated movement history.')
+    // Soft delete or block?
+    // Requirements say "Audit Trail", so maybe we shouldn't delete locations with history.
+    // For now, strict block.
+    throw new Error('Cannot delete location with associated movement history.')
   }
 
   return await prisma.location.delete({

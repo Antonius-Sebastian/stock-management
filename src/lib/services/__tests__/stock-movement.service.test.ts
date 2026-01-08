@@ -1155,51 +1155,63 @@ describe('Stock Movement Service', () => {
         date: new Date('2024-01-01'), // Backdated
         description: 'Initial Stock',
         drums: [
-            { label: 'D1', quantity: 100 },
-            { label: 'D2', quantity: 100 }
-        ]
+          { label: 'D1', quantity: 100 },
+          { label: 'D2', quantity: 100 },
+        ],
       }
 
       const mockTx = {
         drum: {
-            findFirst: vi.fn().mockResolvedValue(null),
-            create: vi.fn().mockImplementation((args) => Promise.resolve({ id: 'new-drum-id', ...args.data })),
+          findFirst: vi.fn().mockResolvedValue(null),
+          create: vi
+            .fn()
+            .mockImplementation((args) =>
+              Promise.resolve({ id: 'new-drum-id', ...args.data })
+            ),
         },
         stockMovement: {
-            create: vi.fn(),
+          create: vi.fn(),
         },
         rawMaterial: {
-            update: vi.fn(),
+          update: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }
 
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(mockTx))
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+        callback(mockTx)
+      )
 
       await createDrumStockIn(input)
 
       // Verify Drum Creation uses input DATE, not NOW
-      expect(mockTx.drum.create).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockTx.drum.create).toHaveBeenCalledWith(
+        expect.objectContaining({
           data: expect.objectContaining({
-              label: 'D1',
-              createdAt: input.date 
-          })
-      }))
-      
+            label: 'D1',
+            createdAt: input.date,
+          }),
+        })
+      )
+
       // Verify Movement Creation
-      expect(mockTx.stockMovement.create).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockTx.stockMovement.create).toHaveBeenCalledWith(
+        expect.objectContaining({
           data: expect.objectContaining({
-              date: input.date,
-              type: 'IN',
-              drumId: 'new-drum-id'
-          })
-      }))
+            date: input.date,
+            type: 'IN',
+            drumId: 'new-drum-id',
+          }),
+        })
+      )
 
       // Verify Total Stock Update
-      expect(mockTx.rawMaterial.update).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockTx.rawMaterial.update).toHaveBeenCalledWith(
+        expect.objectContaining({
           where: { id: 'rm-1' },
-          data: { currentStock: { increment: 200 } }
-      }))
+          data: { currentStock: { increment: 200 } },
+        })
+      )
     })
   })
 })

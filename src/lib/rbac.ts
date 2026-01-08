@@ -3,14 +3,14 @@
  *
  * Defines permission rules for each user role to prevent data manipulation:
  * - ADMIN: Full access to everything (manager/boss)
- * - FACTORY: Production staff - can create batches (finished good IN is automatic via batch workflow)
- * - OFFICE: Office staff - can input raw material IN (purchases) and finished good OUT (distribution)
+ * - OFFICE_PURCHASING: Purchasing staff - can input raw material IN (purchases) and finished good OUT (distribution)
+ * - OFFICE_WAREHOUSE: Warehouse staff - can input finished good IN (receiving) and raw material OUT (production usage)
  *
  * Business Rules:
- * - Raw material IN: Only OFFICE (when purchasing from supplier)
- * - Raw material OUT: Only FACTORY via batch creation (automatic, cannot manually create)
- * - Finished good IN: Only via batch workflow (automatic when FACTORY creates batch)
- * - Finished good OUT: Only OFFICE (when sending to distributor)
+ * - Raw material IN: Only OFFICE_PURCHASING (when purchasing from supplier)
+ * - Raw material OUT: Only OFFICE_WAREHOUSE (when using for production, typically via batch)
+ * - Finished good IN: Only OFFICE_WAREHOUSE (when receiving from production)
+ * - Finished good OUT: Only OFFICE_PURCHASING (when sending to distributor)
  */
 
 export type UserRole = 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
@@ -18,7 +18,7 @@ export type UserRole = 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
 /**
  * Check if user can create/edit raw materials
  * @param role - User's role
- * @returns true if ADMIN or OFFICE
+ * @returns true if ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE
  */
 export function canManageMaterials(role: string | undefined): boolean {
   if (!role) return false
@@ -38,7 +38,7 @@ export function canDeleteMaterials(role: string | undefined): boolean {
 /**
  * Check if user can create/edit finished goods
  * @param role - User's role
- * @returns true if ADMIN or OFFICE
+ * @returns true if ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE
  */
 export function canManageFinishedGoods(role: string | undefined): boolean {
   if (!role) return false
@@ -58,11 +58,11 @@ export function canDeleteFinishedGoods(role: string | undefined): boolean {
 /**
  * Check if user can create batches
  * @param role - User's role
- * @returns true if ADMIN or OFFICE
+ * @returns true if ADMIN or OFFICE_WAREHOUSE only (batch = raw material OUT movement)
  */
 export function canCreateBatches(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
+  return ['ADMIN', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
@@ -88,11 +88,11 @@ export function canDeleteBatches(role: string | undefined): boolean {
 /**
  * Check if user can add finished goods to batches
  * @param role - User's role
- * @returns true if ADMIN or OFFICE
+ * @returns true if ADMIN or OFFICE_WAREHOUSE only (batch = raw material OUT movement)
  */
 export function canAddFinishedGoodsToBatch(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
+  return ['ADMIN', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
@@ -190,21 +190,21 @@ export function canCreateStockAdjustment(role: string | undefined): boolean {
 /**
  * Check if user can view reports
  * @param role - User's role
- * @returns true for all authenticated users
+ * @returns true for all authenticated users (ADMIN, OFFICE_PURCHASING, OFFICE_WAREHOUSE)
  */
 export function canViewReports(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'FACTORY', 'OFFICE'].includes(role)
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
  * Check if user can export reports
  * @param role - User's role
- * @returns true for all authenticated users
+ * @returns true for all authenticated users (ADMIN, OFFICE_PURCHASING, OFFICE_WAREHOUSE)
  */
 export function canExportReports(role: string | undefined): boolean {
   if (!role) return false
-  return ['ADMIN', 'FACTORY', 'OFFICE'].includes(role)
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
 }
 
 /**
@@ -256,7 +256,7 @@ export const PERMISSIONS = {
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products
     canDeleteFinishedGoods: false, // ❌ Cannot delete products
-    canCreateBatches: true, // ✅ Can create batches
+    canCreateBatches: false, // ❌ Cannot create batches (batch = raw material OUT, only WAREHOUSE)
     canEditBatches: false, // ❌ Cannot edit batches
     canDeleteBatches: false, // ❌ Cannot delete batches
     canCreateStockMovements: true, // ✅ Can create: Raw material IN, Finished good OUT

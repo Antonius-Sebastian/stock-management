@@ -87,13 +87,14 @@ export const drumStockInSchema = z.object({
     required_error: 'Please select a date',
   }),
   description: z.string().optional(),
-  drums: z.array(
-    z.object({
-      label: z.string().min(1, 'Drum label is required'),
-      quantity: z.coerce.number().positive('Quantity must be positive'),
-    })
-  ).min(1, 'At least one drum is required'),
+  drums: z
+    .array(
+      z.object({
+        label: z.string().min(1, 'Drum label is required'),
+        quantity: z.coerce.number().positive('Quantity must be positive'),
+      })
+    )
+    .min(1, 'At least one drum is required'),
 })
 
 export type DrumStockInForm = z.infer<typeof drumStockInSchema>
-

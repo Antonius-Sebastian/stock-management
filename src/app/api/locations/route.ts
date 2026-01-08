@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getLocations, createLocation } from '@/lib/services/location.service'
 import { z } from 'zod'

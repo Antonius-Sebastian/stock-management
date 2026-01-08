@@ -123,13 +123,12 @@ model FinishedGoodStock {
 }
 
 model Batch {
-  id          String      @id @default(cuid())
-  code        String      @unique
+  id          String   @id @default(cuid())
+  code        String   @unique
   date        DateTime
   description String?
-  status      BatchStatus @default(IN_PROGRESS)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   stockMovements     StockMovement[]
@@ -137,7 +136,6 @@ model Batch {
 
   // Performance indexes for common queries
   @@index([date])
-  @@index([status])
   @@map("batches")
 }
 
@@ -163,12 +161,6 @@ enum StockMovementType {
   IN
   OUT
   ADJUSTMENT
-}
-
-enum BatchStatus {
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
 }
 
 enum UserRole {

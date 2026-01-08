@@ -29,7 +29,6 @@ export const batchSchemaAPI = z.object({
   code: z.string().min(1, 'Batch code is required'),
   date: z.string().transform((str) => parseToWIB(str)),
   description: z.string().optional(),
-  status: z.enum(['IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
   materials: z
     .array(
       z.object({

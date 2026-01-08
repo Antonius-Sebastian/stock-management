@@ -43,7 +43,11 @@ export interface PaginationMetadata {
 export async function getRawMaterials(
   options?: PaginationOptions
 ): Promise<
-  (RawMaterial & { drums?: Drum[] })[] | { data: (RawMaterial & { drums?: Drum[] })[]; pagination: PaginationMetadata }
+  | (RawMaterial & { drums?: Drum[] })[]
+  | {
+      data: (RawMaterial & { drums?: Drum[] })[]
+      pagination: PaginationMetadata
+    }
 > {
   const include = options?.includeDrums
     ? {

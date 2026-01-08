@@ -42,7 +42,10 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
     email: '',
     password: '',
     name: '',
-    role: 'OFFICE_PURCHASING' as 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE',
+    role: 'OFFICE_PURCHASING' as
+      | 'ADMIN'
+      | 'OFFICE_PURCHASING'
+      | 'OFFICE_WAREHOUSE',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,22 +167,28 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      <Info className="text-muted-foreground h-4 w-4 cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <div className="space-y-2">
                         <div>
                           <p className="font-semibold">Admin</p>
-                          <p className="text-xs mt-1">Akses Penuh - Dapat mengakses semua fitur sistem</p>
+                          <p className="mt-1 text-xs">
+                            Akses Penuh - Dapat mengakses semua fitur sistem
+                          </p>
                         </div>
                         <div>
                           <p className="font-semibold">Office Purchasing</p>
-                          <p className="text-xs mt-1">• Stok Masuk Bahan Baku</p>
+                          <p className="mt-1 text-xs">
+                            • Stok Masuk Bahan Baku
+                          </p>
                           <p className="text-xs">• Stok Keluar Produk Jadi</p>
                         </div>
                         <div>
                           <p className="font-semibold">Office Warehouse</p>
-                          <p className="text-xs mt-1">• Stok Masuk Produk Jadi</p>
+                          <p className="mt-1 text-xs">
+                            • Stok Masuk Produk Jadi
+                          </p>
                           <p className="text-xs">• Stok Keluar Bahan Baku</p>
                         </div>
                       </div>
@@ -189,17 +198,21 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               </div>
               <Select
                 value={formData.role}
-                onValueChange={(value: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE') =>
-                  setFormData({ ...formData, role: value })
-                }
+                onValueChange={(
+                  value: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
+                ) => setFormData({ ...formData, role: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="OFFICE_PURCHASING">Office Purchasing</SelectItem>
-                  <SelectItem value="OFFICE_WAREHOUSE">Office Warehouse</SelectItem>
+                  <SelectItem value="OFFICE_PURCHASING">
+                    Office Purchasing
+                  </SelectItem>
+                  <SelectItem value="OFFICE_WAREHOUSE">
+                    Office Warehouse
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

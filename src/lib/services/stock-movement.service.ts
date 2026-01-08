@@ -125,24 +125,26 @@ export async function createStockMovement(
       if (data.finishedGoodId) {
         // LOCATION AWARE LOGIC
         if (!data.locationId) {
-             // Fallback for legacy calls? Or strict? 
-             // Strict for now per requirements.
-             throw new Error('Location is required for Finished Good transactions.')
+          // Fallback for legacy calls? Or strict?
+          // Strict for now per requirements.
+          throw new Error(
+            'Location is required for Finished Good transactions.'
+          )
         }
 
         const finishedGoodStocks = await tx.finishedGoodStock.findUnique({
-            where: {
-                finishedGoodId_locationId: {
-                    finishedGoodId: data.finishedGoodId,
-                    locationId: data.locationId
-                }
-            }
+          where: {
+            finishedGoodId_locationId: {
+              finishedGoodId: data.finishedGoodId,
+              locationId: data.locationId,
+            },
+          },
         })
-        
+
         // Also fetch the global good to get the Name for error messages
         const finishedGoodInfo = await tx.finishedGood.findUnique({
-             where: { id: data.finishedGoodId },
-             select: { name: true }
+          where: { id: data.finishedGoodId },
+          select: { name: true },
         })
 
         const currentStock = finishedGoodStocks?.quantity || 0
@@ -174,8 +176,8 @@ export async function createStockMovement(
 
     // Update Drum Stock (Raw Material)
     if (data.drumId) {
-       // ... existing drum update ...
-       const drum = await tx.drum.findUnique({
+      // ... existing drum update ...
+      const drum = await tx.drum.findUnique({
         where: { id: data.drumId },
         select: { currentQuantity: true },
       })
@@ -204,27 +206,27 @@ export async function createStockMovement(
 
     // Update Finished Good Stock (Location Aware)
     if (data.finishedGoodId) {
-        if (!data.locationId) throw new Error('Location required')
-        
-        // Update upsert: Create if not exists (for IN), update if exists
-        await tx.finishedGoodStock.upsert({
-            where: {
-                finishedGoodId_locationId: {
-                    finishedGoodId: data.finishedGoodId,
-                    locationId: data.locationId
-                }
-            },
-            update: {
-                quantity: { increment: quantityChange }
-            },
-            create: {
-                finishedGoodId: data.finishedGoodId,
-                locationId: data.locationId,
-                // If this is OUT/ADJUSTMENT negative, it should have been caught by validation above
-                // So safe to assume if creating, it's positive or 0-base
-                quantity: quantityChange < 0 ? 0 : quantityChange // Should ideally be quantityChange
-            }
-        })
+      if (!data.locationId) throw new Error('Location required')
+
+      // Update upsert: Create if not exists (for IN), update if exists
+      await tx.finishedGoodStock.upsert({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: data.finishedGoodId,
+            locationId: data.locationId,
+          },
+        },
+        update: {
+          quantity: { increment: quantityChange },
+        },
+        create: {
+          finishedGoodId: data.finishedGoodId,
+          locationId: data.locationId,
+          // If this is OUT/ADJUSTMENT negative, it should have been caught by validation above
+          // So safe to assume if creating, it's positive or 0-base
+          quantity: quantityChange < 0 ? 0 : quantityChange, // Should ideally be quantityChange
+        },
+      })
 
       // Update Global Aggregate (Keep it in sync)
       await tx.finishedGood.update({
@@ -549,21 +551,25 @@ export interface DrumStockInInput {
  * @param input - Drum stock in input
  * @returns boolean
  */
-export async function createDrumStockIn(input: DrumStockInInput): Promise<void> {
+export async function createDrumStockIn(
+  input: DrumStockInInput
+): Promise<void> {
   const { rawMaterialId, date, description, drums } = input
 
   await prisma.$transaction(async (tx) => {
     // Check for duplicate drum labels
     for (const drum of drums) {
-        const existing = await tx.drum.findFirst({
-            where: {
-                rawMaterialId,
-                label: drum.label
-            }
-        })
-        if (existing) {
-            throw new Error(`Drum ID ${drum.label} already exists for this material`)
-        }
+      const existing = await tx.drum.findFirst({
+        where: {
+          rawMaterialId,
+          label: drum.label,
+        },
+      })
+      if (existing) {
+        throw new Error(
+          `Drum ID ${drum.label} already exists for this material`
+        )
+      }
     }
 
     // Process each drum
@@ -575,8 +581,8 @@ export async function createDrumStockIn(input: DrumStockInInput): Promise<void> 
           currentQuantity: drum.quantity,
           rawMaterialId,
           isActive: true,
-          createdAt: date
-        }
+          createdAt: date,
+        },
       })
 
       // Create Movement tied to Drum
@@ -587,8 +593,8 @@ export async function createDrumStockIn(input: DrumStockInInput): Promise<void> 
           date,
           description: description || 'Stock In (Drum)',
           rawMaterialId,
-          drumId: newDrum.id
-        }
+          drumId: newDrum.id,
+        },
       })
     }
 
@@ -598,9 +604,9 @@ export async function createDrumStockIn(input: DrumStockInInput): Promise<void> 
       where: { id: rawMaterialId },
       data: {
         currentStock: {
-          increment: totalQuantity
-        }
-      }
+          increment: totalQuantity,
+        },
+      },
     })
   })
 }

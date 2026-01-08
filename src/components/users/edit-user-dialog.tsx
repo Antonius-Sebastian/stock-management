@@ -188,9 +188,9 @@ export function EditUserDialog({
               </Label>
               <Select
                 value={formData.role}
-                onValueChange={(value: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE') =>
-                  setFormData({ ...formData, role: value })
-                }
+                onValueChange={(
+                  value: 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
+                ) => setFormData({ ...formData, role: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
@@ -202,11 +202,13 @@ export function EditUserDialog({
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
+                            <Info className="text-muted-foreground h-3 w-3" />
                           </TooltipTrigger>
                           <TooltipContent side="right" className="max-w-xs">
                             <p className="font-semibold">Akses Penuh</p>
-                            <p className="text-xs mt-1">Dapat mengakses semua fitur sistem</p>
+                            <p className="mt-1 text-xs">
+                              Dapat mengakses semua fitur sistem
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -218,11 +220,15 @@ export function EditUserDialog({
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
+                            <Info className="text-muted-foreground h-3 w-3" />
                           </TooltipTrigger>
                           <TooltipContent side="right" className="max-w-xs">
-                            <p className="font-semibold">Pembelian & Penjualan</p>
-                            <p className="text-xs mt-1">• Stok Masuk Bahan Baku</p>
+                            <p className="font-semibold">
+                              Pembelian & Penjualan
+                            </p>
+                            <p className="mt-1 text-xs">
+                              • Stok Masuk Bahan Baku
+                            </p>
                             <p className="text-xs">• Stok Keluar Produk Jadi</p>
                           </TooltipContent>
                         </Tooltip>
@@ -235,11 +241,13 @@ export function EditUserDialog({
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
+                            <Info className="text-muted-foreground h-3 w-3" />
                           </TooltipTrigger>
                           <TooltipContent side="right" className="max-w-xs">
                             <p className="font-semibold">Gudang & Produksi</p>
-                            <p className="text-xs mt-1">• Stok Masuk Produk Jadi</p>
+                            <p className="mt-1 text-xs">
+                              • Stok Masuk Produk Jadi
+                            </p>
                             <p className="text-xs">• Stok Keluar Bahan Baku</p>
                           </TooltipContent>
                         </Tooltip>

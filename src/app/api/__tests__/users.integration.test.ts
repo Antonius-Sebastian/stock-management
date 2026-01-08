@@ -64,7 +64,7 @@ describe('Users API Integration Tests', () => {
     })
 
     it('should return 403 when user is not ADMIN', async () => {
-      const mockUser = createTestUser({ role: 'FACTORY' })
+      const mockUser = createTestUser({ role: 'OFFICE_PURCHASING' })
       const mockSession = {
         user: mockUser,
         expires: new Date(Date.now() + 86400000).toISOString(),
@@ -118,7 +118,7 @@ describe('Users API Integration Tests', () => {
           email: 'new@example.com',
           password: 'Password123',
           name: 'New User',
-          role: 'FACTORY',
+          role: 'OFFICE_PURCHASING',
         }),
       })
 
@@ -131,7 +131,7 @@ describe('Users API Integration Tests', () => {
     })
 
     it('should return 403 when user is not ADMIN', async () => {
-      const mockUser = createTestUser({ role: 'OFFICE' })
+      const mockUser = createTestUser({ role: 'OFFICE_WAREHOUSE' })
       const mockSession = {
         user: mockUser,
         expires: new Date(Date.now() + 86400000).toISOString(),
@@ -147,7 +147,7 @@ describe('Users API Integration Tests', () => {
           email: 'new@example.com',
           password: 'Password123',
           name: 'New User',
-          role: 'FACTORY',
+          role: 'OFFICE_PURCHASING',
         }),
       })
 
@@ -169,7 +169,7 @@ describe('Users API Integration Tests', () => {
         email: 'new@example.com',
         password: 'Password123',
         name: 'New User',
-        role: 'FACTORY' as const,
+        role: 'OFFICE_PURCHASING' as const,
       }
 
       const mockCreated = createTestUser({
@@ -220,7 +220,7 @@ describe('Users API Integration Tests', () => {
           email: 'new@example.com',
           password: 'short', // Too short
           name: 'New User',
-          role: 'FACTORY',
+          role: 'OFFICE_PURCHASING',
         }),
       })
 

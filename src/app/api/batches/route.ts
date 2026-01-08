@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
  * @returns Created batch with details
  *
  * @remarks
- * - Requires ADMIN or FACTORY role
+ * - Requires ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE role
  * - Automatically deducts raw material stock
  * - Creates stock movement records
  * - Validates sufficient stock before creation
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Authentication and authorization required (ADMIN or FACTORY only)
+    // Authentication and authorization required (ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE)
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -127,16 +127,11 @@ export async function POST(request: NextRequest) {
       })
     )
 
-    await AuditHelpers.batchCreated(
-      validatedData.code,
-      '',
-      materials,
-      {
-        id: session.user.id,
-        name: session.user.name || session.user.username,
-        role: session.user.role,
-      }
-    )
+    await AuditHelpers.batchCreated(validatedData.code, '', materials, {
+      id: session.user.id,
+      name: session.user.name || session.user.username,
+      role: session.user.role,
+    })
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {

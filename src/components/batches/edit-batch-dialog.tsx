@@ -63,7 +63,6 @@ const formSchema = z.object({
     required_error: 'Please select a date',
   }),
   description: z.string().optional(),
-  status: z.enum(['IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
   materials: z
     .array(
       z.object({
@@ -98,7 +97,6 @@ export function EditBatchDialog({
       code: '',
       date: new Date(),
       description: '',
-      status: 'IN_PROGRESS',
       materials: [],
     },
   })
@@ -187,9 +185,6 @@ export function EditBatchDialog({
         code: batch.code,
         date: new Date(batch.date),
         description: batch.description || '',
-        status:
-          (batch.status as 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') ||
-          'IN_PROGRESS',
         materials: batch.batchUsages.map((usage) => ({
           rawMaterialId: usage.rawMaterialId,
           quantity: usage.quantity,
@@ -212,7 +207,6 @@ export function EditBatchDialog({
           code: data.code,
           date: data.date.toISOString(),
           description: data.description,
-          status: data.status,
           materials: data.materials,
         }),
       })
@@ -288,32 +282,6 @@ export function EditBatchDialog({
                   <FormControl>
                     <Input placeholder="Enter description" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || 'IN_PROGRESS'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="IN_PROGRESS">Dalam Proses</SelectItem>
-                      <SelectItem value="COMPLETED">Selesai</SelectItem>
-                      <SelectItem value="CANCELLED">Dibatalkan</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

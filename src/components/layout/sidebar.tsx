@@ -16,7 +16,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  HelpCircle,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { useSession } from 'next-auth/react'
@@ -50,11 +49,6 @@ const navigation = [
     name: 'Manajemen User',
     href: '/users',
     icon: Users,
-  },
-  {
-    name: 'Bantuan',
-    href: '/help',
-    icon: HelpCircle,
   },
 ]
 

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { UsersTable } from '@/components/users/users-table'
 import { AddUserDialog } from '@/components/users/add-user-dialog'
-import { HelpButton } from '@/components/help/help-button'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -59,7 +58,6 @@ export default function UsersPage() {
               Kelola user sistem dan peran mereka
             </p>
           </div>
-          <HelpButton pageId="users" />
         </div>
         <AddUserDialog onSuccess={fetchUsers}>
           <Button>

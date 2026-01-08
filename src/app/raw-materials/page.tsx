@@ -15,7 +15,6 @@ import { RawMaterialsTable } from '@/components/raw-materials/raw-materials-tabl
 import { AddRawMaterialDialog } from '@/components/raw-materials/add-raw-material-dialog'
 import { EditRawMaterialDialog } from '@/components/raw-materials/edit-raw-material-dialog'
 import { DrumStockEntryDialog } from '@/components/raw-materials/drum-stock-entry-dialog'
-import { HelpButton } from '@/components/help/help-button'
 import { logger } from '@/lib/logger'
 import { canManageMaterials, canCreateStockMovement } from '@/lib/rbac'
 import {
@@ -143,7 +142,6 @@ export default function RawMaterialsPage() {
               Kelola inventori bahan baku Anda
             </p>
           </div>
-          <HelpButton pageId="raw-materials" />
         </div>
         <div className="flex gap-2">
           {canCreateStockMovement(userRole, 'raw-material', 'IN') && (

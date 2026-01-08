@@ -11,13 +11,19 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FinishedGoodsTable } from '@/components/finished-goods/finished-goods-table'
 import { AddFinishedGoodDialog } from '@/components/finished-goods/add-finished-good-dialog'
 import { EditFinishedGoodDialog } from '@/components/finished-goods/edit-finished-good-dialog'
-import { HelpButton } from '@/components/help/help-button'
 import { canManageFinishedGoods } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { ManageLocationsDialog } from '@/components/locations/manage-locations-dialog'
+
+interface Location {
+  id: string
+  name: string
+  isDefault: boolean
+}
 
 export default function FinishedGoodsPage() {
   const { data: session } = useSession()
@@ -28,10 +34,15 @@ export default function FinishedGoodsPage() {
   const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(
     null
   )
+  const [locations, setLocations] = useState<Location[]>([])
+  const [selectedLocation, setSelectedLocation] = useState<string>('')
 
-  const fetchFinishedGoods = async () => {
+  const fetchFinishedGoods = async (locationId?: string) => {
     try {
-      const response = await fetch('/api/finished-goods')
+      const url = locationId
+        ? `/api/finished-goods?locationId=${locationId}`
+        : '/api/finished-goods'
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error('Failed to fetch finished goods')
       }
@@ -47,12 +58,40 @@ export default function FinishedGoodsPage() {
     }
   }
 
+  // Fetch locations
   useEffect(() => {
-    fetchFinishedGoods()
+    const fetchLocations = async () => {
+      try {
+        const response = await fetch('/api/locations')
+        if (response.ok) {
+          const data = await response.json()
+          setLocations(data)
+          // Set default to first location or default location if available
+          if (data.length > 0) {
+            const defaultLocation =
+              data.find((loc: Location) => loc.isDefault) || data[0]
+            setSelectedLocation(defaultLocation.id)
+          }
+        }
+      } catch (error) {
+        logger.error('Error fetching locations:', error)
+      }
+    }
+    fetchLocations()
   }, [])
 
+  // Fetch finished goods when location changes
+  useEffect(() => {
+    if (selectedLocation) {
+      setIsLoading(true)
+      fetchFinishedGoods(selectedLocation)
+    }
+  }, [selectedLocation])
+
   const handleSuccess = () => {
-    fetchFinishedGoods() // Refresh data
+    if (selectedLocation) {
+      fetchFinishedGoods(selectedLocation) // Refresh data
+    }
   }
 
   const handleEdit = (product: FinishedGood) => {
@@ -82,7 +121,9 @@ export default function FinishedGoodsPage() {
       }
 
       toast.success('Produk jadi berhasil dihapus')
-      fetchFinishedGoods()
+      if (selectedLocation) {
+        fetchFinishedGoods(selectedLocation)
+      }
     } catch (error) {
       logger.error('Error deleting finished good:', error)
       const message =
@@ -111,7 +152,6 @@ export default function FinishedGoodsPage() {
               Kelola inventori produk jadi Anda
             </p>
           </div>
-          <HelpButton pageId="finished-goods" />
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {canManageFinishedGoods(userRole) && (
@@ -132,6 +172,25 @@ export default function FinishedGoodsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {locations.length > 0 && (
+            <Tabs
+              value={selectedLocation}
+              onValueChange={setSelectedLocation}
+              className="mb-6"
+            >
+              <TabsList className="grid w-full grid-cols-2 sm:inline-grid sm:w-auto">
+                {locations.map((location) => (
+                  <TabsTrigger
+                    key={location.id}
+                    value={location.id}
+                    className="text-xs sm:text-sm"
+                  >
+                    {location.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
           <FinishedGoodsTable
             data={finishedGoods}
             onEdit={handleEdit}

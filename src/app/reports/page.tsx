@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { HelpButton } from '@/components/help/help-button'
 import { Button } from '@/components/ui/button'
 import { Download } from 'lucide-react'
 import { StockReportTable } from '@/components/reports/stock-report-table'
@@ -263,7 +262,6 @@ export default function ReportsPage() {
             Laporan pergerakan stok interaktif dengan rincian harian
           </p>
         </div>
-        <HelpButton pageId="reports" />
       </div>
 
       <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
@@ -323,27 +321,6 @@ export default function ReportsPage() {
             </SelectContent>
           </Select>
 
-          {/* Location filter for finished goods */}
-          {reportType === 'finished-goods' && (
-            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-              <SelectTrigger className="w-full sm:w-[160px]">
-                <SelectValue placeholder="Lokasi" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.length === 0 ? (
-                  <SelectItem value="no-location" disabled>
-                    Tidak ada lokasi
-                  </SelectItem>
-                ) : (
-                  locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          )}
         </div>
 
         <Button
@@ -380,6 +357,27 @@ export default function ReportsPage() {
             </TabsList>
 
             <TabsContent value={reportType}>
+              {/* Location tabs for finished goods */}
+              {reportType === 'finished-goods' && locations.length > 0 && (
+                <Tabs
+                  value={selectedLocation}
+                  onValueChange={setSelectedLocation}
+                  className="mb-4"
+                >
+                  <TabsList className="grid w-full grid-cols-2 sm:inline-grid sm:w-auto">
+                    {locations.map((loc) => (
+                      <TabsTrigger
+                        key={loc.id}
+                        value={loc.id}
+                        className="text-xs sm:text-sm"
+                      >
+                        {loc.name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
+
               <Tabs value={dataType} onValueChange={setDataType}>
                 <TabsList className="mb-6 grid h-auto w-full grid-cols-2 sm:grid-cols-4">
                   {DATA_TYPES.map((dt) => (

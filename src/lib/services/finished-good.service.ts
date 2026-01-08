@@ -10,24 +10,31 @@ import { FinishedGoodInput } from '@/lib/validations'
 import { FinishedGood } from '@prisma/client'
 import { PaginationOptions, PaginationMetadata } from './raw-material.service'
 
+export interface GetFinishedGoodsOptions extends PaginationOptions {
+  locationId?: string
+}
+
 /**
- * Get all finished goods with optional pagination
+ * Get all finished goods with optional pagination and location filtering
  *
- * @param options - Optional pagination parameters
+ * @param options - Optional pagination and location filter parameters
  * @returns Finished goods list, with pagination metadata if pagination is used
  *
  * @remarks
  * - If no pagination options provided, returns all finished goods
  * - Pagination: page (min 1), limit (1-100, default 50)
  * - Results ordered by creation date (newest first)
+ * - If locationId provided, currentStock will reflect stock for that location only
  */
 export async function getFinishedGoods(
-  options?: PaginationOptions
+  options?: GetFinishedGoodsOptions
 ): Promise<
   FinishedGood[] | { data: FinishedGood[]; pagination: PaginationMetadata }
 > {
+  const locationId = options?.locationId
+
   if (!options?.page && !options?.limit) {
-    return await prisma.finishedGood.findMany({
+    const finishedGoods = await prisma.finishedGood.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         stocks: {
@@ -35,6 +42,21 @@ export async function getFinishedGoods(
         },
       },
     })
+
+    // Transform to show location-specific stock if locationId provided
+    if (locationId) {
+      return finishedGoods.map((fg) => {
+        const locationStock = fg.stocks.find(
+          (stock) => stock.locationId === locationId
+        )
+        return {
+          ...fg,
+          currentStock: locationStock?.quantity || 0,
+        }
+      })
+    }
+
+    return finishedGoods
   }
 
   const page = Math.max(1, options.page || 1)
@@ -55,8 +77,21 @@ export async function getFinishedGoods(
     prisma.finishedGood.count(),
   ])
 
+  // Transform to show location-specific stock if locationId provided
+  const transformedGoods = locationId
+    ? finishedGoods.map((fg) => {
+        const locationStock = fg.stocks.find(
+          (stock) => stock.locationId === locationId
+        )
+        return {
+          ...fg,
+          currentStock: locationStock?.quantity || 0,
+        }
+      })
+    : finishedGoods
+
   return {
-    data: finishedGoods,
+    data: transformedGoods,
     pagination: {
       page,
       limit,

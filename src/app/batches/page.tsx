@@ -15,7 +15,6 @@ import { BatchesTable } from '@/components/batches/batches-table'
 import { AddBatchDialog } from '@/components/batches/add-batch-dialog'
 import { EditBatchDialog } from '@/components/batches/edit-batch-dialog'
 import { BatchDetailDialog } from '@/components/batches/batch-detail-dialog'
-import { HelpButton } from '@/components/help/help-button'
 import { canCreateBatches } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 
@@ -123,7 +122,6 @@ export default function BatchesPage() {
               Lacak konsumsi bahan baku untuk batch produksi
             </p>
           </div>
-          <HelpButton pageId="batches" />
         </div>
         {canCreateBatches(userRole) && (
           <div data-tour="create-batch">

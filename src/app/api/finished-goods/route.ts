@@ -14,22 +14,32 @@ export async function GET(request: NextRequest) {
       return ErrorResponses.unauthorized()
     }
 
-    // Parse pagination parameters (optional - defaults to all)
+    // Parse pagination and filter parameters (optional - defaults to all)
     const { searchParams } = new URL(request.url)
     const pageParam = searchParams.get('page')
     const limitParam = searchParams.get('limit')
+    const locationIdParam = searchParams.get('locationId')
 
-    // Prepare pagination options
-    const options =
-      pageParam || limitParam
-        ? {
-            page: pageParam ? parseInt(pageParam) : undefined,
-            limit: limitParam ? parseInt(limitParam) : undefined,
-          }
-        : undefined
+    // Prepare options
+    const options: {
+      page?: number
+      limit?: number
+      locationId?: string
+    } = {}
+
+    if (pageParam || limitParam) {
+      options.page = pageParam ? parseInt(pageParam) : undefined
+      options.limit = limitParam ? parseInt(limitParam) : undefined
+    }
+
+    if (locationIdParam) {
+      options.locationId = locationIdParam
+    }
 
     // Get finished goods using service
-    const result = await getFinishedGoods(options)
+    const result = await getFinishedGoods(
+      Object.keys(options).length > 0 ? options : undefined
+    )
 
     return successResponse(result)
   } catch (error) {

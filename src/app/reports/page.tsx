@@ -320,7 +320,6 @@ export default function ReportsPage() {
               })}
             </SelectContent>
           </Select>
-
         </div>
 
         <Button
@@ -344,7 +343,7 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           <Tabs value={reportType} onValueChange={setReportType}>
-            <TabsList className="mb-4 grid w-full grid-cols-2 sm:inline-grid sm:w-auto">
+            <TabsList className="mb-4 grid w-full grid-cols-2 justify-start sm:inline-flex sm:w-auto">
               <TabsTrigger value="raw-materials" className="text-xs sm:text-sm">
                 Laporan Bahan Baku
               </TabsTrigger>
@@ -362,14 +361,14 @@ export default function ReportsPage() {
                 <Tabs
                   value={selectedLocation}
                   onValueChange={setSelectedLocation}
-                  className="mb-4"
+                  className="mb-4 w-full"
                 >
-                  <TabsList className="grid w-full grid-cols-2 sm:inline-grid sm:w-auto">
+                  <TabsList className="grid w-full grid-cols-2 justify-start gap-1 sm:inline-flex sm:w-auto sm:grid-cols-none">
                     {locations.map((loc) => (
                       <TabsTrigger
                         key={loc.id}
                         value={loc.id}
-                        className="text-xs sm:text-sm"
+                        className="flex-1 sm:flex-initial"
                       >
                         {loc.name}
                       </TabsTrigger>
@@ -379,7 +378,7 @@ export default function ReportsPage() {
               )}
 
               <Tabs value={dataType} onValueChange={setDataType}>
-                <TabsList className="mb-6 grid h-auto w-full grid-cols-2 sm:grid-cols-4">
+                <TabsList className="mb-6 grid h-auto w-full grid-cols-2 justify-start sm:grid-cols-4">
                   {DATA_TYPES.map((dt) => (
                     <TabsTrigger
                       key={dt.value}

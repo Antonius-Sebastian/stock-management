@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { RawMaterial } from '@prisma/client'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
@@ -64,6 +64,22 @@ export default function RawMaterialsPage() {
   useEffect(() => {
     fetchRawMaterials()
   }, [])
+
+  // Sort raw materials: items with stock first (descending), then items with 0 stock
+  const sortedRawMaterials = useMemo(() => {
+    return [...rawMaterials].sort((a, b) => {
+      const aHasStock = a.currentStock > 0
+      const bHasStock = b.currentStock > 0
+
+      // If both have stock or both don't have stock, sort by stock descending
+      if (aHasStock === bHasStock) {
+        return b.currentStock - a.currentStock
+      }
+
+      // Items with stock come first
+      return aHasStock ? -1 : 1
+    })
+  }, [rawMaterials])
 
   const handleSuccess = () => {
     fetchRawMaterials()
@@ -162,7 +178,7 @@ export default function RawMaterialsPage() {
         </CardHeader>
         <CardContent>
           <RawMaterialsTable
-            data={rawMaterials}
+            data={sortedRawMaterials}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onRefresh={handleSuccess}

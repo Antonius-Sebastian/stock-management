@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import {
   Card,
@@ -41,6 +41,14 @@ interface StockReportResponse {
   }
 }
 
+// Nested structure for finished goods (by location), flat for raw materials
+interface AllReportData {
+  [dataType: string]:
+    | StockReportResponse
+    | { [locationId: string]: StockReportResponse | null }
+    | null
+}
+
 interface Location {
   id: string
   name: string
@@ -77,39 +85,148 @@ export default function ReportsPage() {
   const [availableYears, setAvailableYears] = useState<string[]>([])
   const [year, setYear] = useState('')
   const [month, setMonth] = useState('')
-  const [reportData, setReportData] = useState<StockReportResponse | null>(null)
+  const [allReportData, setAllReportData] = useState<AllReportData>({
+    'stok-awal': null,
+    'stok-masuk': null,
+    'stok-keluar': null,
+    'stok-sisa': null,
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [isLoadingYears, setIsLoadingYears] = useState(true)
   const [locations, setLocations] = useState<Location[]>([])
   const [selectedLocation, setSelectedLocation] = useState<string>('')
 
-  const fetchReport = async () => {
+  // Filter by dataType and location on client side
+  const reportData = useMemo(() => {
+    const dataTypeData = allReportData[dataType]
+    if (!dataTypeData) return null
+
+    // For finished goods, filter by location
+    if (reportType === 'finished-goods') {
+      if (
+        typeof dataTypeData === 'object' &&
+        dataTypeData !== null &&
+        !('data' in dataTypeData)
+      ) {
+        // Safety check: ensure selectedLocation is set
+        if (!selectedLocation) return null
+        return (
+          (
+            dataTypeData as { [locationId: string]: StockReportResponse | null }
+          )[selectedLocation] || null
+        )
+      }
+    }
+
+    // For raw materials, return directly
+    return dataTypeData as StockReportResponse | null
+  }, [allReportData, dataType, reportType, selectedLocation])
+
+  // Fetch all dataTypes (and locations for finished goods) in parallel
+  const fetchAllReportData = async () => {
     setIsLoading(true)
     try {
-      const params = new URLSearchParams({
+      const baseParams = new URLSearchParams({
         year,
         month,
         type: reportType,
-        dataType,
       })
 
-      // Add location filter for finished goods (required)
+      // For finished goods: fetch all locations × all dataTypes
       if (reportType === 'finished-goods') {
-        if (!selectedLocation) {
+        if (locations.length === 0) {
           toast.error('Silakan pilih lokasi terlebih dahulu')
           setIsLoading(false)
           return
         }
-        params.append('locationId', selectedLocation)
-      }
 
-      const response = await fetch(`/api/reports/stock?${params}`)
-      if (!response.ok) {
-        throw new Error('Gagal memuat laporan')
+        // Create promises for all combinations: locations × dataTypes
+        const allPromises: Array<
+          Promise<{
+            dataType: string
+            locationId: string
+            data: StockReportResponse
+          }>
+        > = []
+
+        for (const location of locations) {
+          for (const dt of DATA_TYPES) {
+            const params = new URLSearchParams(baseParams)
+            params.append('dataType', dt.value)
+            params.append('locationId', location.id)
+
+            const promise = fetch(`/api/reports/stock?${params}`).then(
+              async (response) => {
+                if (!response.ok) {
+                  throw new Error(
+                    `Gagal memuat laporan ${dt.label} untuk ${location.name}`
+                  )
+                }
+                const data = await response.json()
+                return { dataType: dt.value, locationId: location.id, data }
+              }
+            )
+
+            allPromises.push(promise)
+          }
+        }
+
+        const results = await Promise.all(allPromises)
+
+        // Store in nested structure: allReportData[dataType][locationId]
+        const newAllReportData: AllReportData = {
+          'stok-awal': {},
+          'stok-masuk': {},
+          'stok-keluar': {},
+          'stok-sisa': {},
+        }
+
+        results.forEach(({ dataType, locationId, data }) => {
+          if (
+            typeof newAllReportData[dataType] === 'object' &&
+            newAllReportData[dataType] !== null &&
+            !('data' in newAllReportData[dataType])
+          ) {
+            ;(
+              newAllReportData[dataType] as {
+                [locationId: string]: StockReportResponse | null
+              }
+            )[locationId] = data
+          }
+        })
+
+        setAllReportData(newAllReportData)
+      } else {
+        // For raw materials: fetch all 4 dataTypes in parallel
+        const dataTypePromises = DATA_TYPES.map(async (dt) => {
+          const params = new URLSearchParams(baseParams)
+          params.append('dataType', dt.value)
+
+          const response = await fetch(`/api/reports/stock?${params}`)
+          if (!response.ok) {
+            throw new Error(`Gagal memuat laporan ${dt.label}`)
+          }
+          const data = await response.json()
+          return { dataType: dt.value, data }
+        })
+
+        const results = await Promise.all(dataTypePromises)
+
+        // Store all dataTypes in state
+        const newAllReportData: AllReportData = {
+          'stok-awal': null,
+          'stok-masuk': null,
+          'stok-keluar': null,
+          'stok-sisa': null,
+        }
+
+        results.forEach(({ dataType, data }) => {
+          newAllReportData[dataType] = data
+        })
+
+        setAllReportData(newAllReportData)
       }
-      const data = await response.json()
-      setReportData(data)
     } catch (error) {
       logger.error('Error fetching report:', error)
       toast.error('Gagal memuat laporan. Silakan coba lagi.')
@@ -182,23 +299,38 @@ export default function ReportsPage() {
     }
     if (reportType === 'finished-goods') {
       fetchLocations()
+      // Reset allReportData structure when switching to finished goods
+      setAllReportData({
+        'stok-awal': {},
+        'stok-masuk': {},
+        'stok-keluar': {},
+        'stok-sisa': {},
+      })
     } else {
       // Clear location when switching to raw materials
       setSelectedLocation('')
+      // Reset allReportData structure when switching to raw materials
+      setAllReportData({
+        'stok-awal': null,
+        'stok-masuk': null,
+        'stok-keluar': null,
+        'stok-sisa': null,
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportType])
 
   useEffect(() => {
     if (!isLoadingYears && year && month) {
-      // For finished goods, require location to be selected
-      if (reportType === 'finished-goods' && !selectedLocation) {
+      // For finished goods, require locations to be loaded
+      if (reportType === 'finished-goods' && locations.length === 0) {
         return
       }
-      fetchReport()
+      fetchAllReportData() // Fetch all dataTypes (and locations for finished goods)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, dataType, year, month, isLoadingYears, selectedLocation])
+  }, [reportType, year, month, isLoadingYears, locations.length])
+  // Note: dataType and selectedLocation removed from dependencies - filtered client-side
 
   const getReportTitle = () => {
     const typeLabel =

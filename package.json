@@ -15,7 +15,9 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:reset": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/reset-db.ts",
+    "db:create-admin": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/create-admin.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

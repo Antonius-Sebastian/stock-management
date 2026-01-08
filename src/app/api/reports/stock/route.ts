@@ -10,6 +10,7 @@ const stockReportSchema = z.object({
   month: z.coerce.number().int().min(1).max(12),
   type: z.enum(['raw-materials', 'finished-goods']),
   dataType: z.enum(['stok-awal', 'stok-masuk', 'stok-keluar', 'stok-sisa']),
+  locationId: z.string().optional(), // Optional locationId for finished goods
 })
 
 export async function GET(request: NextRequest) {
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
       month: searchParams.get('month'),
       type: searchParams.get('type'),
       dataType: searchParams.get('dataType'),
+      locationId: searchParams.get('locationId') || undefined,
     }
 
     const validatedQuery = stockReportSchema.parse(query)
@@ -84,9 +86,20 @@ export async function GET(request: NextRequest) {
         code: 'kode' in item ? (item as { kode?: string }).kode || '' : '',
       }
 
+      // Filter movements by locationId for finished goods if provided
+      let filteredMovements = item.stockMovements
+      if (
+        validatedQuery.type === 'finished-goods' &&
+        validatedQuery.locationId
+      ) {
+        filteredMovements = item.stockMovements.filter(
+          (movement) => movement.locationId === validatedQuery.locationId
+        )
+      }
+
       // Calculate opening stock at the start of the month
       // This is based on all movements BEFORE the start of the selected month
-      const movementsBeforeMonth = item.stockMovements.filter((movement) => {
+      const movementsBeforeMonth = filteredMovements.filter((movement) => {
         const movementDate = new Date(movement.date)
         return movementDate < startDate
       })
@@ -101,7 +114,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Get movements only within the selected month
-      const movementsInMonth = item.stockMovements.filter((movement) => {
+      const movementsInMonth = filteredMovements.filter((movement) => {
         const movementDate = new Date(movement.date)
         return movementDate >= startDate && movementDate <= endDate
       })

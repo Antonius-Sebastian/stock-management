@@ -93,16 +93,6 @@ export default function LoginPage() {
               {isLoading ? 'Memproses...' : 'Masuk'}
             </Button>
           </form>
-
-          <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-700">
-            <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-              Kredensial default untuk testing:
-              <br />
-              Username: <span className="font-mono font-medium">admin</span> |
-              Password:{' '}
-              <span className="font-mono font-medium">password123</span>
-            </p>
-          </div>
         </div>
       </div>
     </div>

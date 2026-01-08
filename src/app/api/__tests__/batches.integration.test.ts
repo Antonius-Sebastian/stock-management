@@ -58,6 +58,30 @@ vi.mock('@/lib/audit', () => ({
     batchUpdated: vi.fn().mockResolvedValue(undefined),
     batchDeleted: vi.fn().mockResolvedValue(undefined),
   },
+  getIpAddress: vi.fn(() => '127.0.0.1'),
+}))
+
+// Mock rate limit for integration test
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 49,
+    resetInMs: 1000,
+    limit: 50,
+  }),
+  RateLimits: {
+    BATCH_CREATION: { limit: 50, windowMs: 3600000, keyPrefix: 'batch:create' },
+  },
+  createRateLimitHeaders: vi.fn(() => ({})),
+}))
+
+// Mock DB for audit
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    rawMaterial: {
+      findUnique: vi.fn().mockResolvedValue({ name: 'Material' }),
+    },
+  },
 }))
 
 describe('Batches API Integration Tests', () => {

@@ -141,6 +141,9 @@ export async function GET(request: NextRequest) {
           )
         })
 
+        // Calculate total IN quantity for the day
+        // Note: This includes all IN movements regardless of drumId (for raw materials)
+        // All movements with type === 'IN' are included in the calculation
         const inQty = dayMovements
           .filter((m) => m.type === 'IN')
           .reduce((sum, m) => sum + m.quantity, 0)

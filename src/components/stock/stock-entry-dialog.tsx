@@ -44,7 +44,8 @@ interface Location {
 const createFormSchema = (
   items: Item[],
   type: 'in' | 'out' | 'IN' | 'OUT',
-  itemType: 'raw-material' | 'finished-good'
+  itemType: 'raw-material' | 'finished-good',
+  _defaultLocationId?: string
 ) => {
   const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
   const isRawMaterial = itemType === 'raw-material'
@@ -123,8 +124,32 @@ const createFormSchema = (
             if (selectedDrum) {
               return (data.quantity || 0) <= selectedDrum.currentQuantity
             }
+          } else if (
+            itemType === 'finished-good' &&
+            selectedItem &&
+            data.locationId
+          ) {
+            // For finished goods OUT, check location-specific stock
+            const itemWithStocks = selectedItem as Item & {
+              stocks?: Array<{ locationId: string; quantity: number }>
+            }
+            if (itemWithStocks.stocks) {
+              const stock = itemWithStocks.stocks.find(
+                (s) => s.locationId === data.locationId
+              )
+              if (stock) {
+                return (data.quantity || 0) <= stock.quantity
+              }
+            }
+            // Fallback: if no location stock found, check aggregate (shouldn't happen due to filtering)
+            if ('currentStock' in selectedItem) {
+              return (
+                (data.quantity || 0) <=
+                (selectedItem as Item & { currentStock: number }).currentStock
+              )
+            }
           } else if (selectedItem && 'currentStock' in selectedItem) {
-            // For finished goods, check item stock
+            // Fallback for other cases
             return (
               (data.quantity || 0) <=
               (selectedItem as Item & { currentStock: number }).currentStock
@@ -195,7 +220,12 @@ export function StockEntryDialog({
   const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
   const isRawMaterial = actualItemType === 'raw-material'
 
-  const formSchema = createFormSchema(items, type, actualItemType)
+  const formSchema = createFormSchema(
+    items,
+    type,
+    actualItemType,
+    defaultLocationId
+  )
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -309,31 +339,42 @@ export function StockEntryDialog({
   // Watch locationId for finished goods OUT filtering
   const selectedLocationId = form.watch('locationId')
 
-  // Client-side filtering for finished goods OUT based on location
+  // Client-side filtering for finished goods based on location
   const filteredItems = useMemo(() => {
-    if (actualItemType !== 'finished-good' || normalizedType !== 'OUT') {
-      // For non-finished-good OUT, use existing filtering logic
-      const isOutMovement = normalizedType === 'OUT'
-      return isOutMovement
-        ? items.filter((i) => (i.currentStock ?? 0) > 0)
-        : items
+    // For finished goods IN or OUT, filter by selected location
+    if (actualItemType === 'finished-good') {
+      // For finished goods IN, show ALL items (not filtered by stock)
+      // But when displaying stock, show location-specific stock
+      if (normalizedType === 'IN') {
+        if (!selectedLocationId) return [] // Require location selection for IN
+
+        // Show all finished goods, regardless of stock
+        return items
+      }
+
+      // For finished goods OUT, filter by selected location and show only items with stock > 0
+      if (normalizedType === 'OUT') {
+        if (!selectedLocationId) return []
+
+        return items.filter((item) => {
+          const itemWithStocks = item as Item & {
+            stocks?: Array<{ locationId: string; quantity: number }>
+          }
+          if (!itemWithStocks.stocks) return false
+
+          const stock = itemWithStocks.stocks.find(
+            (s) => s.locationId === selectedLocationId
+          )
+          return stock && stock.quantity > 0
+        })
+      }
     }
 
-    // For finished goods OUT, filter by selected location
-    if (!selectedLocationId) return []
-
-    return items.filter((item) => {
-      // Check if item has stocks array (extended Item type for finished goods)
-      const itemWithStocks = item as Item & {
-        stocks?: Array<{ locationId: string; quantity: number }>
-      }
-      if (!itemWithStocks.stocks) return false
-
-      const stock = itemWithStocks.stocks.find(
-        (s) => s.locationId === selectedLocationId
-      )
-      return stock && stock.quantity > 0
-    })
+    // For raw materials, use existing filtering logic
+    const isOutMovement = normalizedType === 'OUT'
+    return isOutMovement
+      ? items.filter((i) => (i.currentStock ?? 0) > 0)
+      : items
   }, [items, actualItemType, normalizedType, selectedLocationId])
 
   const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
@@ -346,10 +387,7 @@ export function StockEntryDialog({
         ...(actualItemType === 'raw-material'
           ? { rawMaterialId: data.itemId, drumId: data.drumId }
           : { finishedGoodId: data.itemId, locationId: data.locationId }),
-        // Append batch code to description if provided
-        description: data.batchCode
-          ? `${data.description || ''} [Batch: ${data.batchCode}]`.trim()
-          : data.description,
+        description: data.description,
       }
 
       const response = await fetch('/api/stock-movements', {
@@ -424,39 +462,41 @@ export function StockEntryDialog({
             onSubmit={form.handleSubmit(handleFormSubmit)}
             className="space-form overflow-hidden"
           >
-            {/* Location selector for finished goods OUT - show first */}
-            {actualItemType === 'finished-good' &&
-              normalizedType === 'OUT' &&
-              !entityId && (
-                <FormField
-                  control={form.control}
-                  name="locationId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lokasi</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih lokasi" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {locations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+            {/* Location selector for finished goods IN and OUT - show first */}
+            {actualItemType === 'finished-good' && !entityId && (
+              <FormField
+                control={form.control}
+                name="locationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lokasi</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value)
+                        // Reset item selection when location changes
+                        form.setValue('itemId', '')
+                      }}
+                      defaultValue={field.value || defaultLocationId}
+                      value={field.value || defaultLocationId}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih lokasi" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {!entityId && (
               <FormField
@@ -465,12 +505,10 @@ export function StockEntryDialog({
                 render={({ field }) => {
                   const normalizedType =
                     typeof type === 'string' ? type.toUpperCase() : type
-                  const isFinishedGoodOut =
-                    actualItemType === 'finished-good' &&
-                    normalizedType === 'OUT'
+                  const isFinishedGood = actualItemType === 'finished-good'
 
-                  // Use filteredItems for finished goods OUT, otherwise use existing logic
-                  const availableItems = isFinishedGoodOut
+                  // Use filteredItems for finished goods (IN and OUT), otherwise use existing logic
+                  const availableItems = isFinishedGood
                     ? filteredItems
                     : normalizedType === 'OUT'
                       ? items.filter((i) => (i.currentStock ?? 0) > 0)
@@ -494,12 +532,11 @@ export function StockEntryDialog({
                               ? 'bahan baku'
                               : 'produk jadi'
                           }`}
-                          disabled={
-                            isFinishedGoodOut && !form.watch('locationId')
-                          }
+                          disabled={isFinishedGood && !form.watch('locationId')}
                         />
                       </FormControl>
-                      {isFinishedGoodOut &&
+                      {isFinishedGood &&
+                        normalizedType === 'OUT' &&
                         filteredItems.length === 0 &&
                         form.watch('locationId') && (
                           <p className="text-muted-foreground text-xs">
@@ -558,7 +595,7 @@ export function StockEntryDialog({
                           </SelectTrigger>
                           <SelectContent>
                             {availableDrums.length === 0 ? (
-                              <div className="py-2 text-center text-sm text-muted-foreground">
+                              <div className="text-muted-foreground py-2 text-center text-sm">
                                 {!selectedItemId
                                   ? 'Pilih bahan baku terlebih dahulu'
                                   : normalizedType === 'OUT'
@@ -620,13 +657,10 @@ export function StockEntryDialog({
                     (d) => d.id === selectedDrumId
                   )
                   availableStock = selectedDrum?.currentQuantity || 0
-                } else if (
-                  actualItemType === 'finished-good' &&
-                  normalizedType === 'OUT' &&
-                  selectedItem
-                ) {
-                  // For finished goods OUT, get stock from selected location
-                  const selectedLocId = form.watch('locationId')
+                } else if (actualItemType === 'finished-good' && selectedItem) {
+                  // For finished goods (both IN and OUT), get stock from selected location
+                  const selectedLocId =
+                    form.watch('locationId') || defaultLocationId
                   const itemWithStocks = selectedItem as Item & {
                     stocks?: Array<{ locationId: string; quantity: number }>
                   }
@@ -637,12 +671,12 @@ export function StockEntryDialog({
                     availableStock = stock?.quantity || 0
                   }
                 } else if (selectedItem && 'currentStock' in selectedItem) {
-                  availableStock = (selectedItem as Item & { currentStock: number })
-                    .currentStock
+                  availableStock = (
+                    selectedItem as Item & { currentStock: number }
+                  ).currentStock
                 }
 
-                const isQuantityDisabled =
-                  isRawMaterial && !selectedDrumId
+                const isQuantityDisabled = isRawMaterial && !selectedDrumId
 
                 return (
                   <FormItem className="min-w-0">
@@ -677,6 +711,15 @@ export function StockEntryDialog({
                           Stok saat ini: {availableStock.toLocaleString()}
                         </p>
                       )}
+                    {actualItemType === 'finished-good' &&
+                      normalizedType === 'IN' &&
+                      selectedItem &&
+                      availableStock > 0 && (
+                        <p className="text-muted-foreground text-xs">
+                          Stok saat ini di lokasi ini:{' '}
+                          {availableStock.toLocaleString()}
+                        </p>
+                      )}
                     <FormMessage />
                   </FormItem>
                 )
@@ -700,54 +743,7 @@ export function StockEntryDialog({
               )}
             />
 
-            {/* Location selector for finished goods IN - show after date */}
-            {actualItemType === 'finished-good' && normalizedType === 'IN' && (
-              <FormField
-                control={form.control}
-                name="locationId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Lokasi</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih lokasi" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Batch code - only for finished goods OUT */}
-            {actualItemType === 'finished-good' && normalizedType === 'OUT' && (
-              <FormField
-                control={form.control}
-                name="batchCode"
-                render={({ field }) => (
-                  <FormItem className="min-w-0">
-                    <FormLabel>Kode Batch (Opsional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Contoh: BATCH-001" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            {/* Batch code removed for finished goods OUT per requirements */}
 
             <FormField
               control={form.control}

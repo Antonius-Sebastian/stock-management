@@ -234,151 +234,154 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
   }
 
   // Transaction: Create batch and all related records
-  return await prisma.$transaction(async (tx) => {
-    // Step 1: Validate all raw materials exist and calculate total quantities
-    for (const material of data.materials) {
-      const totalQuantity = material.drums.reduce(
-        (sum, drum) => sum + drum.quantity,
-        0
-      )
+  // Set timeout to 30 seconds to handle large batches
+  return await prisma.$transaction(
+    async (tx) => {
+      // Step 1: Validate all raw materials exist and calculate total quantities
+      for (const material of data.materials) {
+        const totalQuantity = material.drums.reduce(
+          (sum, drum) => sum + drum.quantity,
+          0
+        )
 
-      const rawMaterials = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
+        const rawMaterials = await tx.$queryRaw<
+          Array<{ id: string; name: string; currentStock: number }>
+        >`
         SELECT id, name, "currentStock"
         FROM raw_materials
         WHERE id = ${material.rawMaterialId}
         FOR UPDATE
       `
 
-      if (rawMaterials.length === 0) {
-        throw new Error(`Raw material not found: ${material.rawMaterialId}`)
-      }
-
-      const rawMaterial = rawMaterials[0]
-
-      if (rawMaterial.currentStock < totalQuantity) {
-        throw new Error(
-          `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
-        )
-      }
-    }
-
-    // Step 2: Create the batch
-    const batch = await tx.batch.create({
-      data: {
-        code: data.code,
-        date: data.date,
-        description: data.description,
-      },
-    })
-
-    // Step 3: Process each raw material and its drums
-    for (const material of data.materials) {
-      const totalQuantity = material.drums.reduce(
-        (sum, drum) => sum + drum.quantity,
-        0
-      )
-
-      // Validate Raw Material Stock (Aggregate)
-      const rawMaterials = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
-        SELECT id, name, "currentStock"
-        FROM raw_materials
-        WHERE id = ${material.rawMaterialId}
-        FOR UPDATE
-      `
-
-      if (rawMaterials.length === 0) {
-        throw new Error(`Raw material not found: ${material.rawMaterialId}`)
-      }
-
-      const rawMaterial = rawMaterials[0]
-
-      if (rawMaterial.currentStock < totalQuantity) {
-        throw new Error(
-          `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
-        )
-      }
-
-      // Process each drum for this material
-      for (const drumEntry of material.drums) {
-        // Validate drum exists and has sufficient stock
-        if (drumEntry.drumId) {
-          const drum = await tx.drum.findUnique({
-            where: { id: drumEntry.drumId },
-          })
-          if (!drum) {
-            throw new Error(`Drum not found: ${drumEntry.drumId}`)
-          }
-          if (drum.rawMaterialId !== material.rawMaterialId) {
-            throw new Error(
-              `Drum ${drum.label} does not belong to material ${rawMaterial.name}`
-            )
-          }
-          if (drum.currentQuantity < drumEntry.quantity) {
-            throw new Error(
-              `Insufficient stock in drum ${drum.label}. Available: ${drum.currentQuantity}, Required: ${drumEntry.quantity}`
-            )
-          }
+        if (rawMaterials.length === 0) {
+          throw new Error(`Raw material not found: ${material.rawMaterialId}`)
         }
 
-        // Create batch usage
-        await tx.batchUsage.create({
-          data: {
-            batchId: batch.id,
-            rawMaterialId: material.rawMaterialId,
-            quantity: drumEntry.quantity,
-            drumId: drumEntry.drumId,
-          },
-        })
+        const rawMaterial = rawMaterials[0]
 
-        // Create stock OUT movement
-        await tx.stockMovement.create({
-          data: {
-            type: 'OUT',
-            quantity: drumEntry.quantity,
-            date: data.date,
-            description: `Batch production: ${data.code}`,
-            rawMaterialId: material.rawMaterialId,
-            batchId: batch.id,
-            drumId: drumEntry.drumId,
-          },
-        })
-
-        // Update Drum Stock if drumId exists
-        if (drumEntry.drumId) {
-          const drum = await tx.drum.findUnique({
-            where: { id: drumEntry.drumId },
-          })
-          if (!drum) throw new Error(`Drum not found: ${drumEntry.drumId}`)
-
-          await tx.drum.update({
-            where: { id: drumEntry.drumId },
-            data: {
-              currentQuantity: { decrement: drumEntry.quantity },
-              isActive: {
-                set: drum.currentQuantity - drumEntry.quantity > 0,
-              },
-            },
-          })
+        if (rawMaterial.currentStock < totalQuantity) {
+          throw new Error(
+            `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
+          )
         }
       }
 
-      // Update Raw Material Aggregate Stock (once per material, total of all drums)
-      await tx.rawMaterial.update({
-        where: { id: material.rawMaterialId },
+      // Step 2: Create the batch
+      const batch = await tx.batch.create({
         data: {
-          currentStock: {
-            decrement: totalQuantity,
-          },
+          code: data.code,
+          date: data.date,
+          description: data.description,
         },
       })
-    }
 
-    return batch
-  })
+      // Step 3: Process each raw material and its drums
+      for (const material of data.materials) {
+        const totalQuantity = material.drums.reduce(
+          (sum, drum) => sum + drum.quantity,
+          0
+        )
+
+        // Validate Raw Material Stock (Aggregate)
+        const rawMaterials = await tx.$queryRaw<
+          Array<{ id: string; name: string; currentStock: number }>
+        >`
+        SELECT id, name, "currentStock"
+        FROM raw_materials
+        WHERE id = ${material.rawMaterialId}
+        FOR UPDATE
+      `
+
+        if (rawMaterials.length === 0) {
+          throw new Error(`Raw material not found: ${material.rawMaterialId}`)
+        }
+
+        const rawMaterial = rawMaterials[0]
+
+        if (rawMaterial.currentStock < totalQuantity) {
+          throw new Error(
+            `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
+          )
+        }
+
+        // Process each drum for this material
+        for (const drumEntry of material.drums) {
+          // Validate drum exists and has sufficient stock
+          let drum = null
+          if (drumEntry.drumId) {
+            drum = await tx.drum.findUnique({
+              where: { id: drumEntry.drumId },
+            })
+            if (!drum) {
+              throw new Error(`Drum not found: ${drumEntry.drumId}`)
+            }
+            if (drum.rawMaterialId !== material.rawMaterialId) {
+              throw new Error(
+                `Drum ${drum.label} does not belong to material ${rawMaterial.name}`
+              )
+            }
+            if (drum.currentQuantity < drumEntry.quantity) {
+              throw new Error(
+                `Insufficient stock in drum ${drum.label}. Available: ${drum.currentQuantity}, Required: ${drumEntry.quantity}`
+              )
+            }
+          }
+
+          // Create batch usage
+          await tx.batchUsage.create({
+            data: {
+              batchId: batch.id,
+              rawMaterialId: material.rawMaterialId,
+              quantity: drumEntry.quantity,
+              drumId: drumEntry.drumId,
+            },
+          })
+
+          // Create stock OUT movement
+          await tx.stockMovement.create({
+            data: {
+              type: 'OUT',
+              quantity: drumEntry.quantity,
+              date: data.date,
+              description: `Batch production: ${data.code}`,
+              rawMaterialId: material.rawMaterialId,
+              batchId: batch.id,
+              drumId: drumEntry.drumId,
+            },
+          })
+
+          // Update Drum Stock if drumId exists (reuse the drum object from validation)
+          if (drumEntry.drumId && drum) {
+            await tx.drum.update({
+              where: { id: drumEntry.drumId },
+              data: {
+                currentQuantity: { decrement: drumEntry.quantity },
+                isActive: {
+                  set: drum.currentQuantity - drumEntry.quantity > 0,
+                },
+              },
+            })
+          }
+        }
+
+        // Update Raw Material Aggregate Stock (once per material, total of all drums)
+        await tx.rawMaterial.update({
+          where: { id: material.rawMaterialId },
+          data: {
+            currentStock: {
+              decrement: totalQuantity,
+            },
+          },
+        })
+      }
+
+      return batch
+    },
+    {
+      maxWait: 10000, // Maximum time to wait for a transaction slot (10 seconds)
+      timeout: 30000, // Maximum time the transaction can run (30 seconds)
+    }
+  )
 }
 
 /**
@@ -453,190 +456,195 @@ export async function updateBatch(
   }
 
   // Transaction: Handle batch updates
-  return await prisma.$transaction(async (tx) => {
-    // Step 1: Restore stock for all old materials and drums
-    for (const oldUsage of existingBatch.batchUsages) {
-      // Restore raw material stock
-      await tx.rawMaterial.update({
-        where: { id: oldUsage.rawMaterialId },
-        data: {
-          currentStock: {
-            increment: oldUsage.quantity,
-          },
-        },
-      })
-
-      // Restore drum stock if it exists
-      if (oldUsage.drumId) {
-        await tx.drum.update({
-          where: { id: oldUsage.drumId },
+  // Set timeout to 30 seconds to handle large batches
+  return await prisma.$transaction(
+    async (tx) => {
+      // Step 1: Restore stock for all old materials and drums
+      for (const oldUsage of existingBatch.batchUsages) {
+        // Restore raw material stock
+        await tx.rawMaterial.update({
+          where: { id: oldUsage.rawMaterialId },
           data: {
-            currentQuantity: {
+            currentStock: {
               increment: oldUsage.quantity,
             },
-            isActive: true, // Reactivate if it was deactivated
+          },
+        })
+
+        // Restore drum stock if it exists
+        if (oldUsage.drumId) {
+          await tx.drum.update({
+            where: { id: oldUsage.drumId },
+            data: {
+              currentQuantity: {
+                increment: oldUsage.quantity,
+              },
+              isActive: true, // Reactivate if it was deactivated
+            },
+          })
+        }
+
+        // Delete old stock movement
+        await tx.stockMovement.deleteMany({
+          where: {
+            batchId: id,
+            rawMaterialId: oldUsage.rawMaterialId,
           },
         })
       }
 
-      // Delete old stock movement
-      await tx.stockMovement.deleteMany({
-        where: {
-          batchId: id,
-          rawMaterialId: oldUsage.rawMaterialId,
-        },
+      // Step 2: Delete all old batch usages
+      await tx.batchUsage.deleteMany({
+        where: { batchId: id },
       })
-    }
 
-    // Step 2: Delete all old batch usages
-    await tx.batchUsage.deleteMany({
-      where: { batchId: id },
-    })
+      // Step 3: Create new batch usages and deduct stock
+      for (const material of data.materials) {
+        const totalQuantity = material.drums.reduce(
+          (sum, drum) => sum + drum.quantity,
+          0
+        )
 
-    // Step 3: Create new batch usages and deduct stock
-    for (const material of data.materials) {
-      const totalQuantity = material.drums.reduce(
-        (sum, drum) => sum + drum.quantity,
-        0
-      )
-
-      // Check if raw material has enough stock with row locking
-      const rawMaterials = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
+        // Check if raw material has enough stock with row locking
+        const rawMaterials = await tx.$queryRaw<
+          Array<{ id: string; name: string; currentStock: number }>
+        >`
         SELECT id, name, "currentStock"
         FROM raw_materials
         WHERE id = ${material.rawMaterialId}
         FOR UPDATE
       `
 
-      if (rawMaterials.length === 0) {
-        throw new Error(`Raw material not found: ${material.rawMaterialId}`)
-      }
-
-      const rawMaterial = rawMaterials[0]
-
-      if (rawMaterial.currentStock < totalQuantity) {
-        throw new Error(
-          `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
-        )
-      }
-
-      // Process each drum for this material
-      for (const drumEntry of material.drums) {
-        // Validate drum exists and has sufficient stock
-        if (drumEntry.drumId) {
-          const drum = await tx.drum.findUnique({
-            where: { id: drumEntry.drumId },
-          })
-          if (!drum) {
-            throw new Error(`Drum not found: ${drumEntry.drumId}`)
-          }
-          if (drum.rawMaterialId !== material.rawMaterialId) {
-            throw new Error(
-              `Drum ${drum.label} does not belong to material ${rawMaterial.name}`
-            )
-          }
-          if (drum.currentQuantity < drumEntry.quantity) {
-            throw new Error(
-              `Insufficient stock in drum ${drum.label}. Available: ${drum.currentQuantity}, Required: ${drumEntry.quantity}`
-            )
-          }
+        if (rawMaterials.length === 0) {
+          throw new Error(`Raw material not found: ${material.rawMaterialId}`)
         }
 
-        // Create batch usage
-        await tx.batchUsage.create({
-          data: {
-            batchId: id,
-            rawMaterialId: material.rawMaterialId,
-            quantity: drumEntry.quantity,
-            drumId: drumEntry.drumId,
-          },
-        })
+        const rawMaterial = rawMaterials[0]
 
-        // Create stock movement (OUT)
-        await tx.stockMovement.create({
-          data: {
-            type: 'OUT',
-            quantity: drumEntry.quantity,
-            date: data.date,
-            rawMaterialId: material.rawMaterialId,
-            batchId: id,
-            description: `Batch ${data.code} production`,
-            drumId: drumEntry.drumId,
-          },
-        })
+        if (rawMaterial.currentStock < totalQuantity) {
+          throw new Error(
+            `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
+          )
+        }
 
-        // Update Drum Stock if drumId exists
-        if (drumEntry.drumId) {
-          const drum = await tx.drum.findUnique({
-            where: { id: drumEntry.drumId },
-          })
-          if (!drum) throw new Error(`Drum not found: ${drumEntry.drumId}`)
+        // Process each drum for this material
+        for (const drumEntry of material.drums) {
+          // Validate drum exists and has sufficient stock
+          let drum = null
+          if (drumEntry.drumId) {
+            drum = await tx.drum.findUnique({
+              where: { id: drumEntry.drumId },
+            })
+            if (!drum) {
+              throw new Error(`Drum not found: ${drumEntry.drumId}`)
+            }
+            if (drum.rawMaterialId !== material.rawMaterialId) {
+              throw new Error(
+                `Drum ${drum.label} does not belong to material ${rawMaterial.name}`
+              )
+            }
+            if (drum.currentQuantity < drumEntry.quantity) {
+              throw new Error(
+                `Insufficient stock in drum ${drum.label}. Available: ${drum.currentQuantity}, Required: ${drumEntry.quantity}`
+              )
+            }
+          }
 
-          await tx.drum.update({
-            where: { id: drumEntry.drumId },
+          // Create batch usage
+          await tx.batchUsage.create({
             data: {
-              currentQuantity: { decrement: drumEntry.quantity },
-              isActive: { set: drum.currentQuantity - drumEntry.quantity > 0 },
+              batchId: id,
+              rawMaterialId: material.rawMaterialId,
+              quantity: drumEntry.quantity,
+              drumId: drumEntry.drumId,
             },
           })
+
+          // Create stock movement (OUT)
+          await tx.stockMovement.create({
+            data: {
+              type: 'OUT',
+              quantity: drumEntry.quantity,
+              date: data.date,
+              rawMaterialId: material.rawMaterialId,
+              batchId: id,
+              description: `Batch ${data.code} production`,
+              drumId: drumEntry.drumId,
+            },
+          })
+
+          // Update Drum Stock if drumId exists (reuse the drum object from validation)
+          if (drumEntry.drumId && drum) {
+            await tx.drum.update({
+              where: { id: drumEntry.drumId },
+              data: {
+                currentQuantity: { decrement: drumEntry.quantity },
+                isActive: {
+                  set: drum.currentQuantity - drumEntry.quantity > 0,
+                },
+              },
+            })
+          }
         }
+
+        // Deduct stock (Aggregate) - total of all drums for this material
+        await tx.rawMaterial.update({
+          where: { id: material.rawMaterialId },
+          data: {
+            currentStock: {
+              decrement: totalQuantity,
+            },
+          },
+        })
       }
 
-      // Deduct stock (Aggregate) - total of all drums for this material
-      await tx.rawMaterial.update({
-        where: { id: material.rawMaterialId },
+      // Step 4: Update batch info
+      const updatedBatch = await tx.batch.update({
+        where: { id },
         data: {
-          currentStock: {
-            decrement: totalQuantity,
-          },
+          code: data.code,
+          date: data.date,
+          description: data.description,
         },
-      })
-    }
-
-    // Step 4: Update batch info
-    const updatedBatch = await tx.batch.update({
-      where: { id },
-      data: {
-        code: data.code,
-        date: data.date,
-        description: data.description,
-      },
-      include: {
-        batchUsages: {
-          include: {
-            rawMaterial: true,
-            drum: {
-              select: {
-                id: true,
-                label: true,
+        include: {
+          batchUsages: {
+            include: {
+              rawMaterial: true,
+              drum: {
+                select: {
+                  id: true,
+                  label: true,
+                },
               },
             },
           },
         },
-      },
-    })
+      })
 
-    return {
-      ...updatedBatch,
-      batchUsages: updatedBatch.batchUsages.map((usage) => ({
-        id: usage.id,
-        quantity: usage.quantity,
-        rawMaterial: {
-          id: usage.rawMaterial.id,
-          kode: usage.rawMaterial.kode,
-          name: usage.rawMaterial.name,
-        },
-        drum: usage.drum
-          ? {
-              id: usage.drum.id,
-              label: usage.drum.label,
-            }
-          : null,
-      })),
-    } as BatchWithDetails
-  })
+      return {
+        ...updatedBatch,
+        batchUsages: updatedBatch.batchUsages.map((usage) => ({
+          id: usage.id,
+          quantity: usage.quantity,
+          rawMaterial: {
+            id: usage.rawMaterial.id,
+            kode: usage.rawMaterial.kode,
+            name: usage.rawMaterial.name,
+          },
+          drum: usage.drum
+            ? {
+                id: usage.drum.id,
+                label: usage.drum.label,
+              }
+            : null,
+        })),
+      } as BatchWithDetails
+    },
+    {
+      maxWait: 10000, // Maximum time to wait for a transaction slot (10 seconds)
+      timeout: 30000, // Maximum time the transaction can run (30 seconds)
+    }
+  )
 }
 
 /**

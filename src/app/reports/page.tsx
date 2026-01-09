@@ -91,7 +91,11 @@ const DATA_TYPES = [
 export default function ReportsPage() {
   const [reportType, setReportType] = useState('raw-materials')
   const [dataType, setDataType] = useState('stok-sisa')
+  const [availableDates, setAvailableDates] = useState<
+    Array<{ year: number; months: number[] }>
+  >([])
   const [availableYears, setAvailableYears] = useState<string[]>([])
+  const [availableMonths, setAvailableMonths] = useState<number[]>([])
   const [year, setYear] = useState('')
   const [month, setMonth] = useState('')
   const [allReportData, setAllReportData] = useState<AllReportData>({
@@ -244,50 +248,89 @@ export default function ReportsPage() {
     }
   }
 
-  // Fetch available years from earliest data
+  // Fetch available dates (year/month combinations with movements)
   useEffect(() => {
-    const fetchAvailableYears = async () => {
+    const fetchAvailableDates = async () => {
       try {
-        const response = await fetch('/api/reports/available-years')
+        const response = await fetch('/api/reports/available-dates')
         if (!response.ok) {
-          throw new Error('Failed to fetch available years')
+          throw new Error('Failed to fetch available dates')
         }
         const data = await response.json()
-        const years = data.years || []
+        const dates = data.dates || []
 
-        // Filter out future years - only allow current year or earlier
-        const currentDate = new Date()
-        const currentYear = currentDate.getFullYear()
-        const filteredYears = years.filter(
-          (y: string) => parseInt(y) <= currentYear
-        )
-        setAvailableYears(filteredYears)
+        setAvailableDates(dates)
+
+        // Extract unique years and set available years
+        const years = dates.map((d: { year: number }) => d.year.toString())
+        setAvailableYears(years)
 
         // Set default to current year/month if available
-        const currentYearStr = currentYear.toString()
-        const currentMonth = (currentDate.getMonth() + 1).toString()
+        const currentDate = new Date()
+        const currentYear = currentDate.getFullYear()
+        const currentMonth = currentDate.getMonth() + 1
 
-        if (filteredYears.includes(currentYearStr)) {
-          setYear(currentYearStr)
-        } else if (filteredYears.length > 0) {
-          setYear(filteredYears[filteredYears.length - 1]) // Use latest available year
+        // Find current year in available dates
+        const currentYearData = dates.find(
+          (d: { year: number }) => d.year === currentYear
+        )
+
+        if (currentYearData) {
+          setYear(currentYear.toString())
+          // Set month to current month if available, otherwise first available month
+          if (currentYearData.months.includes(currentMonth)) {
+            setMonth(currentMonth.toString())
+            setAvailableMonths(currentYearData.months)
+          } else if (currentYearData.months.length > 0) {
+            setMonth(currentYearData.months[0].toString())
+            setAvailableMonths(currentYearData.months)
+          }
+        } else if (dates.length > 0) {
+          // Use latest available year
+          const latestYearData = dates[dates.length - 1]
+          setYear(latestYearData.year.toString())
+          if (latestYearData.months.length > 0) {
+            setMonth(latestYearData.months[latestYearData.months.length - 1].toString())
+            setAvailableMonths(latestYearData.months)
+          }
         }
-
-        setMonth(currentMonth)
       } catch (error) {
-        logger.error('Error fetching available years:', error)
-        // Fallback to current year if API fails
-        const currentYear = new Date().getFullYear().toString()
-        setAvailableYears([currentYear])
-        setYear(currentYear)
-        setMonth((new Date().getMonth() + 1).toString())
+        logger.error('Error fetching available dates:', error)
+        // Fallback to current year/month if API fails
+        const currentDate = new Date()
+        const currentYear = currentDate.getFullYear()
+        const currentMonth = currentDate.getMonth() + 1
+        setAvailableDates([{ year: currentYear, months: [currentMonth] }])
+        setAvailableYears([currentYear.toString()])
+        setAvailableMonths([currentMonth])
+        setYear(currentYear.toString())
+        setMonth(currentMonth.toString())
       } finally {
         setIsLoadingYears(false)
       }
     }
 
-    fetchAvailableYears()
+    fetchAvailableDates()
   }, [])
+
+  // Update available months when year changes
+  useEffect(() => {
+    if (year && availableDates.length > 0) {
+      const yearNum = parseInt(year)
+      const yearData = availableDates.find((d) => d.year === yearNum)
+      if (yearData) {
+        setAvailableMonths(yearData.months)
+        // If current month is not available for selected year, select first available month
+        const currentMonthNum = parseInt(month)
+        if (!yearData.months.includes(currentMonthNum)) {
+          setMonth(yearData.months[0].toString())
+        }
+      } else {
+        setAvailableMonths([])
+        setMonth('')
+      }
+    }
+  }, [year, availableDates, month])
 
   // Fetch locations for finished goods filter
   useEffect(() => {
@@ -455,35 +498,36 @@ export default function ReportsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="month-select">Bulan</Label>
-                <Select value={month} onValueChange={setMonth} disabled={!year}>
+                <Select
+                  value={month}
+                  onValueChange={setMonth}
+                  disabled={!year || availableMonths.length === 0}
+                >
                   <SelectTrigger id="month-select" className="w-full sm:w-[160px]">
-                    <SelectValue placeholder="Bulan" />
+                    <SelectValue
+                      placeholder={
+                        !year
+                          ? 'Pilih tahun dulu'
+                          : availableMonths.length === 0
+                            ? 'Tidak ada data'
+                            : 'Bulan'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((m) => {
-                      const monthNum = parseInt(m.value)
-                      const yearNum = year
-                        ? parseInt(year)
-                        : new Date().getFullYear()
-                      const currentDate = new Date()
-                      const currentYear = currentDate.getFullYear()
-                      const currentMonth = currentDate.getMonth() + 1
-
-                      // Disable future months/years
-                      const isFuture =
-                        yearNum > currentYear ||
-                        (yearNum === currentYear && monthNum > currentMonth)
-
-                      return (
-                        <SelectItem
-                          key={m.value}
-                          value={m.value}
-                          disabled={isFuture}
-                        >
+                    {availableMonths.length === 0 ? (
+                      <SelectItem value="no-data" disabled>
+                        Tidak ada data tersedia
+                      </SelectItem>
+                    ) : (
+                      MONTHS.filter((m) =>
+                        availableMonths.includes(parseInt(m.value))
+                      ).map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
                           {m.label}
                         </SelectItem>
-                      )
-                    })}
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

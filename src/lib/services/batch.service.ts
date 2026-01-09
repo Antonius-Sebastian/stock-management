@@ -184,28 +184,10 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
   // Transaction: Create batch and all related records
   return await prisma.$transaction(async (tx) => {
     // Step 1: Validate all raw materials exist and have sufficient stock
-    for (const material of data.materials) {
-      const rawMaterials = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
-        SELECT id, name, "currentStock"
-        FROM raw_materials
-        WHERE id = ${material.rawMaterialId}
-        FOR UPDATE
-      `
-
-      if (rawMaterials.length === 0) {
-        throw new Error(`Raw material not found: ${material.rawMaterialId}`)
-      }
-
-      const rawMaterial = rawMaterials[0]
-
-      if (rawMaterial.currentStock < material.quantity) {
-        throw new Error(
-          `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${material.quantity}`
-        )
-      }
-    }
+    // Removed to optimize performance: The validation is performed again in Step 3 (Process each raw material)
+    // inside the same transaction. Since the transaction is atomic, if Step 3 fails,
+    // Step 2 (batch creation) will be rolled back.
+    // This saves N database queries where N is the number of raw materials in the batch.
 
     // Step 2: Create the batch
     const batch = await tx.batch.create({

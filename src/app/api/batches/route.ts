@@ -117,15 +117,18 @@ export async function POST(request: NextRequest) {
 
     // Audit log - fetch names for audit
     const { prisma } = await import('@/lib/db')
-    const materials = await Promise.all(
-      validatedData.materials.map(async (m) => {
-        const material = await prisma.rawMaterial.findUnique({
-          where: { id: m.rawMaterialId },
-          select: { name: true },
-        })
-        return { name: material?.name || 'Unknown', quantity: m.quantity }
+    const materials = []
+    for (const m of validatedData.materials) {
+      const material = await prisma.rawMaterial.findUnique({
+        where: { id: m.rawMaterialId },
+        select: { name: true },
       })
-    )
+      const totalQuantity = m.drums.reduce(
+        (sum, drum) => sum + drum.quantity,
+        0
+      )
+      materials.push({ name: material?.name || 'Unknown', quantity: totalQuantity })
+    }
 
     await AuditHelpers.batchCreated(validatedData.code, '', materials, {
       id: session.user.id,

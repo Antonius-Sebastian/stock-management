@@ -181,7 +181,7 @@ describe('Batch Service', () => {
         materials: [
           {
             rawMaterialId: 'rm-1',
-            quantity: 10,
+            drums: [{ drumId: '', quantity: 10 }],
           },
         ],
       }
@@ -281,8 +281,8 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [
-          { rawMaterialId: 'rm-1', quantity: 10 },
-          { rawMaterialId: 'rm-1', quantity: 5 }, // Duplicate
+          { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 10 }] },
+          { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 5 }] }, // Duplicate
         ],
       }
 
@@ -297,7 +297,9 @@ describe('Batch Service', () => {
       const input = {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
-        materials: [{ rawMaterialId: 'non-existent', quantity: 10 }],
+        materials: [
+          { rawMaterialId: 'non-existent', drums: [{ drumId: '', quantity: 10 }] },
+        ],
       }
 
       const mockTx = {
@@ -326,7 +328,9 @@ describe('Batch Service', () => {
       const input = {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
-        materials: [{ rawMaterialId: 'rm-1', quantity: 150 }],
+        materials: [
+          { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 150 }] },
+        ],
       }
 
       const mockTx = {
@@ -359,7 +363,9 @@ describe('Batch Service', () => {
       const input = {
         code: 'BATCH-FIFO',
         date: new Date('2024-01-15'),
-        materials: [{ rawMaterialId: 'rm-1', quantity: 150 }],
+        materials: [
+          { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 150 }] },
+        ],
       }
 
       const mockBatch = createTestBatch({ code: 'BATCH-FIFO' })
@@ -457,7 +463,10 @@ describe('Batch Service', () => {
         date: new Date('2024-01-16'),
         description: 'Updated batch',
         materials: [
-          { rawMaterialId: 'rm-1', quantity: 15 }, // Changed from 10 to 15
+          {
+            rawMaterialId: 'rm-1',
+            drums: [{ drumId: '', quantity: 15 }], // Changed from 10 to 15
+          },
         ],
       }
 
@@ -599,8 +608,8 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [
-          { rawMaterialId: 'rm-1', quantity: 10 },
-          { rawMaterialId: 'rm-1', quantity: 5 }, // Duplicate
+          { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 10 }] },
+          { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 5 }] }, // Duplicate
         ],
       }
 
@@ -622,7 +631,9 @@ describe('Batch Service', () => {
       const input = {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
-        materials: [{ rawMaterialId: 'non-existent', quantity: 10 }],
+        materials: [
+          { rawMaterialId: 'non-existent', drums: [{ drumId: '', quantity: 10 }] },
+        ],
       }
 
       const existingBatch = {
@@ -658,7 +669,9 @@ describe('Batch Service', () => {
       const input = {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
-        materials: [{ rawMaterialId: 'rm-1', quantity: 150 }],
+        materials: [
+          { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 150 }] },
+        ],
       }
 
       const existingBatch = {

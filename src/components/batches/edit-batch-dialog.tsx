@@ -66,56 +66,57 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
     description: z.string().optional(),
     materials: z
       .array(
-        z
-          .object({
-            rawMaterialId: z.string().min(1, 'Silakan pilih bahan baku'),
-            drumId: z.string().optional(),
-            quantity: z.coerce
-              .number({
-                required_error: 'Jumlah wajib diisi',
-                invalid_type_error: 'Jumlah harus berupa angka',
+        z.object({
+          rawMaterialId: z.string().min(1, 'Silakan pilih bahan baku'),
+          drums: z
+            .array(
+              z.object({
+                drumId: z.string().min(1, 'Drum wajib dipilih'),
+                quantity: z.coerce
+                  .number({
+                    required_error: 'Jumlah wajib diisi',
+                    invalid_type_error: 'Jumlah harus berupa angka',
+                  })
+                  .refine(
+                    (val) => !isNaN(val) && val > 0,
+                    'Jumlah harus lebih besar dari nol'
+                  ),
               })
-              .refine(
-                (val) => !isNaN(val) && val > 0,
-                'Jumlah harus lebih besar dari nol'
-              ),
-          })
-          .refine(
-            (material) => {
-              // Material wajib punya drum - drumId is always required if material has drums
-              if (!material.rawMaterialId) return true
-              const rawMaterial = rawMaterials.find(
-                (rm) => rm.id === material.rawMaterialId
-              )
-              if (rawMaterial?.drums && rawMaterial.drums.length > 0) {
-                return !!material.drumId
-              }
-              return true
-            },
-            {
-              message: 'Drum wajib dipilih untuk bahan baku ini',
-              path: ['drumId'],
-            }
-          )
+            )
+            .min(1, 'Minimal satu drum wajib dipilih untuk bahan baku ini'),
+        })
       )
       .min(1, 'Minimal satu bahan baku wajib dipilih')
-      .refine(
-        (materials) => {
-          // Prevent duplicate material+drum combinations
-          // Allow same material with different drums
-          const combos = materials.map(
-            (m) => `${m.rawMaterialId}:${m.drumId || ''}`
-          )
-          return combos.length === new Set(combos).size
-        },
-        {
-          message:
-            'Tidak dapat memilih kombinasi bahan baku & drum yang sama lebih dari sekali',
-          path: [],
+      .refine((materials) => {
+        // Prevent duplicate materials
+        const materialIds = materials.map((m) => m.rawMaterialId)
+        return materialIds.length === new Set(materialIds).size
+      }, 'Setiap bahan baku hanya dapat digunakan sekali per batch')
+      .refine((materials) => {
+        // Prevent duplicate drums across all materials
+        const allDrumIds: string[] = []
+        for (const material of materials) {
+          for (const drum of material.drums) {
+            if (drum.drumId) {
+              allDrumIds.push(drum.drumId)
+            }
+          }
         }
-      )
+        return allDrumIds.length === new Set(allDrumIds).size
+      }, 'Setiap drum hanya dapat digunakan sekali per batch')
+      .refine((materials) => {
+        // Prevent duplicate drums within the same material
+        for (const material of materials) {
+          const drumIds = material.drums.map((d) => d.drumId)
+          if (drumIds.length !== new Set(drumIds).size) {
+            return false
+          }
+        }
+        return true
+      }, 'Drum yang sama tidak dapat digunakan lebih dari sekali untuk bahan baku yang sama')
       .refine(
         (materials) => {
+          // Validate stock availability
           return materials.every((material) => {
             if (!material.rawMaterialId) return true
             const rawMaterial = rawMaterials.find(
@@ -123,25 +124,214 @@ const createFormSchema = (rawMaterials: RawMaterial[]) =>
             )
             if (!rawMaterial) return true
 
-            if (material.drumId) {
+            return material.drums.every((drumEntry) => {
+              if (!drumEntry.drumId) return true
               const drum = rawMaterial.drums?.find(
-                (d) => d.id === material.drumId
+                (d) => d.id === drumEntry.drumId
               )
-              return drum ? material.quantity <= drum.currentQuantity : true
-            }
-
-            return material.quantity <= rawMaterial.currentStock
+              return drum ? drumEntry.quantity <= drum.currentQuantity : true
+            })
           })
         },
         {
-          message:
-            'Satu atau lebih jumlah melebihi stok yang tersedia (periksa Stok Drum atau Total stok)',
+          message: 'Satu atau lebih jumlah melebihi stok yang tersedia di drum',
           path: [],
         }
       ),
   })
 
-type FormData = z.infer<ReturnType<typeof createFormSchema>>
+type BatchFormData = z.infer<ReturnType<typeof createFormSchema>>
+
+interface MaterialDrumsFieldArrayProps {
+  materialIndex: number
+  selectedMaterial: RawMaterial
+  usedDrumIds: Set<string>
+  usedDrumIdsInThisMaterial: Set<string>
+  form: any
+  batch?: BatchWithUsage | null
+  getAvailableStock: (materialId: string, drumId?: string) => number
+}
+
+function MaterialDrumsFieldArray({
+  materialIndex,
+  selectedMaterial,
+  usedDrumIds,
+  usedDrumIdsInThisMaterial,
+  form,
+  batch,
+  getAvailableStock,
+}: MaterialDrumsFieldArrayProps) {
+  const drumPath = `materials.${materialIndex}.drums` as const
+  const {
+    fields: drumFields,
+    append: addDrum,
+    remove: removeDrum,
+  } = useFieldArray({
+    control: form.control,
+    name: drumPath as any,
+  })
+
+  // Get available drums (not used in other materials, and with stock > 0)
+  // For edit mode, also include drums that are already used in this batch
+  const availableDrums =
+    selectedMaterial.drums?.filter((drum) => {
+      const availableStock = getAvailableStock(selectedMaterial.id, drum.id)
+      return availableStock > 0 && !usedDrumIds.has(drum.id)
+    }) || []
+
+  return (
+    <div className="space-y-3">
+      {drumFields.map((drumField, drumIndex) => {
+        const drums = form.watch(drumPath as any) as Array<{
+          drumId: string
+          quantity: number
+        }>
+        const selectedDrumId = drums[drumIndex]?.drumId
+        const selectedDrum = selectedMaterial.drums?.find(
+          (d) => d.id === selectedDrumId
+        )
+        const isDrumUsedInThisMaterial =
+          selectedDrumId &&
+          drums.filter(
+            (d, idx) => idx !== drumIndex && d.drumId === selectedDrumId
+          ).length > 0
+
+        const drumIdPath = `${drumPath}.${drumIndex}.drumId` as any
+        const quantityPath = `${drumPath}.${drumIndex}.quantity` as any
+
+        return (
+          <div
+            key={drumField.id}
+            className="bg-muted/30 flex flex-col gap-3 rounded-lg border p-3"
+          >
+            <div className="flex gap-3">
+              <FormField
+                control={form.control}
+                name={drumIdPath}
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel>Drum</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value)
+                          // Reset quantity when drum changes
+                          form.setValue(quantityPath, '' as unknown as number)
+                        }}
+                        value={field.value}
+                      >
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue placeholder="Pilih Drum" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableDrums.map((drum) => {
+                            const isUsed =
+                              usedDrumIds.has(drum.id) ||
+                              (usedDrumIdsInThisMaterial.has(drum.id) &&
+                                drum.id !== selectedDrumId)
+                            const availableStock = getAvailableStock(
+                              selectedMaterial.id,
+                              drum.id
+                            )
+                            const isDisabled = availableStock <= 0 || isUsed
+                            return (
+                              <SelectItem
+                                key={drum.id}
+                                value={drum.id}
+                                disabled={isDisabled}
+                              >
+                                {drum.label} (Sisa:{' '}
+                                {availableStock.toLocaleString()}){' '}
+                                {availableStock <= 0
+                                  ? '(Habis)'
+                                  : isUsed
+                                    ? '(Sudah digunakan)'
+                                    : ''}
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={quantityPath}
+                render={({ field }) => {
+                  const isQuantityDisabled = !selectedDrumId
+
+                  return (
+                    <FormItem className="w-32">
+                      <FormLabel>Jumlah</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0"
+                          disabled={isQuantityDisabled}
+                          {...field}
+                        />
+                      </FormControl>
+                      {isQuantityDisabled && (
+                        <p className="text-muted-foreground text-xs">
+                          Pilih drum terlebih dahulu
+                        </p>
+                      )}
+                      {selectedDrum &&
+                        !isQuantityDisabled &&
+                        getAvailableStock(selectedMaterial.id, selectedDrumId) >
+                          0 && (
+                          <p className="text-muted-foreground text-xs">
+                            Tersedia:{' '}
+                            {getAvailableStock(
+                              selectedMaterial.id,
+                              selectedDrumId
+                            ).toLocaleString()}
+                          </p>
+                        )}
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="hover:bg-destructive/10 hover:text-destructive mt-8 h-9 w-9 shrink-0"
+                onClick={() => removeDrum(drumIndex)}
+                disabled={drumFields.length === 1}
+                aria-label="Hapus drum"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )
+      })}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() =>
+          addDrum({ drumId: '', quantity: '' as unknown as number })
+        }
+        className="w-full border-dashed"
+        disabled={
+          availableDrums.length === 0 ||
+          drumFields.length >= availableDrums.length
+        }
+      >
+        <Plus className="mr-2 h-4 w-4" />
+        Tambah Drum
+      </Button>
+    </div>
+  )
+}
 
 interface EditBatchDialogProps {
   batch: BatchWithUsage | null
@@ -159,7 +349,7 @@ export function EditBatchDialog({
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
 
   const formSchema = createFormSchema(rawMaterials)
-  const form = useForm<FormData>({
+  const form = useForm<BatchFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       code: '',
@@ -259,22 +449,51 @@ export function EditBatchDialog({
 
   useEffect(() => {
     if (batch && open) {
+      // Group batchUsages by rawMaterialId and convert to nested structure
+      const materialsMap = new Map<
+        string,
+        Array<{ drumId: string; quantity: number }>
+      >()
+
+      for (const usage of batch.batchUsages) {
+        if (!materialsMap.has(usage.rawMaterialId)) {
+          materialsMap.set(usage.rawMaterialId, [])
+        }
+        const drums = materialsMap.get(usage.rawMaterialId)!
+        drums.push({
+          drumId: usage.drumId || '',
+          quantity: usage.quantity,
+        })
+      }
+
+      const materials = Array.from(materialsMap.entries()).map(
+        ([rawMaterialId, drums]) => ({
+          rawMaterialId,
+          drums,
+        })
+      )
+
       form.reset({
         code: batch.code,
         date: new Date(batch.date),
         description: batch.description || '',
-        materials: batch.batchUsages.map((usage) => ({
-          rawMaterialId: usage.rawMaterialId,
-          quantity: usage.quantity,
-          drumId: usage.drumId || undefined,
-        })),
+        materials,
       })
     }
   }, [batch, open, form])
 
   const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
-    onSubmit: async (data: FormData) => {
+    onSubmit: async (data: BatchFormData) => {
       if (!batch) return
+
+      // Transform nested structure to match API format
+      const transformedMaterials = data.materials.map((material) => ({
+        rawMaterialId: material.rawMaterialId,
+        drums: material.drums.map((drum) => ({
+          drumId: drum.drumId,
+          quantity: drum.quantity,
+        })),
+      }))
 
       const response = await fetch(`/api/batches/${batch.id}`, {
         method: 'PUT',
@@ -285,7 +504,7 @@ export function EditBatchDialog({
           code: data.code,
           date: data.date.toISOString(),
           description: data.description,
-          materials: data.materials,
+          materials: transformedMaterials,
         }),
       })
 
@@ -365,255 +584,190 @@ export function EditBatchDialog({
               )}
             />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">
+            <Card className="border-2 shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base font-semibold">
                   Bahan Baku yang Digunakan
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="mb-4 flex flex-col gap-3 border-b pb-4"
-                  >
-                    <div className="flex gap-3">
-                      <FormField
-                        control={form.control}
-                        name={`materials.${index}.rawMaterialId`}
-                        render={({ field }) => (
-                          <FormItem className="flex flex-1 flex-col">
-                            <FormLabel>Bahan Baku</FormLabel>
-                            <Select
-                              onValueChange={(val) => {
-                                field.onChange(val)
-                                // Reset drum and quantity when material changes
-                                form.setValue(
-                                  `materials.${index}.drumId`,
-                                  undefined
-                                )
-                                form.setValue(`materials.${index}.quantity`, 0)
-                              }}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="w-full [&>span]:truncate">
-                                  <SelectValue placeholder="Pilih bahan baku" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {sortedRawMaterials.length === 0 ? (
-                                  <div className="text-muted-foreground px-2 py-6 text-center text-sm">
-                                    Tidak ada bahan baku tersedia
-                                  </div>
-                                ) : (
-                                  <>
-                                    {sortedRawMaterials.map((material) => {
-                                      const availableStock = getAvailableStock(
-                                        material.id
-                                      )
-                                      const isInBatch =
-                                        materialsInBatch.includes(material.id)
-                                      const isDisabled =
-                                        availableStock === 0 && !isInBatch
+              <CardContent className="space-subsection pt-0">
+                {fields.map((field, materialIndex) => {
+                  const selectedMaterialId = form.watch(
+                    `materials.${materialIndex}.rawMaterialId`
+                  )
+                  const selectedMaterial = rawMaterials.find(
+                    (m) => m.id === selectedMaterialId
+                  )
+                  const hasDrums =
+                    selectedMaterial?.drums && selectedMaterial.drums.length > 0
 
-                                      return (
-                                        <SelectItem
-                                          key={material.id}
-                                          value={material.id}
-                                          disabled={isDisabled}
-                                        >
-                                          <div className="flex max-w-[400px] items-center gap-2">
-                                            <span className="truncate">
-                                              {material.kode} - {material.name}
-                                            </span>
-                                            {availableStock > 0 ? (
-                                              <span className="shrink-0 font-medium whitespace-nowrap text-green-600">
-                                                (Tersedia:{' '}
-                                                {availableStock.toLocaleString()}
-                                                )
-                                              </span>
-                                            ) : (
-                                              <span className="text-destructive shrink-0 whitespace-nowrap">
-                                                (Stok Habis)
-                                              </span>
-                                            )}
-                                          </div>
-                                        </SelectItem>
-                                      )
-                                    })}
-                                  </>
-                                )}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="hover:bg-destructive/10 hover:text-destructive mt-8 shrink-0"
-                        onClick={() => remove(index)}
-                        disabled={fields.length === 1}
-                        aria-label="Remove material"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </Button>
-                    </div>
+                  // Get all used drums across all materials
+                  const allMaterials = form.watch('materials') as BatchFormData['materials']
+                  const usedDrumIds = new Set<string>()
+                  for (const mat of allMaterials) {
+                    if (mat.rawMaterialId) {
+                      for (const drum of mat.drums) {
+                        if (drum.drumId) {
+                          usedDrumIds.add(drum.drumId)
+                        }
+                      }
+                    }
+                  }
 
-                      {/* Drum Selector - Show first if material has drums */}
-                      <FormField
-                        control={form.control}
-                        name={`materials.${index}.drumId`}
-                        render={({ field }) => {
-                          const selectedMaterialId = form.watch(
-                            `materials.${index}.rawMaterialId`
-                          )
-                          const selectedMaterial = rawMaterials.find(
-                            (m) => m.id === selectedMaterialId
-                          )
-                          const hasDrums =
-                            selectedMaterial?.drums &&
-                            selectedMaterial.drums.length > 0
+                  // Get drums used in this material (to prevent duplicates within same material)
+                  const drumsInThisMaterial =
+                    allMaterials[materialIndex]?.drums || []
+                  const usedDrumIdsInThisMaterial = new Set(
+                    drumsInThisMaterial.map((d) => d.drumId).filter((id) => id)
+                  )
 
-                          if (!selectedMaterialId || !hasDrums) return <></>
-
-                          // Check if this drum is already used in another material entry
-                          const allMaterials = form.watch('materials')
-                          const isDrumAlreadyUsed = (drumId: string) => {
-                            return allMaterials.some(
-                              (m, idx) =>
-                                idx !== index &&
-                                m.rawMaterialId === selectedMaterialId &&
-                                m.drumId === drumId
-                            )
-                          }
-
-                          return (
-                            <FormItem className="flex-1">
-                              <FormLabel>Drum</FormLabel>
+                  return (
+                    <Card
+                      key={field.id}
+                      className="border-2 shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base font-semibold">
+                            Bahan Baku {materialIndex + 1}
+                          </CardTitle>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="hover:bg-destructive/10 hover:text-destructive h-8 w-8"
+                            onClick={() => remove(materialIndex)}
+                            disabled={fields.length === 1}
+                            aria-label="Hapus bahan baku"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-subsection pt-0">
+                        <FormField
+                          control={form.control}
+                          name={`materials.${materialIndex}.rawMaterialId`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Bahan Baku</FormLabel>
                               <FormControl>
                                 <Select
-                                  onValueChange={(value) => {
-                                    field.onChange(value)
-                                    // Reset quantity when drum changes
-                                    form.setValue(`materials.${index}.quantity`, 0)
+                                  onValueChange={(val) => {
+                                    field.onChange(val)
+                                    // Reset drums when material changes
+                                    form.setValue(
+                                      `materials.${materialIndex}.drums`,
+                                      [
+                                        {
+                                          drumId: '',
+                                          quantity: '' as unknown as number,
+                                        },
+                                      ]
+                                    )
                                   }}
                                   value={field.value}
                                 >
-                                  <SelectTrigger className="h-9 w-full">
-                                    <SelectValue placeholder="Pilih Drum (Wajib)" />
+                                  <SelectTrigger className="w-full [&>span]:truncate">
+                                    <SelectValue placeholder="Pilih bahan baku" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {selectedMaterial?.drums?.map((drum) => {
-                                      const isUsed = isDrumAlreadyUsed(drum.id)
-                                      const availableStock = getAvailableStock(
-                                        selectedMaterialId,
-                                        drum.id
-                                      )
-                                      const isDisabled =
-                                        availableStock <= 0 || isUsed
-                                      return (
-                                        <SelectItem
-                                          key={drum.id}
-                                          value={drum.id}
-                                          disabled={isDisabled}
-                                        >
-                                          {drum.label} (Sisa:{' '}
-                                          {availableStock.toLocaleString()}){' '}
-                                          {availableStock <= 0
-                                            ? '(Habis)'
-                                            : isUsed
-                                              ? '(Sudah digunakan)'
-                                              : ''}
-                                        </SelectItem>
-                                      )
-                                    })}
+                                    {sortedRawMaterials.length === 0 ? (
+                                      <div className="text-muted-foreground px-2 py-6 text-center text-sm">
+                                        Tidak ada bahan baku tersedia
+                                      </div>
+                                    ) : (
+                                      <>
+                                        {sortedRawMaterials.map((material) => {
+                                          // Filter out already selected materials (except current one)
+                                          const isAlreadySelected = allMaterials.some(
+                                            (m, idx) =>
+                                              idx !== materialIndex &&
+                                              m.rawMaterialId === material.id
+                                          )
+                                          if (isAlreadySelected) return null
+
+                                          const availableStock = getAvailableStock(
+                                            material.id
+                                          )
+                                          const isInBatch =
+                                            materialsInBatch.includes(material.id)
+                                          const isDisabled =
+                                            availableStock === 0 && !isInBatch
+
+                                          return (
+                                            <SelectItem
+                                              key={material.id}
+                                              value={material.id}
+                                              disabled={isDisabled}
+                                            >
+                                              <div className="flex max-w-[400px] items-center gap-2">
+                                                <span className="truncate">
+                                                  {material.kode} -{' '}
+                                                  {material.name}
+                                                </span>
+                                                {availableStock > 0 ? (
+                                                  <span className="shrink-0 font-medium whitespace-nowrap text-green-600">
+                                                    (Tersedia:{' '}
+                                                    {availableStock.toLocaleString()}
+                                                    )
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-destructive shrink-0 whitespace-nowrap">
+                                                    (Stok Habis)
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </SelectItem>
+                                          )
+                                        })}
+                                      </>
+                                    )}
                                   </SelectContent>
                                 </Select>
                               </FormControl>
-                              <div className="text-muted-foreground text-xs">
-                                Pilih drum terlebih dahulu sebelum memasukkan
-                                jumlah. Bahan baku yang sama dapat menggunakan
-                                drum yang berbeda.
-                              </div>
                               <FormMessage />
                             </FormItem>
-                          )
-                        }}
-                      />
+                          )}
+                        />
 
-                    {/* Quantity Input - Disabled until drum selected */}
-                    <FormField
-                      control={form.control}
-                      name={`materials.${index}.quantity`}
-                      render={({ field }) => {
-                        const selectedMaterialId = form.watch(
-                          `materials.${index}.rawMaterialId`
-                        )
-                        const selectedDrumId = form.watch(
-                          `materials.${index}.drumId`
-                        )
-                        const selectedMaterial = rawMaterials.find(
-                          (m) => m.id === selectedMaterialId
-                        )
-
-                        const hasDrums =
-                          selectedMaterial?.drums &&
-                          selectedMaterial.drums.length > 0
-                        const isQuantityDisabled =
-                          hasDrums && !selectedDrumId
-
-                        let availableStock = 0
-                        if (selectedDrumId && selectedMaterial) {
-                          availableStock = getAvailableStock(
-                            selectedMaterialId,
-                            selectedDrumId
-                          )
-                        } else if (selectedMaterial) {
-                          availableStock = getAvailableStock(selectedMaterialId)
-                        }
-
-                        return (
-                          <FormItem className="w-32">
-                            <FormLabel>Jumlah</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                placeholder="0"
-                                disabled={isQuantityDisabled}
-                                {...field}
+                        {selectedMaterialId && hasDrums && (
+                          <div className="space-subsection">
+                            <div className="mb-2 flex items-center justify-between">
+                              <h4 className="text-sm font-medium">Drum</h4>
+                            </div>
+                            {selectedMaterial && (
+                              <MaterialDrumsFieldArray
+                                materialIndex={materialIndex}
+                                selectedMaterial={selectedMaterial}
+                                usedDrumIds={usedDrumIds}
+                                usedDrumIdsInThisMaterial={
+                                  usedDrumIdsInThisMaterial
+                                }
+                                form={form}
+                                batch={batch}
+                                getAvailableStock={getAvailableStock}
                               />
-                            </FormControl>
-                            {isQuantityDisabled && (
-                              <p className="text-muted-foreground text-xs">
-                                Pilih drum terlebih dahulu
-                              </p>
                             )}
-                            {selectedMaterial &&
-                              !isQuantityDisabled &&
-                              availableStock > 0 && (
-                                <p className="text-muted-foreground text-xs">
-                                  Tersedia: {availableStock.toLocaleString()}
-                                </p>
-                              )}
-                            <FormMessage />
-                          </FormItem>
-                        )
-                      }}
-                    />
-                  </div>
-                ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => append({ rawMaterialId: '', quantity: 0 })}
+                  onClick={() =>
+                    append({
+                      rawMaterialId: '',
+                      drums: [
+                        { drumId: '', quantity: '' as unknown as number },
+                      ],
+                    })
+                  }
+                  className="hover:bg-muted/50 w-full border-dashed transition-colors hover:border-solid"
+                  disabled={isLoading}
                 >
                   <Plus className="mr-2 h-5 w-5" />
                   Tambah Bahan Baku

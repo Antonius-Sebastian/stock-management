@@ -24,6 +24,7 @@ export const batchSchema = z.object({
 /**
  * Validation schema for batch API routes
  * Uses string date with WIB transform
+ * Supports multiple drums per material entry
  */
 export const batchSchemaAPI = z.object({
   code: z.string().min(1, 'Batch code is required'),
@@ -33,11 +34,32 @@ export const batchSchemaAPI = z.object({
     .array(
       z.object({
         rawMaterialId: z.string().min(1, 'Raw material is required'),
-        quantity: z.number().positive('Quantity must be positive'),
-        drumId: z.string().optional(),
+        drums: z
+          .array(
+            z.object({
+              drumId: z.string().min(1, 'Drum is required'),
+              quantity: z.number().positive('Quantity must be positive'),
+            })
+          )
+          .min(1, 'At least one drum is required per material'),
       })
     )
-    .min(1, 'At least one raw material is required'),
+    .min(1, 'At least one raw material is required')
+    .refine((materials) => {
+      const materialIds = materials.map((m) => m.rawMaterialId)
+      return materialIds.length === new Set(materialIds).size
+    }, 'Each material can only be used once per batch')
+    .refine((materials) => {
+      const allDrumIds: string[] = []
+      for (const material of materials) {
+        for (const drum of material.drums) {
+          if (drum.drumId) {
+            allDrumIds.push(drum.drumId)
+          }
+        }
+      }
+      return allDrumIds.length === new Set(allDrumIds).size
+    }, 'Each drum can only be used once per batch'),
 })
 
 /**

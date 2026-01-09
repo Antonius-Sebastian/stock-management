@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  X,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { useSession } from 'next-auth/react'
@@ -75,8 +76,9 @@ export function Sidebar() {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-4 left-4 z-50 lg:hidden"
+        className="fixed top-3 left-3 z-50 h-11 w-11 backdrop-blur-sm lg:hidden"
         onClick={() => setIsMobileOpen(!isMobileOpen)}
+        aria-label="Toggle menu"
       >
         <Menu className="h-5 w-5" />
       </Button>
@@ -84,8 +86,9 @@ export function Sidebar() {
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden"
           onClick={() => setIsMobileOpen(false)}
+          aria-hidden="true"
         />
       )}
 
@@ -105,18 +108,32 @@ export function Sidebar() {
               Sistem Inventory
             </h2>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleCollapse}
-            className="ml-auto hidden h-8 w-8 lg:flex"
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Mobile Close Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsMobileOpen(false)}
+              className="h-8 w-8 lg:hidden"
+              aria-label="Close menu"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            {/* Desktop Collapse Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleCollapse}
+              className="hidden h-8 w-8 lg:flex"
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
@@ -130,22 +147,38 @@ export function Sidebar() {
               ) {
                 return null
               }
+              const isActive = pathname === item.href
               return (
                 <Button
                   key={item.name}
-                  variant={pathname === item.href ? 'default' : 'ghost'}
+                  variant={isActive ? 'default' : 'ghost'}
                   className={cn(
-                    'w-full',
-                    isCollapsed ? 'justify-center px-2' : 'justify-start',
-                    pathname === item.href &&
-                      'bg-primary text-primary-foreground'
+                    'h-11 w-full transition-all duration-200',
+                    isCollapsed ? 'justify-center px-2' : 'justify-start px-3',
+                    isActive &&
+                      'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+                    !isActive &&
+                      'hover:bg-accent hover:text-accent-foreground active:scale-[0.98]'
                   )}
                   asChild
                   title={isCollapsed ? item.name : undefined}
                 >
-                  <Link href={item.href} onClick={() => setIsMobileOpen(false)}>
-                    <Icon className={cn('h-5 w-5 shrink-0', !isCollapsed && 'mr-2.5')} />
-                    {!isCollapsed && <span>{item.name}</span>}
+                  <Link
+                    href={item.href}
+                    onClick={() => {
+                      setIsMobileOpen(false)
+                    }}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-5 w-5 shrink-0 transition-transform duration-200',
+                        !isCollapsed && 'mr-2.5',
+                        isActive && 'scale-110'
+                      )}
+                    />
+                    {!isCollapsed && (
+                      <span className="font-medium">{item.name}</span>
+                    )}
                   </Link>
                 </Button>
               )

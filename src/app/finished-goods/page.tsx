@@ -183,18 +183,16 @@ export default function FinishedGoodsPage() {
 
   return (
     <div className="space-section">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">
-              Produk Jadi
-            </h1>
-            <p className="text-muted-foreground mt-1.5 text-sm lg:text-base">
-              Kelola inventori produk jadi Anda
-            </p>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+            Produk Jadi
+          </h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Kelola inventori produk jadi Anda
+          </p>
         </div>
-        <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
           {canCreateStockMovement(userRole, 'finished-good', 'IN') && (
             <Button
               variant="outline"

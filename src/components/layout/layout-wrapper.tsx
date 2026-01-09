@@ -14,10 +14,12 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <TourProvider>
-      <div className="bg-background flex h-screen">
+      <div className="bg-background flex h-screen overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-auto p-4 pt-16 lg:p-6 lg:pt-6">
-          {children}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 pt-16 transition-all duration-300 sm:p-4 sm:pt-16 md:p-5 lg:p-6 lg:pt-6">
+          <div className="mx-auto w-full max-w-7xl">
+            {children}
+          </div>
         </main>
       </div>
     </TourProvider>

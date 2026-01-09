@@ -159,18 +159,16 @@ export default function RawMaterialsPage() {
 
   return (
     <div className="space-section">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">
-              Bahan Baku
-            </h1>
-            <p className="text-muted-foreground mt-1.5 text-sm lg:text-base">
-              Kelola inventori bahan baku Anda
-            </p>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+            Bahan Baku
+          </h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Kelola inventori bahan baku Anda
+          </p>
         </div>
-        <div className="flex gap-2.5">
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap">
           {canCreateStockMovement(userRole, 'raw-material', 'IN') && (
             <DrumStockEntryDialog onSuccess={handleSuccess} />
           )}

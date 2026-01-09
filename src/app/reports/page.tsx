@@ -18,9 +18,21 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Download, Loader2, BarChart3 } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import {
+  Download,
+  Loader2,
+  BarChart3,
+  Package,
+  ShoppingCart,
+  TrendingUp,
+  Calendar,
+  Activity,
+} from 'lucide-react'
 import { StockReportTable } from '@/components/reports/stock-report-table'
 import { logger } from '@/lib/logger'
+import { cn } from '@/lib/utils'
 
 interface StockReportData {
   id: string
@@ -344,6 +356,68 @@ export default function ReportsPage() {
     return `${typeLabel} - ${dataTypeLabel} - ${monthLabel} ${year}`
   }
 
+  // Calculate summary statistics
+  const summaryStats = useMemo(() => {
+    if (!reportData || !reportData.data || reportData.data.length === 0) {
+      return null
+    }
+
+    const data = reportData.data
+    const currentDay = reportData.meta.currentDay
+    const dayColumns = Array.from(
+      { length: currentDay },
+      (_, i) => (i + 1).toString()
+    )
+
+    // Calculate totals
+    let totalQuantity = 0
+    let itemsWithActivity = 0
+    let itemsWithZeroActivity = 0
+    const dailyTotals: number[] = []
+
+    dayColumns.forEach((day) => {
+      let dayTotal = 0
+      data.forEach((item) => {
+        const value = item[day]
+        const numericValue = typeof value === 'number' ? value : 0
+        if (numericValue > 0) {
+          dayTotal += numericValue
+          totalQuantity += numericValue
+        }
+      })
+      dailyTotals.push(dayTotal)
+    })
+
+    // Count items with activity
+    data.forEach((item) => {
+      const hasActivity = dayColumns.some((day) => {
+        const value = item[day]
+        const numericValue = typeof value === 'number' ? value : 0
+        return numericValue > 0
+      })
+      if (hasActivity) {
+        itemsWithActivity++
+      } else {
+        itemsWithZeroActivity++
+      }
+    })
+
+    const averagePerDay =
+      currentDay > 0 ? totalQuantity / currentDay : 0
+    const peakDayIndex = dailyTotals.indexOf(Math.max(...dailyTotals))
+    const peakDay = peakDayIndex + 1
+
+    return {
+      totalItems: data.length,
+      totalQuantity,
+      averagePerDay,
+      peakDay,
+      itemsWithActivity,
+      itemsWithZeroActivity,
+      currentDay,
+    }
+  }, [reportData])
+
   const handleExport = async () => {
     setIsExporting(true)
     try {
@@ -374,7 +448,9 @@ export default function ReportsPage() {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
 
-      toast.success('Laporan berhasil diekspor')
+      toast.success(
+        `Laporan berhasil diekspor: ${filename}. File telah didownload ke perangkat Anda.`
+      )
     } catch (error) {
       logger.error('Error exporting report:', error)
       toast.error('Gagal mengekspor laporan. Silakan coba lagi.')
@@ -385,85 +461,137 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-            Laporan Stok
-          </h1>
-          <p className="text-muted-foreground">
-            Laporan pergerakan stok interaktif dengan rincian harian
-          </p>
-        </div>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Laporan Stok
+        </h1>
+        <p className="text-muted-foreground text-sm sm:text-base">
+          Laporan pergerakan stok interaktif dengan rincian harian
+        </p>
       </div>
 
-      <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:gap-4">
-          <Select
-            value={year}
-            onValueChange={setYear}
-            disabled={isLoadingYears || availableYears.length === 0}
-          >
-            <SelectTrigger className="w-full sm:w-[100px]">
-              <SelectValue
-                placeholder={isLoadingYears ? 'Loading...' : 'Tahun'}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {isLoadingYears ? (
-                <SelectItem value="loading" disabled>
-                  Memuat...
-                </SelectItem>
-              ) : availableYears.length === 0 ? (
-                <SelectItem value="no-data" disabled>
-                  Tidak ada data tersedia
-                </SelectItem>
-              ) : (
-                availableYears.map((y) => (
-                  <SelectItem key={y} value={y}>
-                    {y}
-                  </SelectItem>
-                ))
+      <Card>
+        <CardHeader>
+          <CardTitle>Filter Laporan</CardTitle>
+          <CardDescription>
+            Pilih periode dan tipe laporan yang ingin dilihat
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="year-select">Tahun</Label>
+                <Select
+                  value={year}
+                  onValueChange={setYear}
+                  disabled={isLoadingYears || availableYears.length === 0}
+                >
+                  <SelectTrigger id="year-select" className="w-full sm:w-[120px]">
+                    <SelectValue
+                      placeholder={isLoadingYears ? 'Loading...' : 'Tahun'}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingYears ? (
+                      <SelectItem value="loading" disabled>
+                        Memuat...
+                      </SelectItem>
+                    ) : availableYears.length === 0 ? (
+                      <SelectItem value="no-data" disabled>
+                        Tidak ada data tersedia
+                      </SelectItem>
+                    ) : (
+                      availableYears.map((y) => (
+                        <SelectItem key={y} value={y}>
+                          {y}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="month-select">Bulan</Label>
+                <Select value={month} onValueChange={setMonth} disabled={!year}>
+                  <SelectTrigger id="month-select" className="w-full sm:w-[160px]">
+                    <SelectValue placeholder="Bulan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((m) => {
+                      const monthNum = parseInt(m.value)
+                      const yearNum = year
+                        ? parseInt(year)
+                        : new Date().getFullYear()
+                      const currentDate = new Date()
+                      const currentYear = currentDate.getFullYear()
+                      const currentMonth = currentDate.getMonth() + 1
+
+                      // Disable future months/years
+                      const isFuture =
+                        yearNum > currentYear ||
+                        (yearNum === currentYear && monthNum > currentMonth)
+
+                      return (
+                        <SelectItem
+                          key={m.value}
+                          value={m.value}
+                          disabled={isFuture}
+                        >
+                          {m.label}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleExport}
+              variant="outline"
+              disabled={isExporting}
+              className="w-full sm:w-auto"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? 'Mengekspor...' : 'Ekspor ke Excel'}
+            </Button>
+          </div>
+
+          {/* Active filters summary */}
+          {(year || month || reportType) && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              <span className="text-muted-foreground text-sm font-medium flex items-center">
+                Filter aktif:
+              </span>
+              {year && (
+                <Badge variant="secondary" className="text-xs">
+                  Tahun: {year}
+                </Badge>
               )}
-            </SelectContent>
-          </Select>
-
-          <Select value={month} onValueChange={setMonth} disabled={!year}>
-            <SelectTrigger className="w-full sm:w-[140px]">
-              <SelectValue placeholder="Bulan" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m) => {
-                const monthNum = parseInt(m.value)
-                const yearNum = year ? parseInt(year) : new Date().getFullYear()
-                const currentDate = new Date()
-                const currentYear = currentDate.getFullYear()
-                const currentMonth = currentDate.getMonth() + 1
-
-                // Disable future months/years
-                const isFuture =
-                  yearNum > currentYear ||
-                  (yearNum === currentYear && monthNum > currentMonth)
-
-                return (
-                  <SelectItem key={m.value} value={m.value} disabled={isFuture}>
-                    {m.label}
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button
-          onClick={handleExport}
-          variant="outline"
-          disabled={isExporting}
-          className="w-full sm:w-auto"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {isExporting ? 'Mengekspor...' : 'Ekspor ke Excel'}
-        </Button>
-      </div>
+              {month && (
+                <Badge variant="secondary" className="text-xs">
+                  {MONTHS.find((m) => m.value === month)?.label || 'Bulan'}
+                </Badge>
+              )}
+              {reportType && (
+                <Badge variant="secondary" className="text-xs">
+                  {reportType === 'raw-materials'
+                    ? 'Bahan Baku'
+                    : 'Produk Jadi'}
+                </Badge>
+              )}
+              {reportType === 'finished-goods' && selectedLocation && (
+                <Badge variant="secondary" className="text-xs">
+                  {locations.find((l) => l.id === selectedLocation)?.name ||
+                    'Lokasi'}
+                </Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -475,47 +603,68 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           <Tabs value={reportType} onValueChange={setReportType}>
-            <TabsList className="mb-4 grid w-full grid-cols-2 justify-start sm:inline-flex sm:w-auto">
-              <TabsTrigger value="raw-materials" className="text-xs sm:text-sm">
-                Laporan Bahan Baku
+            <TabsList className="mb-4 grid w-full grid-cols-2 gap-2 sm:inline-flex sm:w-auto sm:gap-2">
+              <TabsTrigger
+                value="raw-materials"
+                className={cn(
+                  'text-xs sm:text-sm transition-all duration-200',
+                  'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
+                )}
+              >
+                <Package className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Laporan Bahan Baku</span>
+                <span className="sm:hidden">Bahan Baku</span>
               </TabsTrigger>
               <TabsTrigger
                 value="finished-goods"
-                className="text-xs sm:text-sm"
+                className={cn(
+                  'text-xs sm:text-sm transition-all duration-200',
+                  'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
+                )}
               >
-                Laporan Produk Jadi
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Laporan Produk Jadi</span>
+                <span className="sm:hidden">Produk Jadi</span>
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value={reportType}>
               {/* Location tabs for finished goods */}
               {reportType === 'finished-goods' && locations.length > 0 && (
-                <Tabs
-                  value={selectedLocation}
-                  onValueChange={setSelectedLocation}
-                  className="mb-4 w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-2 justify-start gap-1 sm:inline-flex sm:w-auto sm:grid-cols-none">
-                    {locations.map((loc) => (
-                      <TabsTrigger
-                        key={loc.id}
-                        value={loc.id}
-                        className="flex-1 sm:flex-initial"
-                      >
-                        {loc.name}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
+                <div className="mb-4 w-full overflow-x-auto sm:overflow-visible">
+                  <Tabs
+                    value={selectedLocation}
+                    onValueChange={setSelectedLocation}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full min-w-max grid-cols-2 justify-start gap-2 sm:inline-flex sm:w-auto sm:grid-cols-none">
+                      {locations.map((loc) => (
+                        <TabsTrigger
+                          key={loc.id}
+                          value={loc.id}
+                          className={cn(
+                            'flex-1 sm:flex-initial transition-all duration-200',
+                            'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
+                          )}
+                        >
+                          {loc.name}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                </div>
               )}
 
               <Tabs value={dataType} onValueChange={setDataType}>
-                <TabsList className="mb-6 grid h-auto w-full grid-cols-2 justify-start sm:grid-cols-4">
+                <TabsList className="mb-6 grid h-auto w-full grid-cols-2 gap-2 justify-start sm:grid-cols-4 sm:gap-2">
                   {DATA_TYPES.map((dt) => (
                     <TabsTrigger
                       key={dt.value}
                       value={dt.value}
-                      className="text-xs sm:text-sm"
+                      className={cn(
+                        'text-xs sm:text-sm transition-all duration-200',
+                        'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
+                      )}
                     >
                       {dt.label}
                     </TabsTrigger>
@@ -535,22 +684,109 @@ export default function ReportsPage() {
                           }}
                         />
                       </div>
-                      <p className="text-muted-foreground animate-pulse text-sm font-medium">
-                        Memuat laporan...
-                      </p>
+                      <div className="text-center space-y-1">
+                        <p className="text-muted-foreground animate-pulse text-sm font-medium">
+                          Memuat laporan...
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          Mohon tunggu, sedang mengambil data
+                        </p>
+                      </div>
                     </div>
-                  ) : reportData ? (
-                    <StockReportTable
-                      data={reportData.data}
-                      currentDay={reportData.meta.currentDay}
-                    />
+                  ) : reportData && reportData.data.length > 0 ? (
+                    <div className="space-y-6">
+                      {/* Summary Statistics */}
+                      {summaryStats && (
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                          <Card className="transition-shadow duration-200 hover:shadow-md">
+                            <CardHeader className="pb-2">
+                              <CardDescription className="text-xs sm:text-sm">
+                                Total Items
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
+                                {summaryStats.totalItems}
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card className="transition-shadow duration-200 hover:shadow-md">
+                            <CardHeader className="pb-2">
+                              <CardDescription className="text-xs sm:text-sm flex items-center gap-1">
+                                <TrendingUp className="h-3 w-3 shrink-0" />
+                                <span className="truncate">Total Quantity</span>
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
+                                {summaryStats.totalQuantity.toLocaleString(
+                                  'id-ID'
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card className="transition-shadow duration-200 hover:shadow-md">
+                            <CardHeader className="pb-2">
+                              <CardDescription className="text-xs sm:text-sm flex items-center gap-1">
+                                <Activity className="h-3 w-3 shrink-0" />
+                                <span className="truncate">Rata-rata/Hari</span>
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
+                                {summaryStats.averagePerDay.toFixed(1)}
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card className="transition-shadow duration-200 hover:shadow-md">
+                            <CardHeader className="pb-2">
+                              <CardDescription className="text-xs sm:text-sm flex items-center gap-1">
+                                <Calendar className="h-3 w-3 shrink-0" />
+                                <span className="truncate">Peak Day</span>
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
+                                Hari {summaryStats.peakDay}
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card className="transition-shadow duration-200 hover:shadow-md sm:col-span-3 lg:col-span-1">
+                            <CardHeader className="pb-2">
+                              <CardDescription className="text-xs sm:text-sm">
+                                Items Aktif
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
+                                {summaryStats.itemsWithActivity}/
+                                {summaryStats.totalItems}
+                              </div>
+                              <p className="text-muted-foreground mt-1 text-xs">
+                                {summaryStats.itemsWithZeroActivity} tidak aktif
+                              </p>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+
+                      <StockReportTable
+                        data={reportData.data}
+                        currentDay={reportData.meta.currentDay}
+                      />
+                    </div>
                   ) : (
-                    <div className="flex h-64 flex-col items-center justify-center gap-3">
+                    <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20">
                       <div className="text-muted-foreground rounded-full bg-muted/50 p-3">
                         <BarChart3 className="h-6 w-6" />
                       </div>
-                      <div className="text-muted-foreground font-medium">
-                        Tidak ada data tersedia
+                      <div className="text-center">
+                        <p className="text-muted-foreground font-medium">
+                          Tidak ada data tersedia
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                          Coba pilih periode lain atau filter yang berbeda
+                        </p>
                       </div>
                     </div>
                   )}

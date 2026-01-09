@@ -48,16 +48,14 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight lg:text-3xl">
-              Manajemen User
-            </h2>
-            <p className="text-muted-foreground">
-              Kelola user sistem dan peran mereka
-            </p>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Manajemen User
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Kelola user sistem dan peran mereka
+          </p>
         </div>
         <AddUserDialog onSuccess={fetchUsers}>
           <Button>

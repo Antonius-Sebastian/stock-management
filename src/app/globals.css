@@ -209,14 +209,74 @@
     @apply transition-all duration-200 ease-in-out;
   }
 
+  /* Page fade-in animation */
+  @keyframes page-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-page-fade-in {
+    animation: page-fade-in 0.4s ease-out;
+  }
+
   /* Spacing utilities */
   .space-section {
-    @apply space-y-6;
+    @apply space-y-6 sm:space-y-8 lg:space-y-10;
   }
   .space-subsection {
-    @apply space-y-4;
+    @apply space-y-4 sm:space-y-5 lg:space-y-6;
   }
   .space-form {
     @apply space-y-4;
+  }
+
+  /* Animation utilities */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-up {
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-in-from-bottom {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.5s ease-out;
+  }
+
+  .animate-slide-in-from-bottom {
+    animation: slide-in-from-bottom 0.5s ease-out;
   }
 }

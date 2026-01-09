@@ -127,19 +127,17 @@ export default function BatchesPage() {
 
   return (
     <div className="space-section">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">
-              Pemakaian Batch
-            </h1>
-            <p className="text-muted-foreground mt-1.5">
-              Lacak konsumsi bahan baku untuk batch produksi
-            </p>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+            Pemakaian Batch
+          </h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Lacak konsumsi bahan baku untuk batch produksi
+          </p>
         </div>
         {canCreateBatches(userRole) && (
-          <div data-tour="create-batch">
+          <div data-tour="create-batch" className="flex-shrink-0">
             <AddBatchDialog onSuccess={handleSuccess} />
           </div>
         )}

@@ -67,7 +67,11 @@ export function Sidebar() {
   }
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' })
+    // Use relative URL to ensure it works with any domain
+    await signOut({
+      callbackUrl: '/login',
+      redirect: true,
+    })
   }
 
   return (
@@ -156,7 +160,7 @@ export function Sidebar() {
                     'h-11 w-full transition-all duration-200',
                     isCollapsed ? 'justify-center px-2' : 'justify-start px-3',
                     isActive &&
-                      'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+                      'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm',
                     !isActive &&
                       'hover:bg-accent hover:text-accent-foreground active:scale-[0.98]'
                   )}
@@ -211,7 +215,9 @@ export function Sidebar() {
                 onClick={handleLogout}
                 title={isCollapsed ? 'Keluar' : undefined}
               >
-                <LogOut className={cn('h-5 w-5 shrink-0', !isCollapsed && 'mr-2.5')} />
+                <LogOut
+                  className={cn('h-5 w-5 shrink-0', !isCollapsed && 'mr-2.5')}
+                />
                 {!isCollapsed && <span>Keluar</span>}
               </Button>
 

@@ -12,6 +12,9 @@ const loginSchema = z.object({
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // ✅ Removed PrismaAdapter - using JWT sessions (stateless)
+  // Trust host to automatically detect the correct URL from request headers
+  // This is especially useful for Vercel deployments where domain can change
+  trustHost: true,
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days

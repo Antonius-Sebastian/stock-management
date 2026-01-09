@@ -15,7 +15,8 @@ const envSchema = z.object({
   NEXTAUTH_SECRET: z
     .string()
     .min(32, 'NEXTAUTH_SECRET must be at least 32 characters'),
-  NEXTAUTH_URL: z.string().url('NEXTAUTH_URL must be a valid URL'),
+  // NEXTAUTH_URL is optional when trustHost is enabled (auto-detected from request)
+  NEXTAUTH_URL: z.string().url('NEXTAUTH_URL must be a valid URL').optional(),
 
   // Node Environment
   NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
@@ -29,7 +30,7 @@ export const env = envSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL,
   DIRECT_URL: process.env.DIRECT_URL,
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL || process.env.AUTH_URL,
   NODE_ENV: process.env.NODE_ENV || 'development',
 })
 

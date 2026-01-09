@@ -99,14 +99,14 @@ export function EditUserDialog({
       })
 
       if (response.ok) {
-        toast.success(`User "${formData.username}" updated successfully`)
+        toast.success(`User "${formData.username}" berhasil diperbarui`)
         onSuccess()
       } else {
         const data = await response.json()
-        toast.error(data.error || 'Failed to update user')
+        toast.error(data.error || 'Gagal memperbarui pengguna')
       }
     } catch {
-      toast.error('Failed to update user')
+      toast.error('Gagal memperbarui pengguna')
     } finally {
       setLoading(false)
     }
@@ -117,15 +117,15 @@ export function EditUserDialog({
       <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
         <form onSubmit={handleSubmit} className="overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>Ubah User</DialogTitle>
             <DialogDescription>
-              Update user information. Leave password blank to keep unchanged.
+              Perbarui informasi user. Biarkan password kosong untuk tetap menggunakan password saat ini.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-username">
-                Username <span className="text-red-500">*</span>
+                Nama Pengguna <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="edit-username"
@@ -140,7 +140,7 @@ export function EditUserDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-name">
-                Full Name <span className="text-red-500">*</span>
+                Nama Lengkap <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="edit-name"
@@ -153,7 +153,7 @@ export function EditUserDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-email">Email (Optional)</Label>
+              <Label htmlFor="edit-email">Email (Opsional)</Label>
               <Input
                 id="edit-email"
                 type="email"
@@ -165,7 +165,7 @@ export function EditUserDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-password">New Password (Optional)</Label>
+              <Label htmlFor="edit-password">Kata Sandi Baru (Opsional)</Label>
               <Input
                 id="edit-password"
                 type="password"
@@ -173,18 +173,18 @@ export function EditUserDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                placeholder="Leave blank to keep current password"
+                placeholder="Biarkan kosong untuk tetap menggunakan password saat ini"
                 minLength={6}
               />
               {formData.password && (
                 <p className="text-muted-foreground text-xs">
-                  Password must be at least 6 characters
+                  Kata sandi minimal 6 karakter
                 </p>
               )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-role">
-                Role <span className="text-red-500">*</span>
+                Peran <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={formData.role}
@@ -193,7 +193,7 @@ export function EditUserDialog({
                 ) => setFormData({ ...formData, role: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
+                  <SelectValue placeholder="Pilih peran" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">
@@ -260,10 +260,10 @@ export function EditUserDialog({
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="space-y-0.5">
                 <Label htmlFor="edit-active" className="text-base">
-                  Active Status
+                  Status Aktif
                 </Label>
                 <div className="text-muted-foreground text-sm">
-                  Inactive users cannot login
+                  User nonaktif tidak dapat login
                 </div>
               </div>
               <Switch
@@ -282,10 +282,10 @@ export function EditUserDialog({
               onClick={() => onOpenChange(false)}
               disabled={loading}
             >
-              Cancel
+              Batal
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Updating...' : 'Update User'}
+              {loading ? 'Memperbarui...' : 'Perbarui User'}
             </Button>
           </DialogFooter>
         </form>

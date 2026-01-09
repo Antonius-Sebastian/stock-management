@@ -21,6 +21,10 @@ import { canEditBatches, canDeleteBatches } from '@/lib/rbac'
 type BatchWithUsage = Batch & {
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
+    drum: {
+      id: string
+      label: string
+    } | null
   })[]
 }
 
@@ -96,7 +100,7 @@ export function BatchesTable({
                   <span className="font-medium">{usage.rawMaterial.kode}</span>
                   <span className="text-muted-foreground">
                     {' '}
-                    - {usage.quantity.toLocaleString()} unit
+                    - {usage.quantity.toLocaleString()}
                   </span>
                 </div>
               ))}

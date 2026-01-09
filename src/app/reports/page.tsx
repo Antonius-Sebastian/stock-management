@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Download } from 'lucide-react'
+import { Download, Loader2, BarChart3 } from 'lucide-react'
 import { StockReportTable } from '@/components/reports/stock-report-table'
 import { logger } from '@/lib/logger'
 
@@ -411,11 +411,11 @@ export default function ReportsPage() {
             <SelectContent>
               {isLoadingYears ? (
                 <SelectItem value="loading" disabled>
-                  Loading...
+                  Memuat...
                 </SelectItem>
               ) : availableYears.length === 0 ? (
                 <SelectItem value="no-data" disabled>
-                  No data available
+                  Tidak ada data tersedia
                 </SelectItem>
               ) : (
                 availableYears.map((y) => (
@@ -524,8 +524,20 @@ export default function ReportsPage() {
 
                 <TabsContent value={dataType}>
                   {isLoading ? (
-                    <div className="flex h-64 items-center justify-center">
-                      <div className="text-lg">Memuat laporan...</div>
+                    <div className="flex h-64 flex-col items-center justify-center space-y-4">
+                      <div className="relative">
+                        <Loader2 className="text-primary h-12 w-12 animate-spin transition-opacity duration-300" />
+                        <Loader2
+                          className="text-primary/50 absolute inset-0 h-12 w-12 animate-spin transition-opacity duration-300"
+                          style={{
+                            animationDirection: 'reverse',
+                            animationDuration: '1.5s',
+                          }}
+                        />
+                      </div>
+                      <p className="text-muted-foreground animate-pulse text-sm font-medium">
+                        Memuat laporan...
+                      </p>
                     </div>
                   ) : reportData ? (
                     <StockReportTable
@@ -533,8 +545,13 @@ export default function ReportsPage() {
                       currentDay={reportData.meta.currentDay}
                     />
                   ) : (
-                    <div className="flex h-64 items-center justify-center">
-                      <div className="text-lg">Tidak ada data tersedia</div>
+                    <div className="flex h-64 flex-col items-center justify-center gap-3">
+                      <div className="text-muted-foreground rounded-full bg-muted/50 p-3">
+                        <BarChart3 className="h-6 w-6" />
+                      </div>
+                      <div className="text-muted-foreground font-medium">
+                        Tidak ada data tersedia
+                      </div>
                     </div>
                   )}
                 </TabsContent>

@@ -51,5 +51,9 @@ export interface BatchWithUsage {
     rawMaterial: RawMaterial
     rawMaterialId: string
     quantity: number
+    drum: {
+      id: string
+      label: string
+    } | null
   }>
 }

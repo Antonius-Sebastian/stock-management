@@ -1,8 +1,17 @@
 'use client'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
+
+// Dynamically import ReactQueryDevtools with SSR disabled to prevent hydration errors
+const ReactQueryDevtools = dynamic(
+  () =>
+    import('@tanstack/react-query-devtools').then((mod) => ({
+      default: mod.ReactQueryDevtools,
+    })),
+  { ssr: false }
+)
 
 /**
  * React Query Provider
@@ -32,8 +41,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {/* DevTools only show in development */}
-      <ReactQueryDevtools initialIsOpen={false} />
+      {/* DevTools only show in development and only on client to avoid hydration errors */}
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   )
 }

@@ -194,7 +194,7 @@ export function RawMaterialsTable({
               {hasEditPermission && (
                 <DropdownMenuItem onClick={() => onEdit?.(material)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  Ubah
                 </DropdownMenuItem>
               )}
               {hasStockInPermission && (
@@ -216,7 +216,7 @@ export function RawMaterialsTable({
                     onClick={() => onDelete?.(material)}
                     className="text-destructive"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
+                    <Trash2 className="mr-2 h-5 w-5" />
                     Hapus
                   </DropdownMenuItem>
                 </>

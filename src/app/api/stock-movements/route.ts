@@ -70,6 +70,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    // Validate locationId for finished-good IN movements before parsing
+    if (
+      body.finishedGoodId &&
+      body.type === 'IN' &&
+      (!body.locationId || body.locationId.trim() === '')
+    ) {
+      return NextResponse.json(
+        { error: 'Lokasi harus dipilih untuk stok masuk produk jadi' },
+        { status: 400 }
+      )
+    }
+
     const validatedData = stockMovementSchemaAPI.parse(body)
 
     // Determine item type for permission check
@@ -116,6 +129,7 @@ export async function POST(request: NextRequest) {
       rawMaterialId: validatedData.rawMaterialId || null,
       finishedGoodId: validatedData.finishedGoodId || null,
       batchId: null,
+      locationId: body.locationId || null,
     }
 
     // Create stock movement using service

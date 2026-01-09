@@ -87,10 +87,10 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[100px]">Username</TableHead>
+              <TableHead className="min-w-[100px]">Nama Pengguna</TableHead>
               <TableHead className="min-w-[120px]">Nama</TableHead>
               <TableHead className="min-w-[150px]">Email</TableHead>
-              <TableHead className="min-w-[80px]">Role</TableHead>
+              <TableHead className="min-w-[80px]">Peran</TableHead>
               <TableHead className="min-w-[100px]">Status</TableHead>
               <TableHead className="min-w-[100px]">Dibuat</TableHead>
               <TableHead className="w-[70px]">Aksi</TableHead>
@@ -149,7 +149,7 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleEdit(user)}>
                           <Pencil className="mr-2 h-4 w-4" />
-                          Edit
+                          Ubah
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleDelete(user)}

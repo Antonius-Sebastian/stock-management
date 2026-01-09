@@ -144,7 +144,7 @@ export function Sidebar() {
                   title={isCollapsed ? item.name : undefined}
                 >
                   <Link href={item.href} onClick={() => setIsMobileOpen(false)}>
-                    <Icon className={cn('h-4 w-4', !isCollapsed && 'mr-2')} />
+                    <Icon className={cn('h-5 w-5 shrink-0', !isCollapsed && 'mr-2.5')} />
                     {!isCollapsed && <span>{item.name}</span>}
                   </Link>
                 </Button>
@@ -178,7 +178,7 @@ export function Sidebar() {
                 onClick={handleLogout}
                 title={isCollapsed ? 'Keluar' : undefined}
               >
-                <LogOut className={cn('h-4 w-4', !isCollapsed && 'mr-2')} />
+                <LogOut className={cn('h-5 w-5 shrink-0', !isCollapsed && 'mr-2.5')} />
                 {!isCollapsed && <span>Keluar</span>}
               </Button>
 

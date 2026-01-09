@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { UserPlus } from 'lucide-react'
+import { UserPlus, Loader2 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 
 export type User = {
@@ -76,8 +76,20 @@ export default function UsersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-muted-foreground">Memuat user...</p>
+            <div className="flex h-64 flex-col items-center justify-center space-y-4">
+              <div className="relative">
+                <Loader2 className="text-primary h-12 w-12 animate-spin transition-opacity duration-300" />
+                <Loader2
+                  className="text-primary/50 absolute inset-0 h-12 w-12 animate-spin transition-opacity duration-300"
+                  style={{
+                    animationDirection: 'reverse',
+                    animationDuration: '1.5s',
+                  }}
+                />
+              </div>
+              <p className="text-muted-foreground animate-pulse text-sm font-medium">
+                Memuat user...
+              </p>
             </div>
           ) : (
             <UsersTable users={users} onRefresh={fetchUsers} />

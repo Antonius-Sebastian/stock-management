@@ -32,17 +32,17 @@ import { getWIBDate } from '@/lib/timezone'
 const createFormSchema = (items: Item[]) =>
   z
     .object({
-      itemId: z.string().min(1, 'Please select an item'),
+      itemId: z.string().min(1, 'Silakan pilih item'),
       quantity: z.coerce
         .number({
-          required_error: 'Quantity is required',
-          invalid_type_error: 'Quantity must be a number',
+          required_error: 'Jumlah wajib diisi',
+          invalid_type_error: 'Jumlah harus berupa angka',
         })
-        .refine((val) => !isNaN(val) && val !== 0, 'Quantity cannot be zero'),
+        .refine((val) => !isNaN(val) && val !== 0, 'Jumlah tidak boleh nol'),
       date: z.date({
-        required_error: 'Please select a date',
+        required_error: 'Silakan pilih tanggal',
       }),
-      description: z.string().min(1, 'Reason is required for stock adjustment'),
+      description: z.string().min(1, 'Alasan wajib diisi untuk penyesuaian stok'),
     })
     .refine(
       (data) => {
@@ -56,7 +56,7 @@ const createFormSchema = (items: Item[]) =>
         return true
       },
       {
-        message: 'Adjustment would result in negative stock',
+        message: 'Penyesuaian akan menghasilkan stok negatif',
         path: ['quantity'],
       }
     )

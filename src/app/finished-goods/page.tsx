@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { FinishedGood } from '@prisma/client'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
-import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Loader2 } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs } from '@/components/ui/tabs'
 import { FinishedGoodsTable } from '@/components/finished-goods/finished-goods-table'
 import { AddFinishedGoodDialog } from '@/components/finished-goods/add-finished-good-dialog'
 import { EditFinishedGoodDialog } from '@/components/finished-goods/edit-finished-good-dialog'
@@ -163,26 +163,38 @@ export default function FinishedGoodsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-lg">Memuat...</div>
+      <div className="flex h-64 flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <Loader2 className="text-primary h-12 w-12 animate-spin transition-opacity duration-300" />
+          <Loader2
+            className="text-primary/50 absolute inset-0 h-12 w-12 animate-spin transition-opacity duration-300"
+            style={{
+              animationDirection: 'reverse',
+              animationDuration: '1.5s',
+            }}
+          />
+        </div>
+        <p className="text-muted-foreground animate-pulse text-sm font-medium">
+          Memuat produk jadi...
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-section">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">
               Produk Jadi
             </h1>
-            <p className="text-muted-foreground text-sm lg:text-base">
+            <p className="text-muted-foreground mt-1.5 text-sm lg:text-base">
               Kelola inventori produk jadi Anda
             </p>
           </div>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row">
           {canCreateStockMovement(userRole, 'finished-good', 'IN') && (
             <Button
               variant="outline"
@@ -191,7 +203,7 @@ export default function FinishedGoodsPage() {
                 setStockDialogOpen(true)
               }}
             >
-              <ArrowDownCircle className="mr-2 h-4 w-4" />
+              <ArrowDownCircle className="mr-2 h-5 w-5" />
               Input Stok Masuk
             </Button>
           )}
@@ -203,7 +215,7 @@ export default function FinishedGoodsPage() {
                 setStockDialogOpen(true)
               }}
             >
-              <ArrowUpCircle className="mr-2 h-4 w-4" />
+              <ArrowUpCircle className="mr-2 h-5 w-5" />
               Input Stok Keluar
             </Button>
           )}
@@ -226,23 +238,25 @@ export default function FinishedGoodsPage() {
         </CardHeader>
         <CardContent>
           {locations.length > 0 && (
-            <Tabs
-              value={selectedLocation}
-              onValueChange={setSelectedLocation}
-              className="mb-6 w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2 justify-start gap-1 sm:inline-flex sm:w-auto sm:grid-cols-none">
-                {locations.map((location) => (
-                  <TabsTrigger
-                    key={location.id}
-                    value={location.id}
-                    className="flex-1 sm:flex-initial"
-                  >
-                    {location.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <div className="mb-6 flex flex-wrap gap-0">
+              {locations.map((location, index) => (
+                <Button
+                  key={location.id}
+                  variant={selectedLocation === location.id ? 'default' : 'outline'}
+                  onClick={() => setSelectedLocation(location.id)}
+                  className={`
+                    rounded-none border-r-0 transition-all duration-200
+                    ${index === 0 ? 'rounded-l-md' : ''}
+                    ${index === locations.length - 1 ? 'rounded-r-md border-r' : ''}
+                    ${selectedLocation === location.id 
+                      ? 'bg-primary text-primary-foreground shadow-sm z-10' 
+                      : 'bg-background hover:bg-muted'}
+                  `}
+                >
+                  {location.name}
+                </Button>
+              ))}
+            </div>
           )}
           <FinishedGoodsTable
             data={finishedGoods}
@@ -267,6 +281,9 @@ export default function FinishedGoodsPage() {
         type={stockDialogType}
         entityType="finished-good"
         onSuccess={handleSuccess}
+        defaultLocationId={
+          stockDialogType === 'out' ? selectedLocation : undefined
+        }
       />
     </div>
   )

@@ -5,10 +5,18 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   ReactNode,
 } from 'react'
-import Joyride, { type Step, type CallBackProps } from 'react-joyride'
+import dynamic from 'next/dynamic'
+import type { Step, CallBackProps } from 'react-joyride'
 import type { UserRole } from '@/lib/rbac'
+
+// Dynamically import Joyride with SSR disabled to prevent hydration errors
+const Joyride = dynamic(
+  () => import('react-joyride').then((mod) => mod.default),
+  { ssr: false }
+)
 
 interface TourContextType {
   startTour: (steps: Step[]) => void
@@ -32,6 +40,11 @@ interface TourProviderProps {
 export function TourProvider({ children }: TourProviderProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [steps, setSteps] = useState<Step[]>([])
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const startTour = useCallback((newSteps: Step[]) => {
     setSteps(newSteps)
@@ -50,31 +63,33 @@ export function TourProvider({ children }: TourProviderProps) {
   return (
     <TourContext.Provider value={{ startTour, isRunning }}>
       {children}
-      <Joyride
-        steps={steps}
-        run={isRunning}
-        continuous
-        showProgress
-        showSkipButton
-        callback={handleTourCallback}
-        styles={{
-          options: {
-            primaryColor: 'hsl(var(--primary))',
-            textColor: 'hsl(var(--foreground))',
-            backgroundColor: 'hsl(var(--background))',
-            overlayColor: 'rgba(0, 0, 0, 0.5)',
-            arrowColor: 'hsl(var(--background))',
-          },
-        }}
-        locale={{
-          back: 'Kembali',
-          close: 'Tutup',
-          last: 'Selesai',
-          next: 'Lanjut',
-          open: 'Buka dialog',
-          skip: 'Lewati',
-        }}
-      />
+      {isMounted && (
+        <Joyride
+          steps={steps}
+          run={isRunning}
+          continuous
+          showProgress
+          showSkipButton
+          callback={handleTourCallback}
+          styles={{
+            options: {
+              primaryColor: 'hsl(var(--primary))',
+              textColor: 'hsl(var(--foreground))',
+              backgroundColor: 'hsl(var(--background))',
+              overlayColor: 'rgba(0, 0, 0, 0.5)',
+              arrowColor: 'hsl(var(--background))',
+            },
+          }}
+          locale={{
+            back: 'Kembali',
+            close: 'Tutup',
+            last: 'Selesai',
+            next: 'Lanjut',
+            open: 'Buka dialog',
+            skip: 'Lewati',
+          }}
+        />
+      )}
     </TourContext.Provider>
   )
 }

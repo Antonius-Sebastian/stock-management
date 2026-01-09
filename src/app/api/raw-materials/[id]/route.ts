@@ -8,7 +8,54 @@ import {
 } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { rawMaterialSchema } from '@/lib/validations'
-import { updateRawMaterial, deleteRawMaterial } from '@/lib/services'
+import {
+  updateRawMaterial,
+  deleteRawMaterial,
+  getRawMaterialById,
+  getDrumsByRawMaterialId,
+} from '@/lib/services'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Authentication required (all roles can view)
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+    const { searchParams } = new URL(request.url)
+    const includeDrums = searchParams.get('include') === 'drums'
+
+    // Get raw material
+    const material = await getRawMaterialById(id)
+
+    // Get drums if requested
+    if (includeDrums) {
+      const drums = await getDrumsByRawMaterialId(id)
+      return NextResponse.json({ ...material, drums })
+    }
+
+    return NextResponse.json(material)
+  } catch (error) {
+    logger.error('Error fetching raw material:', error)
+
+    if (error instanceof Error) {
+      if (error.message.includes('not found')) {
+        return NextResponse.json({ error: error.message }, { status: 404 })
+      }
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json(
+      { error: 'Gagal memuat bahan baku' },
+      { status: 500 }
+    )
+  }
+}
 
 export async function PUT(
   request: NextRequest,

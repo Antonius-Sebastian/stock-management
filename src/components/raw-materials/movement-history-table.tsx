@@ -228,8 +228,8 @@ export function MovementHistoryTable({
       <DataTable
         columns={columns}
         data={filteredMovements}
-        searchKey="description"
-        searchPlaceholder="Cari berdasarkan deskripsi..."
+        searchKeys={['description', 'batch.code', 'drum.label']}
+        searchPlaceholder="Cari berdasarkan drum atau batch..."
         emptyMessage="Belum ada pergerakan stok yang tercatat."
         tableId="movement-history"
       />

@@ -37,6 +37,10 @@ export type BatchWithDetails = Batch & {
       kode: string
       name: string
     }
+    drum: {
+      id: string
+      label: string
+    } | null
   }>
 }
 
@@ -59,6 +63,12 @@ const batchSelect = {
           id: true,
           kode: true,
           name: true,
+        },
+      },
+      drum: {
+        select: {
+          id: true,
+          label: true,
         },
       },
     },
@@ -130,6 +140,12 @@ export async function getBatchById(id: string): Promise<BatchWithDetails> {
       batchUsages: {
         include: {
           rawMaterial: true,
+          drum: {
+            select: {
+              id: true,
+              label: true,
+            },
+          },
         },
       },
     },
@@ -139,7 +155,24 @@ export async function getBatchById(id: string): Promise<BatchWithDetails> {
     throw new Error('Batch not found')
   }
 
-  return batch as BatchWithDetails
+  return {
+    ...batch,
+    batchUsages: batch.batchUsages.map((usage) => ({
+      id: usage.id,
+      quantity: usage.quantity,
+      rawMaterial: {
+        id: usage.rawMaterial.id,
+        kode: usage.rawMaterial.kode,
+        name: usage.rawMaterial.name,
+      },
+      drum: usage.drum
+        ? {
+            id: usage.drum.id,
+            label: usage.drum.label,
+          }
+        : null,
+    })),
+  } as BatchWithDetails
 }
 
 /**
@@ -572,12 +605,35 @@ export async function updateBatch(
         batchUsages: {
           include: {
             rawMaterial: true,
+            drum: {
+              select: {
+                id: true,
+                label: true,
+              },
+            },
           },
         },
       },
     })
 
-    return updatedBatch as BatchWithDetails
+    return {
+      ...updatedBatch,
+      batchUsages: updatedBatch.batchUsages.map((usage) => ({
+        id: usage.id,
+        quantity: usage.quantity,
+        rawMaterial: {
+          id: usage.rawMaterial.id,
+          kode: usage.rawMaterial.kode,
+          name: usage.rawMaterial.name,
+        },
+        drum: usage.drum
+          ? {
+              id: usage.drum.id,
+              label: usage.drum.label,
+            }
+          : null,
+      })),
+    } as BatchWithDetails
   })
 }
 

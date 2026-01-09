@@ -68,7 +68,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
       })
 
       if (response.ok) {
-        toast.success(`User "${formData.username}" created successfully`)
+        toast.success(`User "${formData.username}" berhasil dibuat`)
         setOpen(false)
         setFormData({
           username: '',
@@ -80,10 +80,10 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
         onSuccess()
       } else {
         const data = await response.json()
-        toast.error(data.error || 'Failed to create user')
+        toast.error(data.error || 'Gagal membuat pengguna')
       }
     } catch {
-      toast.error('Failed to create user')
+      toast.error('Gagal membuat pengguna')
     } finally {
       setLoading(false)
     }
@@ -95,16 +95,15 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
       <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
         <form onSubmit={handleSubmit} className="overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Add New User</DialogTitle>
+            <DialogTitle>Tambah User Baru</DialogTitle>
             <DialogDescription>
-              Create a new user account. Default password can be changed after
-              login.
+              Buat akun user baru. Password default dapat diubah setelah login.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="username">
-                Username <span className="text-red-500">*</span>
+                Nama Pengguna <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="username"
@@ -119,7 +118,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="name">
-                Full Name <span className="text-red-500">*</span>
+                Nama Lengkap <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -132,7 +131,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="email">Email (Optional)</Label>
+              <Label htmlFor="email">Email (Opsional)</Label>
               <Input
                 id="email"
                 type="email"
@@ -145,7 +144,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password">
-                Password <span className="text-red-500">*</span>
+                Kata Sandi <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="password"
@@ -154,7 +153,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                placeholder="Min. 6 characters"
+                placeholder="Min. 6 karakter"
                 required
                 minLength={6}
               />
@@ -162,7 +161,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
             <div className="grid gap-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="role">
-                  Role <span className="text-red-500">*</span>
+                  Peran <span className="text-red-500">*</span>
                 </Label>
                 <TooltipProvider>
                   <Tooltip>
@@ -203,7 +202,7 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                 ) => setFormData({ ...formData, role: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
+                  <SelectValue placeholder="Pilih peran" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin</SelectItem>
@@ -224,10 +223,10 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               onClick={() => setOpen(false)}
               disabled={loading}
             >
-              Cancel
+              Batal
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create User'}
+              {loading ? 'Membuat...' : 'Buat User'}
             </Button>
           </DialogFooter>
         </form>

@@ -330,8 +330,7 @@ export async function getDrumsByRawMaterialId(
   return await prisma.drum.findMany({
     where: {
       rawMaterialId,
-      isActive: true,
-      currentQuantity: { gt: 0 },
+      // Return all drums (both active and inactive) - client-side filtering will handle visibility
     },
     orderBy: {
       createdAt: 'asc', // FIFO by default likely preferred

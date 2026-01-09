@@ -24,6 +24,10 @@ import { Calendar, Package, FileText } from 'lucide-react'
 type BatchWithUsage = Batch & {
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
+    drum: {
+      id: string
+      label: string
+    } | null
   })[]
 }
 
@@ -50,10 +54,10 @@ export function BatchDetailDialog({
       <DialogContent className="max-h-[85vh] max-w-[95vw] overflow-y-auto sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl">
-            Batch Details
+            Detail Batch
           </DialogTitle>
           <DialogDescription>
-            Complete information about this production batch
+            Informasi lengkap tentang batch produksi ini
           </DialogDescription>
         </DialogHeader>
 
@@ -63,7 +67,7 @@ export function BatchDetailDialog({
             <div className="space-y-1">
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <Package className="h-4 w-4" />
-                <span>Batch Code</span>
+                <span>Kode Batch</span>
               </div>
               <div className="text-lg font-semibold">{batch.code}</div>
             </div>
@@ -71,7 +75,7 @@ export function BatchDetailDialog({
             <div className="space-y-1">
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <Calendar className="h-4 w-4" />
-                <span>Production Date</span>
+                <span>Tanggal Produksi</span>
               </div>
               <div className="text-lg font-semibold">
                 {format(new Date(batch.date), 'MMMM dd, yyyy')}
@@ -82,7 +86,7 @@ export function BatchDetailDialog({
               <div className="space-y-1 sm:col-span-2">
                 <div className="text-muted-foreground flex items-center gap-2 text-sm">
                   <FileText className="h-4 w-4" />
-                  <span>Description</span>
+                  <span>Deskripsi</span>
                 </div>
                 <div className="text-sm">{batch.description}</div>
               </div>
@@ -97,7 +101,7 @@ export function BatchDetailDialog({
               </h3>
               <Badge variant="secondary">
                 {batch.batchUsages.length}{' '}
-                {batch.batchUsages.length === 1 ? 'material' : 'materials'}
+                {batch.batchUsages.length === 1 ? 'bahan' : 'bahan'}
               </Badge>
             </div>
 
@@ -105,12 +109,13 @@ export function BatchDetailDialog({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[80px]">Code</TableHead>
+                    <TableHead className="min-w-[80px]">Kode</TableHead>
                     <TableHead className="min-w-[150px]">
-                      Material Name
+                      Nama Bahan Baku
                     </TableHead>
+                    <TableHead className="min-w-[100px]">Drum</TableHead>
                     <TableHead className="min-w-[100px] text-right">
-                      Quantity Used
+                      Jumlah Digunakan
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -118,10 +123,10 @@ export function BatchDetailDialog({
                   {batch.batchUsages.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={3}
+                        colSpan={4}
                         className="text-muted-foreground text-center"
                       >
-                        No materials recorded
+                        Tidak ada bahan baku yang dicatat
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -138,6 +143,15 @@ export function BatchDetailDialog({
                             {usage.rawMaterial.name}
                           </Link>
                         </TableCell>
+                        <TableCell>
+                          {usage.drum ? (
+                            <Badge variant="outline" className="font-medium">
+                              {usage.drum.label}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-medium">
                           {usage.quantity.toLocaleString()}
                         </TableCell>
@@ -146,7 +160,7 @@ export function BatchDetailDialog({
                   )}
                   {batch.batchUsages.length > 0 && (
                     <TableRow className="bg-muted/50 font-semibold">
-                      <TableCell colSpan={2} className="text-right">
+                      <TableCell colSpan={3} className="text-right">
                         Total:
                       </TableCell>
                       <TableCell className="text-right">

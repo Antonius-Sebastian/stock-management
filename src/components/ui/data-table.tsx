@@ -13,7 +13,7 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Package } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -114,7 +114,17 @@ export function DataTable<TData, TValue>({
       ? (row, columnId, filterValue) => {
           const searchValue = String(filterValue).toLowerCase()
           return searchKeys.some((key) => {
-            const value = row.getValue(key)
+            // Handle nested paths like "batch.code" or "drum.label"
+            const keys = key.split('.')
+            let value: any = row.original
+            for (const k of keys) {
+              value = value?.[k]
+              if (value === null || value === undefined) break
+            }
+            // Handle null/undefined values
+            if (value === null || value === undefined) {
+              return false
+            }
             return String(value).toLowerCase().includes(searchValue)
           })
         }
@@ -218,9 +228,18 @@ export function DataTable<TData, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="text-muted-foreground h-24 text-center"
+                  className="h-32 text-center"
                 >
-                  {emptyMessage}
+                  <div className="flex flex-col items-center justify-center gap-3 py-8">
+                    <div className="text-muted-foreground rounded-full bg-muted/50 p-3">
+                      <Package className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-medium">
+                        {emptyMessage}
+                      </p>
+                    </div>
+                  </div>
                 </TableCell>
               </TableRow>
             )}

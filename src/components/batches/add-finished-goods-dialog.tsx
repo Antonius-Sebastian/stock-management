@@ -32,25 +32,25 @@ const formSchema = z.object({
   finishedGoods: z
     .array(
       z.object({
-        finishedGoodId: z.string().min(1, 'Please select a finished good'),
+        finishedGoodId: z.string().min(1, 'Silakan pilih produk jadi'),
         quantity: z.coerce
           .number({
-            required_error: 'Quantity is required',
-            invalid_type_error: 'Quantity must be a number',
+            required_error: 'Jumlah wajib diisi',
+            invalid_type_error: 'Jumlah harus berupa angka',
           })
           .refine(
             (val) => !isNaN(val) && val > 0,
-            'Quantity must be greater than zero'
+            'Jumlah harus lebih besar dari nol'
           ),
       })
     )
-    .min(1, 'At least one finished good is required')
+    .min(1, 'Minimal satu produk jadi wajib dipilih')
     .refine((finishedGoods) => {
       const finishedGoodIds = finishedGoods
         .map((fg) => fg.finishedGoodId)
         .filter((id) => id !== '')
       return finishedGoodIds.length === new Set(finishedGoodIds).size
-    }, 'Cannot select the same finished good multiple times'),
+    }, 'Tidak dapat memilih produk jadi yang sama lebih dari sekali'),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -197,7 +197,7 @@ export function AddFinishedGoodsDialog({
                   onClick={() => remove(index)}
                   disabled={fields.length === 1}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-5 w-5" />
                 </Button>
               </div>
             ))}
@@ -212,7 +212,7 @@ export function AddFinishedGoodsDialog({
               }
               className="w-full"
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-5 w-5" />
               Tambah Produk Jadi Lainnya
             </Button>
             <DialogFooter>

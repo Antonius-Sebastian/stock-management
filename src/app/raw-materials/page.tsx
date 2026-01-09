@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { RawMaterial } from '@prisma/client'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import { Loader2 } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -140,26 +141,36 @@ export default function RawMaterialsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-lg">Memuat...</div>
+      <div className="flex h-64 flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <Loader2 className="text-primary h-12 w-12 animate-spin" />
+          <Loader2
+            className="text-primary/50 absolute inset-0 h-12 w-12 animate-spin"
+            style={{
+              animationDirection: 'reverse',
+              animationDuration: '1.5s',
+            }}
+          />
+        </div>
+        <p className="text-muted-foreground animate-pulse">Memuat...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-section">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">
               Bahan Baku
             </h1>
-            <p className="text-muted-foreground text-sm lg:text-base">
+            <p className="text-muted-foreground mt-1.5 text-sm lg:text-base">
               Kelola inventori bahan baku Anda
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2.5">
           {canCreateStockMovement(userRole, 'raw-material', 'IN') && (
             <DrumStockEntryDialog onSuccess={handleSuccess} />
           )}

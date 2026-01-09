@@ -10,7 +10,7 @@ export function StockLevelBadge({ stock, moq }: StockLevelBadgeProps) {
   if (moq === 0) {
     return (
       <Badge variant="outline" className="text-muted-foreground">
-        No MOQ Set
+        Tidak Ada MOQ
       </Badge>
     )
   }
@@ -19,20 +19,21 @@ export function StockLevelBadge({ stock, moq }: StockLevelBadgeProps) {
 
   if (ratio >= 1) {
     return (
-      <Badge className="bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700">
-        Good
+      <Badge variant="success" className="font-semibold">
+        Baik
       </Badge>
     )
   } else if (ratio >= 0.5) {
     return (
-      <Badge
-        variant="secondary"
-        className="bg-yellow-500 text-white hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700"
-      >
-        Low
+      <Badge variant="warning" className="font-semibold">
+        Rendah
       </Badge>
     )
   } else {
-    return <Badge variant="destructive">Critical</Badge>
+    return (
+      <Badge variant="destructive" className="font-semibold">
+        Kritis
+      </Badge>
+    )
   }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Batch, BatchUsage, RawMaterial } from '@prisma/client'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import { Loader2 } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -21,6 +22,10 @@ import { logger } from '@/lib/logger'
 type BatchWithUsage = Batch & {
   batchUsages: (BatchUsage & {
     rawMaterial: RawMaterial
+    drum: {
+      id: string
+      label: string
+    } | null
   })[]
 }
 
@@ -104,21 +109,31 @@ export default function BatchesPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-lg">Memuat...</div>
+      <div className="flex h-64 flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <Loader2 className="text-primary h-12 w-12 animate-spin" />
+          <Loader2
+            className="text-primary/50 absolute inset-0 h-12 w-12 animate-spin"
+            style={{
+              animationDirection: 'reverse',
+              animationDuration: '1.5s',
+            }}
+          />
+        </div>
+        <p className="text-muted-foreground animate-pulse">Memuat...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-section">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">
               Pemakaian Batch
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mt-1.5">
               Lacak konsumsi bahan baku untuk batch produksi
             </p>
           </div>

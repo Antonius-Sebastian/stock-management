@@ -37,6 +37,7 @@ interface FinishedGoodsTableProps {
   onDelete?: (product: FinishedGood) => void
   onRefresh?: () => void
   userRole?: string
+  selectedLocation?: string
 }
 
 export function FinishedGoodsTable({
@@ -45,6 +46,7 @@ export function FinishedGoodsTable({
   onDelete,
   onRefresh,
   userRole,
+  selectedLocation,
 }: FinishedGoodsTableProps) {
   const [stockDialogOpen, setStockDialogOpen] = useState(false)
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
@@ -217,6 +219,7 @@ export function FinishedGoodsTable({
             entityId={selectedProduct.id}
             entityName={selectedProduct.name}
             onSuccess={handleStockSuccess}
+            defaultLocationId={selectedLocation}
           />
           <StockAdjustmentDialog
             open={adjustmentDialogOpen}

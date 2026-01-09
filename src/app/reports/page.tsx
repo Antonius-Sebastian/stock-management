@@ -26,9 +26,6 @@ import {
   BarChart3,
   Package,
   ShoppingCart,
-  TrendingUp,
-  Calendar,
-  Activity,
 } from 'lucide-react'
 import { StockReportTable } from '@/components/reports/stock-report-table'
 import { logger } from '@/lib/logger'
@@ -356,67 +353,6 @@ export default function ReportsPage() {
     return `${typeLabel} - ${dataTypeLabel} - ${monthLabel} ${year}`
   }
 
-  // Calculate summary statistics
-  const summaryStats = useMemo(() => {
-    if (!reportData || !reportData.data || reportData.data.length === 0) {
-      return null
-    }
-
-    const data = reportData.data
-    const currentDay = reportData.meta.currentDay
-    const dayColumns = Array.from(
-      { length: currentDay },
-      (_, i) => (i + 1).toString()
-    )
-
-    // Calculate totals
-    let totalQuantity = 0
-    let itemsWithActivity = 0
-    let itemsWithZeroActivity = 0
-    const dailyTotals: number[] = []
-
-    dayColumns.forEach((day) => {
-      let dayTotal = 0
-      data.forEach((item) => {
-        const value = item[day]
-        const numericValue = typeof value === 'number' ? value : 0
-        if (numericValue > 0) {
-          dayTotal += numericValue
-          totalQuantity += numericValue
-        }
-      })
-      dailyTotals.push(dayTotal)
-    })
-
-    // Count items with activity
-    data.forEach((item) => {
-      const hasActivity = dayColumns.some((day) => {
-        const value = item[day]
-        const numericValue = typeof value === 'number' ? value : 0
-        return numericValue > 0
-      })
-      if (hasActivity) {
-        itemsWithActivity++
-      } else {
-        itemsWithZeroActivity++
-      }
-    })
-
-    const averagePerDay =
-      currentDay > 0 ? totalQuantity / currentDay : 0
-    const peakDayIndex = dailyTotals.indexOf(Math.max(...dailyTotals))
-    const peakDay = peakDayIndex + 1
-
-    return {
-      totalItems: data.length,
-      totalQuantity,
-      averagePerDay,
-      peakDay,
-      itemsWithActivity,
-      itemsWithZeroActivity,
-      currentDay,
-    }
-  }, [reportData])
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -426,6 +362,11 @@ export default function ReportsPage() {
         month,
         type: reportType,
       })
+
+      // Add locationId for finished goods
+      if (reportType === 'finished-goods' && selectedLocation) {
+        params.append('locationId', selectedLocation)
+      }
 
       const response = await fetch(`/api/reports/export?${params}`)
       if (!response.ok) {
@@ -694,87 +635,10 @@ export default function ReportsPage() {
                       </div>
                     </div>
                   ) : reportData && reportData.data.length > 0 ? (
-                    <div className="space-y-6">
-                      {/* Summary Statistics */}
-                      {summaryStats && (
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                          <Card className="transition-shadow duration-200 hover:shadow-md">
-                            <CardHeader className="pb-2">
-                              <CardDescription className="text-xs sm:text-sm">
-                                Total Items
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
-                                {summaryStats.totalItems}
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card className="transition-shadow duration-200 hover:shadow-md">
-                            <CardHeader className="pb-2">
-                              <CardDescription className="text-xs sm:text-sm flex items-center gap-1">
-                                <TrendingUp className="h-3 w-3 shrink-0" />
-                                <span className="truncate">Total Quantity</span>
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
-                                {summaryStats.totalQuantity.toLocaleString(
-                                  'id-ID'
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card className="transition-shadow duration-200 hover:shadow-md">
-                            <CardHeader className="pb-2">
-                              <CardDescription className="text-xs sm:text-sm flex items-center gap-1">
-                                <Activity className="h-3 w-3 shrink-0" />
-                                <span className="truncate">Rata-rata/Hari</span>
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
-                                {summaryStats.averagePerDay.toFixed(1)}
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card className="transition-shadow duration-200 hover:shadow-md">
-                            <CardHeader className="pb-2">
-                              <CardDescription className="text-xs sm:text-sm flex items-center gap-1">
-                                <Calendar className="h-3 w-3 shrink-0" />
-                                <span className="truncate">Peak Day</span>
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
-                                Hari {summaryStats.peakDay}
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card className="transition-shadow duration-200 hover:shadow-md sm:col-span-3 lg:col-span-1">
-                            <CardHeader className="pb-2">
-                              <CardDescription className="text-xs sm:text-sm">
-                                Items Aktif
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-lg font-bold sm:text-xl lg:text-2xl">
-                                {summaryStats.itemsWithActivity}/
-                                {summaryStats.totalItems}
-                              </div>
-                              <p className="text-muted-foreground mt-1 text-xs">
-                                {summaryStats.itemsWithZeroActivity} tidak aktif
-                              </p>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      )}
-
-                      <StockReportTable
-                        data={reportData.data}
-                        currentDay={reportData.meta.currentDay}
-                      />
-                    </div>
+                    <StockReportTable
+                      data={reportData.data}
+                      currentDay={reportData.meta.currentDay}
+                    />
                   ) : (
                     <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20">
                       <div className="text-muted-foreground rounded-full bg-muted/50 p-3">

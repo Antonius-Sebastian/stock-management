@@ -21,6 +21,7 @@ import { StockEntryDialog } from '@/components/stock/stock-entry-dialog'
 import { canManageFinishedGoods, canCreateStockMovement } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { ManageLocationsDialog } from '@/components/locations/manage-locations-dialog'
+import { cn } from '@/lib/utils'
 
 interface Location {
   id: string
@@ -242,14 +243,14 @@ export default function FinishedGoodsPage() {
                   key={location.id}
                   variant={selectedLocation === location.id ? 'default' : 'outline'}
                   onClick={() => setSelectedLocation(location.id)}
-                  className={`
-                    rounded-none border-r-0 transition-all duration-200
-                    ${index === 0 ? 'rounded-l-md' : ''}
-                    ${index === locations.length - 1 ? 'rounded-r-md border-r' : ''}
-                    ${selectedLocation === location.id 
-                      ? 'bg-primary text-primary-foreground shadow-sm z-10' 
-                      : 'bg-background hover:bg-muted'}
-                  `}
+                  className={cn(
+                    'rounded-none border-r-0 transition-all duration-200',
+                    index === 0 && 'rounded-l-md',
+                    index === locations.length - 1 && 'rounded-r-md border-r',
+                    selectedLocation === location.id
+                      ? 'bg-primary text-primary-foreground shadow-sm z-10'
+                      : 'bg-background hover:bg-muted'
+                  )}
                 >
                   {location.name}
                 </Button>
@@ -262,6 +263,7 @@ export default function FinishedGoodsPage() {
             onDelete={handleDelete}
             onRefresh={handleSuccess}
             userRole={userRole}
+            selectedLocation={selectedLocation}
           />
         </CardContent>
       </Card>
@@ -279,9 +281,7 @@ export default function FinishedGoodsPage() {
         type={stockDialogType}
         entityType="finished-good"
         onSuccess={handleSuccess}
-        defaultLocationId={
-          stockDialogType === 'out' ? selectedLocation : undefined
-        }
+        defaultLocationId={selectedLocation}
       />
     </div>
   )

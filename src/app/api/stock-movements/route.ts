@@ -130,6 +130,7 @@ export async function POST(request: NextRequest) {
       finishedGoodId: validatedData.finishedGoodId || null,
       batchId: null,
       locationId: body.locationId || null,
+      drumId: validatedData.drumId || null,
     }
 
     // Create stock movement using service

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { UsersTable } from '@/components/users/users-table'
 import { AddUserDialog } from '@/components/users/add-user-dialog'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,8 @@ export type User = {
 }
 
 export default function UsersPage() {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -90,7 +93,7 @@ export default function UsersPage() {
               </p>
             </div>
           ) : (
-            <UsersTable users={users} onRefresh={fetchUsers} />
+            <UsersTable users={users} onRefresh={fetchUsers} userRole={userRole} />
           )}
         </CardContent>
       </Card>

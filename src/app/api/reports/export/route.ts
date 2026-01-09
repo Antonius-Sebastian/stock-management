@@ -10,6 +10,7 @@ const exportReportSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2030),
   month: z.coerce.number().int().min(1).max(12),
   type: z.enum(['raw-materials', 'finished-goods']),
+  locationId: z.string().optional(), // Optional locationId for finished goods
 })
 
 const MONTH_NAMES = [
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       year: searchParams.get('year'),
       month: searchParams.get('month'),
       type: searchParams.get('type'),
+      locationId: searchParams.get('locationId') || undefined,
     }
 
     const validatedQuery = exportReportSchema.parse(query)
@@ -143,9 +145,20 @@ export async function GET(request: NextRequest) {
           code: 'kode' in item ? (item as { kode?: string }).kode || '' : '',
         }
 
+        // Filter movements by locationId for finished goods if provided
+        let filteredMovements = item.stockMovements
+        if (
+          validatedQuery.type === 'finished-goods' &&
+          validatedQuery.locationId
+        ) {
+          filteredMovements = item.stockMovements.filter(
+            (movement) => movement.locationId === validatedQuery.locationId
+          )
+        }
+
         // Step 1: Calculate opening stock (stock at start of month)
         // Sum all movements that happened before the selected month
-        const movementsBeforeMonth = item.stockMovements.filter((movement) => {
+        const movementsBeforeMonth = filteredMovements.filter((movement) => {
           const movementDate = new Date(movement.date)
           return movementDate < startDate
         })
@@ -160,7 +173,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Step 2: Get all movements within the selected month
-        const movementsInMonth = item.stockMovements.filter((movement) => {
+        const movementsInMonth = filteredMovements.filter((movement) => {
           const movementDate = new Date(movement.date)
           return movementDate >= startDate && movementDate <= endDate
         })
@@ -311,6 +324,19 @@ export async function GET(request: NextRequest) {
       return max
     }
 
+    // Get location name if locationId is provided for finished goods
+    let locationName: string | null = null
+    if (
+      validatedQuery.type === 'finished-goods' &&
+      validatedQuery.locationId
+    ) {
+      const location = await prisma.location.findUnique({
+        where: { id: validatedQuery.locationId },
+        select: { name: true },
+      })
+      locationName = location?.name || null
+    }
+
     // Create a sheet for each data type
     for (const dataType of dataTypes) {
       const sheetData = calculateStockData(dataType.key)
@@ -320,13 +346,14 @@ export async function GET(request: NextRequest) {
       const monthName = MONTH_NAMES[validatedQuery.month - 1]
       const reportTypeName =
         validatedQuery.type === 'raw-materials' ? 'BAHAN BAKU' : 'PRODUK JADI'
+      const locationText = locationName ? ` - ${locationName}` : ''
       const currentDate = new Date()
       const formattedDate = `${currentDate.getDate()} ${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()} ${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`
 
       // Row 1: Report Title
       worksheet.mergeCells('A1:E1')
       const titleCell = worksheet.getCell('A1')
-      titleCell.value = `LAPORAN STOK ${reportTypeName}`
+      titleCell.value = `LAPORAN STOK ${reportTypeName}${locationText}`
       titleCell.font = {
         size: 14,
         bold: true,
@@ -593,7 +620,10 @@ export async function GET(request: NextRequest) {
     const monthName = MONTH_NAMES[validatedQuery.month - 1]
     const reportTypeName =
       validatedQuery.type === 'raw-materials' ? 'Bahan_Baku' : 'Produk_Jadi'
-    const filename = `Laporan_${reportTypeName}_${monthName}_${validatedQuery.year}.xlsx`
+    const locationSuffix = locationName
+      ? `_${locationName.replace(/\s+/g, '_')}`
+      : ''
+    const filename = `Laporan_${reportTypeName}${locationSuffix}_${monthName}_${validatedQuery.year}.xlsx`
 
     // Return Excel file
     return new NextResponse(buffer, {

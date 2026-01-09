@@ -171,10 +171,23 @@ function MaterialDrumsFieldArray({
     name: drumPath as any,
   })
 
+  // Get all selected drum IDs in this material for display purposes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drums = form.watch(drumPath as any) as Array<{
+    drumId: string
+    quantity: number
+  }>
+  const selectedDrumIdsInThisMaterial = new Set(
+    drums.map((d) => d.drumId).filter((id) => id)
+  )
+
   // Get available drums (not used in other materials, and with stock > 0)
   // For edit mode, also include drums that are already used in this batch
+  // Always include currently selected drums so SelectValue can display them
   const availableDrums =
     selectedMaterial.drums?.filter((drum) => {
+      const isSelected = selectedDrumIdsInThisMaterial.has(drum.id)
+      if (isSelected) return true // Always include selected drum for display
       const availableStock = getAvailableStock(selectedMaterial.id, drum.id)
       return availableStock > 0 && !usedDrumIds.has(drum.id)
     }) || []
@@ -182,10 +195,6 @@ function MaterialDrumsFieldArray({
   return (
     <div className="space-y-3">
       {drumFields.map((drumField, drumIndex) => {
-        const drums = form.watch(drumPath as any) as Array<{
-          drumId: string
-          quantity: number
-        }>
         const selectedDrumId = drums[drumIndex]?.drumId
         const selectedDrum = selectedMaterial.drums?.find(
           (d) => d.id === selectedDrumId
@@ -218,7 +227,7 @@ function MaterialDrumsFieldArray({
                           // Reset quantity when drum changes
                           form.setValue(quantityPath, '' as unknown as number)
                         }}
-                        value={field.value}
+                        value={field.value || undefined}
                       >
                         <SelectTrigger className="h-9 w-full">
                           <SelectValue placeholder="Pilih Drum" />
@@ -242,11 +251,7 @@ function MaterialDrumsFieldArray({
                               >
                                 {drum.label} (Sisa:{' '}
                                 {availableStock.toLocaleString()}){' '}
-                                {availableStock <= 0
-                                  ? '(Habis)'
-                                  : isUsed
-                                    ? '(Sudah digunakan)'
-                                    : ''}
+                                {availableStock <= 0 ? '(Habis)' : ''}
                               </SelectItem>
                             )
                           })}

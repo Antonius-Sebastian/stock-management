@@ -94,8 +94,11 @@ export async function createStockMovement(
         }
       }
 
-      if (data.rawMaterialId) {
-        // ... raw material logic (unchanged) ...
+      // For raw materials, if drumId is provided, skip aggregate stock validation
+      // (drum stock validation is sufficient)
+      if (data.rawMaterialId && !data.drumId) {
+        // Only validate aggregate stock if no drumId is provided
+        // (This should not happen for raw materials now, but kept for safety)
         const rawMaterials = await tx.$queryRaw<
           Array<{ id: string; name: string; currentStock: number }>
         >`

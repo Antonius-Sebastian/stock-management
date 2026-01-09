@@ -28,6 +28,8 @@ export const stockMovementSchemaAPI = z
     description: z.string().optional(),
     rawMaterialId: z.string().optional(),
     finishedGoodId: z.string().optional(),
+    drumId: z.string().optional(),
+    locationId: z.string().optional(),
   })
   .refine((data) => data.quantity !== 0, {
     message: 'Quantity cannot be zero',
@@ -47,6 +49,19 @@ export const stockMovementSchemaAPI = z
   .refine((data) => data.rawMaterialId || data.finishedGoodId, {
     message: 'Either rawMaterialId or finishedGoodId must be provided',
   })
+  .refine(
+    (data) => {
+      // For raw materials, drumId is required
+      if (data.rawMaterialId) {
+        return data.drumId && data.drumId.trim() !== ''
+      }
+      return true
+    },
+    {
+      message: 'Drum is required for raw material stock operations',
+      path: ['drumId'],
+    }
+  )
 
 /**
  * Query schema for getting stock movements by date

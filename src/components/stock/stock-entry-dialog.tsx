@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Plus, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -48,7 +47,7 @@ const createFormSchema = (
   itemType: 'raw-material' | 'finished-good'
 ) => {
   const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
-  const isRawMaterialIn = itemType === 'raw-material' && normalizedType === 'IN'
+  const isRawMaterial = itemType === 'raw-material'
 
   const baseSchema = z.object({
     itemId: z.string().min(1, 'Silakan pilih item'),
@@ -68,30 +67,64 @@ const createFormSchema = (
     description: z.string().optional(),
     locationId: z.string().optional(),
     batchCode: z.string().optional(),
-    drums: z
-      .array(
-        z.object({
-          label: z.string().min(1, 'Label drum wajib diisi'),
-          quantity: z.coerce
-            .number({
-              required_error: 'Jumlah wajib diisi',
-              invalid_type_error: 'Jumlah harus berupa angka',
-            })
-            .refine(
-              (val) => !isNaN(val) && val > 0,
-              'Jumlah harus lebih besar dari nol'
-            ),
-        })
-      )
-      .optional(),
+    drumId: z.string().optional(),
   })
 
   return baseSchema
     .refine(
       (data) => {
+        // For raw materials, drumId is required
+        if (isRawMaterial) {
+          return data.drumId && data.drumId.trim() !== ''
+        }
+        return true
+      },
+      {
+        message: 'Drum wajib dipilih untuk bahan baku',
+        path: ['drumId'],
+      }
+    )
+    .refine(
+      (data) => {
+        // For raw materials, quantity is required when drumId is selected
+        if (isRawMaterial && data.drumId) {
+          return data.quantity !== undefined && data.quantity > 0
+        }
+        // For finished goods OUT, quantity is required
+        if (itemType === 'finished-good' && normalizedType === 'OUT') {
+          return data.quantity !== undefined && data.quantity > 0
+        }
+        // For finished goods IN, quantity is required
+        if (itemType === 'finished-good' && normalizedType === 'IN') {
+          return data.quantity !== undefined && data.quantity > 0
+        }
+        return true
+      },
+      {
+        message: 'Jumlah wajib diisi',
+        path: ['quantity'],
+      }
+    )
+    .refine(
+      (data) => {
         if (normalizedType === 'OUT') {
           const selectedItem = items.find((item) => item.id === data.itemId)
-          if (selectedItem && 'currentStock' in selectedItem) {
+          if (isRawMaterial && data.drumId && selectedItem) {
+            // For raw materials, check drum stock
+            const itemWithDrums = selectedItem as Item & {
+              drums?: Array<{
+                id: string
+                currentQuantity: number
+              }>
+            }
+            const selectedDrum = itemWithDrums.drums?.find(
+              (d) => d.id === data.drumId
+            )
+            if (selectedDrum) {
+              return (data.quantity || 0) <= selectedDrum.currentQuantity
+            }
+          } else if (selectedItem && 'currentStock' in selectedItem) {
+            // For finished goods, check item stock
             return (
               (data.quantity || 0) <=
               (selectedItem as Item & { currentStock: number }).currentStock
@@ -102,23 +135,6 @@ const createFormSchema = (
       },
       {
         message: 'Jumlah tidak boleh melebihi stok yang tersedia',
-        path: ['quantity'],
-      }
-    )
-    .refine(
-      (data) => {
-        if (isRawMaterialIn) {
-          // If drums are provided, quantity is optional (sum of drums)
-          // If no drums, quantity is required
-          if (data.drums && data.drums.length > 0) {
-            return true // Drums provided, quantity optional
-          }
-          return data.quantity !== undefined && data.quantity > 0 // No drums, quantity required
-        }
-        return true
-      },
-      {
-        message: 'Jumlah atau drum harus diisi',
         path: ['quantity'],
       }
     )
@@ -177,8 +193,7 @@ export function StockEntryDialog({
   // Determine the actual item type to use
   const actualItemType = entityType || itemType || 'raw-material'
   const normalizedType = typeof type === 'string' ? type.toUpperCase() : type
-  const isRawMaterialIn =
-    actualItemType === 'raw-material' && normalizedType === 'IN'
+  const isRawMaterial = actualItemType === 'raw-material'
 
   const formSchema = createFormSchema(items, type, actualItemType)
   const form = useForm<FormData>({
@@ -190,18 +205,9 @@ export function StockEntryDialog({
       description: '',
       locationId: '', // Default empty, will be required for FG
       batchCode: '',
-      drums: [],
+      drumId: '',
     },
     mode: 'onSubmit',
-  })
-
-  const {
-    fields: drumFields,
-    append: appendDrum,
-    remove: removeDrum,
-  } = useFieldArray({
-    control: form.control,
-    name: 'drums',
   })
 
   const fetchItems = async (signal?: AbortSignal) => {
@@ -211,8 +217,8 @@ export function StockEntryDialog({
           ? '/api/raw-materials'
           : '/api/finished-goods'
 
-      // Include drums for raw material IN
-      if (isRawMaterialIn) {
+      // Include drums for raw materials (both IN and OUT)
+      if (actualItemType === 'raw-material') {
         endpoint += '?include=drums'
       }
 
@@ -278,7 +284,7 @@ export function StockEntryDialog({
         description: '',
         locationId: '',
         batchCode: '',
-        drums: [],
+        drumId: '',
       })
     }
 
@@ -332,54 +338,13 @@ export function StockEntryDialog({
 
   const { handleSubmit: handleFormSubmit, isLoading } = useFormSubmission({
     onSubmit: async (data: FormData) => {
-      // Use drum-in endpoint if drums are provided for raw material IN
-      if (isRawMaterialIn && data.drums && data.drums.length > 0) {
-        const drumStockInData = {
-          rawMaterialId: data.itemId,
-          date: data.date,
-          description: data.description || undefined,
-          drums: data.drums,
-        }
-
-        const response = await fetch('/api/stock-movements/drum-in', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(drumStockInData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response
-            .json()
-            .catch(() => ({ error: 'Unknown error' }))
-          throw new Error(errorData.error || 'Gagal mencatat stok masuk drum')
-        }
-
-        toast.success(
-          'Berhasil mencatat stok masuk dengan drum untuk bahan baku'
-        )
-        form.reset({
-          itemId: entityId || '',
-          quantity: '' as unknown as number,
-          date: new Date(),
-          description: '',
-          locationId: '',
-          batchCode: '',
-          drums: [],
-        })
-        setOpen(false)
-        onSuccess()
-        return
-      }
-
-      // Regular stock movement endpoint
+      // Regular stock movement endpoint with drumId for raw materials
       const stockMovementData = {
         type: normalizedType,
         quantity: data.quantity || 0,
         date: data.date.toISOString(),
         ...(actualItemType === 'raw-material'
-          ? { rawMaterialId: data.itemId }
+          ? { rawMaterialId: data.itemId, drumId: data.drumId }
           : { finishedGoodId: data.itemId, locationId: data.locationId }),
         // Append batch code to description if provided
         description: data.batchCode
@@ -416,7 +381,7 @@ export function StockEntryDialog({
         description: '',
         locationId: '',
         batchCode: '',
-        drums: [],
+        drumId: '',
       })
       setOpen(false)
       onSuccess()
@@ -547,50 +512,80 @@ export function StockEntryDialog({
                 }}
               />
             )}
-            {!isRawMaterialIn && (
+            {/* Drum selection for raw materials */}
+            {isRawMaterial && (
               <FormField
                 control={form.control}
-                name="quantity"
+                name="drumId"
                 render={({ field }) => {
                   const selectedItemId = form.watch('itemId')
                   const selectedItem = items.find(
                     (item) => item.id === selectedItemId
-                  )
-
-                  // For finished goods OUT, get stock from selected location
-                  let availableStock = selectedItem?.currentStock || 0
-                  if (
-                    actualItemType === 'finished-good' &&
-                    normalizedType === 'OUT' &&
-                    selectedItem
-                  ) {
-                    const selectedLocId = form.watch('locationId')
-                    const itemWithStocks = selectedItem as Item & {
-                      stocks?: Array<{ locationId: string; quantity: number }>
-                    }
-                    if (selectedLocId && itemWithStocks.stocks) {
-                      const stock = itemWithStocks.stocks.find(
-                        (s) => s.locationId === selectedLocId
-                      )
-                      availableStock = stock?.quantity || 0
-                    }
+                  ) as Item & {
+                    drums?: Array<{
+                      id: string
+                      label: string
+                      currentQuantity: number
+                      isActive: boolean
+                    }>
                   }
 
+                  const availableDrums =
+                    selectedItem?.drums?.filter((drum) => {
+                      if (normalizedType === 'OUT') {
+                        // For OUT, only show drums with available stock
+                        return drum.currentQuantity > 0 && drum.isActive
+                      }
+                      // For IN, show all active drums
+                      return drum.isActive
+                    }) || []
+
                   return (
-                    <FormItem className="min-w-0">
-                      <FormLabel>Jumlah</FormLabel>
+                    <FormItem>
+                      <FormLabel>Drum</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Masukkan jumlah"
-                          {...field}
-                        />
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value)
+                            // Reset quantity when drum changes
+                            form.setValue('quantity', '' as unknown as number)
+                          }}
+                          value={field.value || undefined}
+                          disabled={!selectedItemId}
+                        >
+                          <SelectTrigger className="h-9 w-full">
+                            <SelectValue placeholder="Pilih Drum" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableDrums.length === 0 ? (
+                              <div className="py-2 text-center text-sm text-muted-foreground">
+                                {!selectedItemId
+                                  ? 'Pilih bahan baku terlebih dahulu'
+                                  : normalizedType === 'OUT'
+                                    ? 'Tidak ada drum dengan stok tersedia'
+                                    : 'Tidak ada drum tersedia'}
+                              </div>
+                            ) : (
+                              availableDrums.map((drum) => (
+                                <SelectItem
+                                  key={drum.id}
+                                  value={drum.id}
+                                  disabled={drum.currentQuantity <= 0}
+                                >
+                                  {drum.label} (Sisa:{' '}
+                                  {drum.currentQuantity.toLocaleString()}){' '}
+                                  {drum.currentQuantity <= 0 ? '(Habis)' : ''}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                       </FormControl>
-                      {normalizedType === 'OUT' && selectedItem && (
+                      {selectedItemId && availableDrums.length === 0 && (
                         <p className="text-muted-foreground text-xs">
-                          Tersedia: {availableStock.toLocaleString()}
+                          {normalizedType === 'OUT'
+                            ? 'Tidak ada drum dengan stok tersedia untuk bahan baku ini'
+                            : 'Tidak ada drum tersedia untuk bahan baku ini'}
                         </p>
                       )}
                       <FormMessage />
@@ -600,115 +595,93 @@ export function StockEntryDialog({
               />
             )}
 
-            {isRawMaterialIn && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <FormLabel>Drum (Opsional)</FormLabel>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      appendDrum({
-                        label: '',
-                        quantity: '' as unknown as number,
-                      })
-                    }
-                  >
-                    <Plus className="mr-2 h-5 w-5" />
-                    Tambah Drum
-                  </Button>
-                </div>
-                {drumFields.length === 0 ? (
-                  <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-center text-sm">
-                    <p>Tambahkan drum untuk mencatat stok masuk per drum</p>
-                    <p className="mt-1 text-xs">
-                      Atau gunakan jumlah total di bawah jika tidak menggunakan
-                      drum
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {drumFields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="flex gap-2 rounded-lg border p-3"
-                      >
-                        <FormField
-                          control={form.control}
-                          name={`drums.${index}.label`}
-                          render={({ field }) => (
-                            <FormItem className="flex-1">
-                              <FormLabel className="text-xs">
-                                Label Drum
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Contoh: D1, D2"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`drums.${index}.quantity`}
-                          render={({ field }) => (
-                            <FormItem className="w-32">
-                              <FormLabel className="text-xs">Jumlah</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  placeholder="0"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="mt-6"
-                          onClick={() => removeDrum(index)}
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {drumFields.length === 0 && (
-                  <FormField
-                    control={form.control}
-                    name="quantity"
-                    render={({ field }) => (
-                      <FormItem className="min-w-0">
-                        <FormLabel>
-                          Jumlah Total (jika tidak menggunakan drum)
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Masukkan jumlah"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+            {/* Quantity field - shown for all types */}
+            <FormField
+              control={form.control}
+              name="quantity"
+              render={({ field }) => {
+                const selectedItemId = form.watch('itemId')
+                const selectedItem = items.find(
+                  (item) => item.id === selectedItemId
+                )
+                const selectedDrumId = form.watch('drumId')
+
+                // For raw materials, get stock from selected drum
+                let availableStock = 0
+                if (isRawMaterial && selectedItem && selectedDrumId) {
+                  const itemWithDrums = selectedItem as Item & {
+                    drums?: Array<{
+                      id: string
+                      label: string
+                      currentQuantity: number
+                    }>
+                  }
+                  const selectedDrum = itemWithDrums.drums?.find(
+                    (d) => d.id === selectedDrumId
+                  )
+                  availableStock = selectedDrum?.currentQuantity || 0
+                } else if (
+                  actualItemType === 'finished-good' &&
+                  normalizedType === 'OUT' &&
+                  selectedItem
+                ) {
+                  // For finished goods OUT, get stock from selected location
+                  const selectedLocId = form.watch('locationId')
+                  const itemWithStocks = selectedItem as Item & {
+                    stocks?: Array<{ locationId: string; quantity: number }>
+                  }
+                  if (selectedLocId && itemWithStocks.stocks) {
+                    const stock = itemWithStocks.stocks.find(
+                      (s) => s.locationId === selectedLocId
+                    )
+                    availableStock = stock?.quantity || 0
+                  }
+                } else if (selectedItem && 'currentStock' in selectedItem) {
+                  availableStock = (selectedItem as Item & { currentStock: number })
+                    .currentStock
+                }
+
+                const isQuantityDisabled =
+                  isRawMaterial && !selectedDrumId
+
+                return (
+                  <FormItem className="min-w-0">
+                    <FormLabel>Jumlah</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Masukkan jumlah"
+                        disabled={isQuantityDisabled}
+                        {...field}
+                      />
+                    </FormControl>
+                    {isQuantityDisabled && (
+                      <p className="text-muted-foreground text-xs">
+                        Pilih drum terlebih dahulu
+                      </p>
                     )}
-                  />
-                )}
-              </div>
-            )}
+                    {!isQuantityDisabled &&
+                      normalizedType === 'OUT' &&
+                      availableStock > 0 && (
+                        <p className="text-muted-foreground text-xs">
+                          Tersedia: {availableStock.toLocaleString()}
+                        </p>
+                      )}
+                    {isRawMaterial &&
+                      selectedDrumId &&
+                      availableStock > 0 &&
+                      normalizedType === 'IN' && (
+                        <p className="text-muted-foreground text-xs">
+                          Stok saat ini: {availableStock.toLocaleString()}
+                        </p>
+                      )}
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
+            />
             <FormField
               control={form.control}
               name="date"

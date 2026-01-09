@@ -28,14 +28,16 @@ import {
 } from 'lucide-react'
 import { EditUserDialog } from './edit-user-dialog'
 import { toast } from 'sonner'
+import { canManageUsers } from '@/lib/rbac'
 import type { User } from '@/app/users/page'
 
 type UsersTableProps = {
   users: User[]
   onRefresh: () => void
+  userRole?: string
 }
 
-export function UsersTable({ users, onRefresh }: UsersTableProps) {
+export function UsersTable({ users, onRefresh, userRole }: UsersTableProps) {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
@@ -137,29 +139,35 @@ export function UsersTable({ users, onRefresh }: UsersTableProps) {
                     {new Date(user.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Buka menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Aksi</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(user)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Ubah
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(user)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Hapus
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {canManageUsers(userRole) ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Buka menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Aksi</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {canManageUsers(userRole) && (
+                            <DropdownMenuItem onClick={() => handleEdit(user)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Ubah
+                            </DropdownMenuItem>
+                          )}
+                          {canManageUsers(userRole) && (
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(user)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Hapus
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))

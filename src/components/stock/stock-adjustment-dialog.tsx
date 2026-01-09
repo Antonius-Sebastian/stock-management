@@ -24,12 +24,22 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ItemSelector, DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
 import type { Item } from '@/lib/types'
 import { getWIBDate } from '@/lib/timezone'
 
-const createFormSchema = (items: Item[]) =>
+const createFormSchema = (
+  items: Item[],
+  itemType: 'raw-material' | 'finished-good'
+) =>
   z
     .object({
       itemId: z.string().min(1, 'Silakan pilih item'),
@@ -43,11 +53,41 @@ const createFormSchema = (items: Item[]) =>
         required_error: 'Silakan pilih tanggal',
       }),
       description: z.string().min(1, 'Alasan wajib diisi untuk penyesuaian stok'),
+      drumId: z.string().optional(),
     })
     .refine(
       (data) => {
+        // For raw materials, drumId is required
+        if (itemType === 'raw-material') {
+          return data.drumId && data.drumId.trim() !== ''
+        }
+        return true
+      },
+      {
+        message: 'Drum wajib dipilih untuk bahan baku',
+        path: ['drumId'],
+      }
+    )
+    .refine(
+      (data) => {
         const selectedItem = items.find((item) => item.id === data.itemId)
-        if (selectedItem && 'currentStock' in selectedItem) {
+        if (itemType === 'raw-material' && data.drumId && selectedItem) {
+          // For raw materials, check drum stock
+          const itemWithDrums = selectedItem as Item & {
+            drums?: Array<{
+              id: string
+              currentQuantity: number
+            }>
+          }
+          const selectedDrum = itemWithDrums.drums?.find(
+            (d) => d.id === data.drumId
+          )
+          if (selectedDrum) {
+            const newStock = selectedDrum.currentQuantity + data.quantity
+            return newStock >= 0
+          }
+        } else if (selectedItem && 'currentStock' in selectedItem) {
+          // For finished goods, check item stock
           const currentStock = (selectedItem as Item & { currentStock: number })
             .currentStock
           const newStock = currentStock + data.quantity
@@ -97,7 +137,7 @@ export function StockAdjustmentDialog({
   // Determine the actual item type to use
   const actualItemType = entityType || itemType || 'raw-material'
 
-  const formSchema = createFormSchema(items)
+  const formSchema = createFormSchema(items, actualItemType)
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -105,16 +145,23 @@ export function StockAdjustmentDialog({
       quantity: '' as unknown as number,
       date: getWIBDate(),
       description: '',
+      drumId: '',
     },
     mode: 'onSubmit',
   })
 
   const fetchItems = async (signal: AbortSignal) => {
     try {
-      const endpoint =
+      let endpoint =
         actualItemType === 'raw-material'
           ? '/api/raw-materials'
           : '/api/finished-goods'
+
+      // Include drums for raw materials
+      if (actualItemType === 'raw-material') {
+        endpoint += '?include=drums'
+      }
+
       const response = await fetch(endpoint, { signal })
       if (!response.ok) {
         throw new Error('Failed to fetch items')
@@ -163,7 +210,7 @@ export function StockAdjustmentDialog({
         date: data.date.toISOString(),
         description: data.description || 'Stock adjustment',
         ...(actualItemType === 'raw-material'
-          ? { rawMaterialId: data.itemId }
+          ? { rawMaterialId: data.itemId, drumId: data.drumId }
           : { finishedGoodId: data.itemId }),
       }
 
@@ -192,6 +239,7 @@ export function StockAdjustmentDialog({
         quantity: '' as unknown as number,
         date: getWIBDate(),
         description: '',
+        drumId: '',
       })
       setOpen(false)
       onSuccess()
@@ -250,45 +298,191 @@ export function StockAdjustmentDialog({
               )}
             />
 
-            {currentStock !== null && (
-              <div className="text-muted-foreground text-sm">
-                Stok Saat Ini:{' '}
-                <span className="font-medium">
-                  {currentStock.toLocaleString()}
-                </span>
-              </div>
+            {/* Drum selection for raw materials */}
+            {actualItemType === 'raw-material' && (
+              <FormField
+                control={form.control}
+                name="drumId"
+                render={({ field }) => {
+                  const selectedItemId = form.watch('itemId')
+                  const selectedItem = items.find(
+                    (item) => item.id === selectedItemId
+                  ) as Item & {
+                    drums?: Array<{
+                      id: string
+                      label: string
+                      currentQuantity: number
+                      isActive: boolean
+                    }>
+                  }
+
+                  const availableDrums =
+                    selectedItem?.drums?.filter((drum) => drum.isActive) || []
+
+                  return (
+                    <FormItem>
+                      <FormLabel>Drum</FormLabel>
+                      <FormControl>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value)
+                            // Reset quantity when drum changes
+                            form.setValue('quantity', '' as unknown as number)
+                          }}
+                          value={field.value || undefined}
+                          disabled={!selectedItemId}
+                        >
+                          <SelectTrigger className="h-9 w-full">
+                            <SelectValue placeholder="Pilih Drum" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableDrums.length === 0 ? (
+                              <div className="py-2 text-center text-sm text-muted-foreground">
+                                {!selectedItemId
+                                  ? 'Pilih bahan baku terlebih dahulu'
+                                  : 'Tidak ada drum tersedia'}
+                              </div>
+                            ) : (
+                              availableDrums.map((drum) => (
+                                <SelectItem key={drum.id} value={drum.id}>
+                                  {drum.label} (Sisa:{' '}
+                                  {drum.currentQuantity.toLocaleString()})
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      {selectedItemId && availableDrums.length === 0 && (
+                        <p className="text-muted-foreground text-xs">
+                          Tidak ada drum tersedia untuk bahan baku ini
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
+              />
             )}
+
+            {/* Stock display - show drum stock for raw materials, item stock for finished goods */}
+            {(() => {
+              const selectedItemId = form.watch('itemId')
+              const selectedDrumId = form.watch('drumId')
+              const selectedItem = items.find(
+                (item) => item.id === selectedItemId
+              )
+
+              let displayStock: number | null = null
+              let stockLabel = 'Stok Saat Ini'
+
+              if (actualItemType === 'raw-material' && selectedDrumId && selectedItem) {
+                const itemWithDrums = selectedItem as Item & {
+                  drums?: Array<{
+                    id: string
+                    label: string
+                    currentQuantity: number
+                  }>
+                }
+                const selectedDrum = itemWithDrums.drums?.find(
+                  (d) => d.id === selectedDrumId
+                )
+                if (selectedDrum) {
+                  displayStock = selectedDrum.currentQuantity
+                  stockLabel = 'Stok Drum Saat Ini'
+                }
+              } else if (
+                selectedItem &&
+                'currentStock' in selectedItem
+              ) {
+                displayStock = (selectedItem as Item & { currentStock: number })
+                  .currentStock
+              }
+
+              return (
+                displayStock !== null && (
+                  <div className="text-muted-foreground text-sm">
+                    {stockLabel}:{' '}
+                    <span className="font-medium">
+                      {displayStock.toLocaleString()}
+                    </span>
+                  </div>
+                )
+              )
+            })()}
 
             <FormField
               control={form.control}
               name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Jumlah Penyesuaian</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Masukkan nilai positif atau negatif"
-                      {...field}
-                    />
-                  </FormControl>
-                  <p className="text-muted-foreground text-xs">
-                    Nilai positif menambah stok, nilai negatif mengurangi stok
-                  </p>
-                  {currentStock !== null && form.watch('quantity') && (
-                    <p className="text-muted-foreground text-xs">
-                      Stok Baru:{' '}
-                      <span className="font-medium">
-                        {(
-                          currentStock + (form.watch('quantity') || 0)
-                        ).toLocaleString()}
-                      </span>
-                    </p>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const selectedItemId = form.watch('itemId')
+                const selectedDrumId = form.watch('drumId')
+                const selectedItem = items.find(
+                  (item) => item.id === selectedItemId
+                )
+
+                let currentStock: number | null = null
+                if (actualItemType === 'raw-material' && selectedDrumId && selectedItem) {
+                  const itemWithDrums = selectedItem as Item & {
+                    drums?: Array<{
+                      id: string
+                      currentQuantity: number
+                    }>
+                  }
+                  const selectedDrum = itemWithDrums.drums?.find(
+                    (d) => d.id === selectedDrumId
+                  )
+                  currentStock = selectedDrum?.currentQuantity || null
+                } else if (
+                  selectedItem &&
+                  'currentStock' in selectedItem
+                ) {
+                  currentStock = (selectedItem as Item & { currentStock: number })
+                    .currentStock
+                }
+
+                const isQuantityDisabled =
+                  actualItemType === 'raw-material' && !selectedDrumId
+
+                return (
+                  <FormItem>
+                    <FormLabel>Jumlah Penyesuaian</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Masukkan nilai positif atau negatif"
+                        disabled={isQuantityDisabled}
+                        {...field}
+                      />
+                    </FormControl>
+                    {isQuantityDisabled && (
+                      <p className="text-muted-foreground text-xs">
+                        Pilih drum terlebih dahulu
+                      </p>
+                    )}
+                    {!isQuantityDisabled && (
+                      <p className="text-muted-foreground text-xs">
+                        Nilai positif menambah stok, nilai negatif mengurangi
+                        stok
+                      </p>
+                    )}
+                    {currentStock !== null &&
+                      !isQuantityDisabled &&
+                      form.watch('quantity') && (
+                        <p className="text-muted-foreground text-xs">
+                          Stok Baru:{' '}
+                          <span className="font-medium">
+                            {(
+                              currentStock + (form.watch('quantity') || 0)
+                            ).toLocaleString()}
+                          </span>
+                        </p>
+                      )}
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
             />
 
             <FormField

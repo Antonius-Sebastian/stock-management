@@ -161,10 +161,27 @@ function MaterialDrumsFieldArray({
     name: drumPath as any,
   })
 
+  // Get all selected drum IDs in this material for display purposes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drums = form.watch(drumPath as any) as Array<{
+    drumId: string
+    quantity: number
+  }>
+  const selectedDrumIdsInThisMaterial = new Set(
+    drums.map((d) => d.drumId).filter((id) => id)
+  )
+
   // Get available drums (not used in other materials, and with stock > 0)
+  // Always include currently selected drums so SelectValue can display them
   const availableDrums =
     selectedMaterial.drums?.filter(
-      (drum) => drum.currentQuantity > 0 && !usedDrumIds.has(drum.id)
+      (drum) => {
+        const isSelected = selectedDrumIdsInThisMaterial.has(drum.id)
+        return (
+          isSelected ||
+          (drum.currentQuantity > 0 && !usedDrumIds.has(drum.id))
+        )
+      }
     ) || []
 
   return (
@@ -204,7 +221,7 @@ function MaterialDrumsFieldArray({
                           // Reset quantity when drum changes
                           form.setValue(quantityPath, '' as unknown as number)
                         }}
-                        value={field.value}
+                        value={field.value || undefined}
                       >
                         <SelectTrigger className="h-9 w-full">
                           <SelectValue placeholder="Pilih Drum" />
@@ -225,11 +242,7 @@ function MaterialDrumsFieldArray({
                               >
                                 {drum.label} (Sisa:{' '}
                                 {drum.currentQuantity.toLocaleString()}){' '}
-                                {drum.currentQuantity <= 0
-                                  ? '(Habis)'
-                                  : isUsed
-                                    ? '(Sudah digunakan)'
-                                    : ''}
+                                {drum.currentQuantity <= 0 ? '(Habis)' : ''}
                               </SelectItem>
                             )
                           })}

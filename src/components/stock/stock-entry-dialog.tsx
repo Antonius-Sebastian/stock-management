@@ -62,6 +62,10 @@ const createFormSchema = (
         (val) => !isNaN(val) && val > 0,
         'Jumlah harus lebih besar dari nol'
       )
+      .refine(
+        (val) => val <= 1000000,
+        'Jumlah tidak boleh melebihi 1,000,000'
+      )
       .optional(),
     date: z.date({
       required_error: 'Silakan pilih tanggal',

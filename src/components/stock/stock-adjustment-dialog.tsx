@@ -55,7 +55,8 @@ const createFormSchema = (
           required_error: 'Stok baru wajib diisi',
           invalid_type_error: 'Stok baru harus berupa angka',
         })
-        .min(0, 'Stok baru tidak boleh negatif'),
+        .min(0, 'Stok baru tidak boleh negatif')
+        .max(1000000, 'Stok baru tidak boleh melebihi 1,000,000'),
       date: z.date({
         required_error: 'Silakan pilih tanggal',
       }),
@@ -410,7 +411,8 @@ export function StockAdjustmentDialog({
                               availableDrums.map((drum) => (
                                 <SelectItem key={drum.id} value={drum.id}>
                                   {drum.label} (Sisa:{' '}
-                                  {drum.currentQuantity.toLocaleString()})
+                                  {drum.currentQuantity.toLocaleString()}
+                                  {drum.currentQuantity === 0 && ' - Kosong'})
                                 </SelectItem>
                               ))
                             )}
@@ -489,6 +491,21 @@ export function StockAdjustmentDialog({
                 const selectedLocationId =
                   form.watch('locationId') || defaultLocationId
                 let currentStock: number | null = null
+
+                // Get available drums for raw materials to check if any are available
+                const availableDrumsForCheck =
+                  actualItemType === 'raw-material' && selectedItem
+                    ? (
+                        selectedItem as Item & {
+                          drums?: Array<{
+                            id: string
+                            currentQuantity: number
+                            isActive: boolean
+                          }>
+                        }
+                      )?.drums?.filter((drum) => drum.isActive) || []
+                    : []
+
                 if (
                   actualItemType === 'raw-material' &&
                   selectedDrumId &&
@@ -526,7 +543,8 @@ export function StockAdjustmentDialog({
                 }
 
                 const isNewStockDisabled =
-                  (actualItemType === 'raw-material' && !selectedDrumId) ||
+                  (actualItemType === 'raw-material' &&
+                    (!selectedDrumId || availableDrumsForCheck.length === 0)) ||
                   (actualItemType === 'finished-good' &&
                     !form.watch('locationId'))
                 const newStockValue = form.watch('newStock')

@@ -7,7 +7,10 @@ import { parseToWIB } from '@/lib/timezone'
  */
 export const stockMovementSchema = z.object({
   type: z.enum(['IN', 'OUT']),
-  quantity: z.coerce.number().positive('Quantity must be positive'),
+  quantity: z.coerce
+    .number()
+    .positive('Quantity must be positive')
+    .max(1000000, 'Quantity cannot exceed 1,000,000'),
   date: z.date({
     required_error: 'Please select a date',
   }),
@@ -24,8 +27,14 @@ export const stockMovementSchema = z.object({
 export const stockMovementSchemaAPI = z
   .object({
     type: z.enum(['IN', 'OUT', 'ADJUSTMENT']),
-    quantity: z.number().optional(), // Optional for ADJUSTMENT when newStock is provided
-    newStock: z.number().optional(), // New stock amount for ADJUSTMENT type
+    quantity: z
+      .number()
+      .max(1000000, 'Quantity cannot exceed 1,000,000')
+      .optional(), // Optional for ADJUSTMENT when newStock is provided
+    newStock: z
+      .number()
+      .max(1000000, 'New stock cannot exceed 1,000,000')
+      .optional(), // New stock amount for ADJUSTMENT type
     date: z.string().transform((str) => parseToWIB(str)),
     description: z.string().optional(),
     rawMaterialId: z.string().optional(),
@@ -128,7 +137,10 @@ export const drumStockInSchema = z.object({
     .array(
       z.object({
         label: z.string().min(1, 'Drum label is required'),
-        quantity: z.coerce.number().positive('Quantity must be positive'),
+        quantity: z.coerce
+          .number()
+          .positive('Quantity must be positive')
+          .max(1000000, 'Quantity cannot exceed 1,000,000'),
       })
     )
     .min(1, 'At least one drum is required'),

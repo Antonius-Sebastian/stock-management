@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { canViewReports, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
+import { toWIB, getMonthRangeWIB, getWIBDate } from '@/lib/timezone'
 
 const stockReportSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2030),
@@ -39,13 +40,14 @@ export async function GET(request: NextRequest) {
 
     const validatedQuery = stockReportSchema.parse(query)
 
-    // Generate date range for the month
-    const startDate = new Date(validatedQuery.year, validatedQuery.month - 1, 1)
-    const endDate = new Date(validatedQuery.year, validatedQuery.month, 0)
-    const daysInMonth = endDate.getDate()
+    // Generate date range for the month in WIB timezone
+    const { startDate, endDate, daysInMonth } = getMonthRangeWIB(
+      validatedQuery.year,
+      validatedQuery.month
+    )
 
     // Only show data up to current date for current month, show all days for past months
-    const today = new Date()
+    const today = getWIBDate()
     const isCurrentMonth =
       today.getFullYear() === validatedQuery.year &&
       today.getMonth() === validatedQuery.month - 1
@@ -78,12 +80,20 @@ export async function GET(request: NextRequest) {
             },
           })
 
+    // Track adjustments per item per day for visual indicators
+    const adjustments: Record<string, Record<string, boolean>> = {}
+
     // Calculate stock data for each day
     const reportData = items.map((item) => {
       const itemData: Record<string, string | number> = {
         id: item.id,
         name: item.name,
         code: 'kode' in item ? (item as { kode?: string }).kode || '' : '',
+      }
+
+      // Initialize adjustments tracking for this item
+      if (!adjustments[item.id]) {
+        adjustments[item.id] = {}
       }
 
       // Filter movements by locationId for finished goods if provided
@@ -99,8 +109,9 @@ export async function GET(request: NextRequest) {
 
       // Calculate opening stock at the start of the month
       // This is based on all movements BEFORE the start of the selected month
+      // Convert movement dates to WIB for accurate comparison
       const movementsBeforeMonth = filteredMovements.filter((movement) => {
-        const movementDate = new Date(movement.date)
+        const movementDate = toWIB(movement.date)
         return movementDate < startDate
       })
 
@@ -108,14 +119,18 @@ export async function GET(request: NextRequest) {
       for (const movement of movementsBeforeMonth) {
         if (movement.type === 'IN') {
           openingStock += movement.quantity
-        } else {
+        } else if (movement.type === 'OUT') {
           openingStock -= movement.quantity
+        } else if (movement.type === 'ADJUSTMENT') {
+          // ADJUSTMENT quantity is signed: positive increases, negative decreases
+          openingStock += movement.quantity
         }
       }
 
       // Get movements only within the selected month
+      // Convert movement dates to WIB for accurate comparison
       const movementsInMonth = filteredMovements.filter((movement) => {
-        const movementDate = new Date(movement.date)
+        const movementDate = toWIB(movement.date)
         return movementDate >= startDate && movementDate <= endDate
       })
 
@@ -132,38 +147,93 @@ export async function GET(request: NextRequest) {
         const dayKey = day.toString()
 
         // Get movements for this specific day
+        // Extract date components (year, month, day) in WIB timezone for accurate day comparison
+        // This ensures movements are grouped by their calendar date in WIB, not by exact timestamp
         const dayMovements = movementsInMonth.filter((movement) => {
-          const movementDate = new Date(movement.date)
+          // Get date components in WIB timezone
+          const wibDateParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Jakarta',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+          }).formatToParts(movement.date)
+
+          const dayPart = wibDateParts.find((p) => p.type === 'day')
+          const monthPart = wibDateParts.find((p) => p.type === 'month')
+          const yearPart = wibDateParts.find((p) => p.type === 'year')
+
+          if (!dayPart || !monthPart || !yearPart) {
+            logger.warn('Movement date parts missing', {
+              movementId: movement.id,
+              date: movement.date,
+              itemId: item.id,
+            })
+            return false
+          }
+
+          const movementDay = parseInt(dayPart.value, 10)
+          const movementMonth = parseInt(monthPart.value, 10) - 1 // Month is 0-indexed
+          const movementYear = parseInt(yearPart.value, 10)
+
           return (
-            movementDate.getDate() === day &&
-            movementDate.getMonth() === validatedQuery.month - 1 &&
-            movementDate.getFullYear() === validatedQuery.year
+            movementDay === day &&
+            movementMonth === validatedQuery.month - 1 &&
+            movementYear === validatedQuery.year
           )
         })
 
         // Calculate total IN quantity for the day
-        // Note: This includes all IN movements regardless of drumId (for raw materials)
-        // All movements with type === 'IN' are included in the calculation
-        const inQty = dayMovements
-          .filter((m) => m.type === 'IN')
-          .reduce((sum, m) => sum + m.quantity, 0)
+        // Include IN movements and positive ADJUSTMENT movements
+        const inMovements = dayMovements.filter(
+          (m) => m.type === 'IN' || (m.type === 'ADJUSTMENT' && m.quantity > 0)
+        )
+        const inQty = inMovements.reduce((sum, m) => sum + m.quantity, 0)
+        const hasAdjustmentIn = inMovements.some((m) => m.type === 'ADJUSTMENT')
 
-        const outQty = dayMovements
-          .filter((m) => m.type === 'OUT')
-          .reduce((sum, m) => sum + m.quantity, 0)
+        // Calculate total OUT quantity for the day
+        // Include OUT movements and negative ADJUSTMENT movements (as positive values)
+        const outMovements = dayMovements.filter(
+          (m) => m.type === 'OUT' || (m.type === 'ADJUSTMENT' && m.quantity < 0)
+        )
+        const outQty = outMovements.reduce(
+          (sum, m) =>
+            sum + (m.type === 'ADJUSTMENT' ? Math.abs(m.quantity) : m.quantity),
+          0
+        )
+        const hasAdjustmentOut = outMovements.some(
+          (m) => m.type === 'ADJUSTMENT'
+        )
 
+        // Track adjustments based on dataType
+        // Only track if the adjustment affects the current dataType
         switch (validatedQuery.dataType) {
           case 'stok-awal':
-            // Stock at start of day
+            // Stock at start of day - adjustments don't directly affect this
+            // But we track if there were adjustments that day for context
+            if (hasAdjustmentIn || hasAdjustmentOut) {
+              adjustments[item.id][dayKey] = true
+            }
             itemData[dayKey] = runningStock
             break
           case 'stok-masuk':
+            // Only track positive adjustments (they affect stok-masuk)
+            if (hasAdjustmentIn) {
+              adjustments[item.id][dayKey] = true
+            }
             itemData[dayKey] = inQty
             break
           case 'stok-keluar':
+            // Only track negative adjustments (they affect stok-keluar)
+            if (hasAdjustmentOut) {
+              adjustments[item.id][dayKey] = true
+            }
             itemData[dayKey] = outQty
             break
           case 'stok-sisa':
+            // Track any adjustments (they affect stok-sisa)
+            if (hasAdjustmentIn || hasAdjustmentOut) {
+              adjustments[item.id][dayKey] = true
+            }
             // Stock at end of day = opening stock + movements
             itemData[dayKey] = runningStock + inQty - outQty
             break
@@ -197,6 +267,14 @@ export async function GET(request: NextRequest) {
       })
       .map((item) => item.itemData)
 
+    // Filter adjustments to only include items that are in the final report
+    const filteredAdjustments: Record<string, Record<string, boolean>> = {}
+    filteredReportData.forEach((item) => {
+      if (adjustments[item.id]) {
+        filteredAdjustments[item.id] = adjustments[item.id]
+      }
+    })
+
     return NextResponse.json({
       data: filteredReportData,
       meta: {
@@ -207,6 +285,10 @@ export async function GET(request: NextRequest) {
         daysInMonth,
         currentDay,
       },
+      adjustments:
+        Object.keys(filteredAdjustments).length > 0
+          ? filteredAdjustments
+          : undefined,
     })
   } catch (error) {
     logger.error('Error generating stock report:', error)

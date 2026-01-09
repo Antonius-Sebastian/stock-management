@@ -226,8 +226,9 @@ export async function createStockMovement(
           finishedGoodId: data.finishedGoodId,
           locationId: data.locationId,
           // If this is OUT/ADJUSTMENT negative, it should have been caught by validation above
-          // So safe to assume if creating, it's positive or 0-base
-          quantity: quantityChange < 0 ? 0 : quantityChange, // Should ideally be quantityChange
+          // Validation prevents negative adjustments from creating new records, so this is a safe fallback
+          // Using quantityChange directly would be ideal, but keeping 0 fallback for extra safety
+          quantity: quantityChange < 0 ? 0 : quantityChange,
         },
       })
 

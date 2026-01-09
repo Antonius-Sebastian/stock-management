@@ -48,6 +48,11 @@ interface StockReportResponse {
     daysInMonth: number
     currentDay: number
   }
+  adjustments?: {
+    [itemId: string]: {
+      [day: string]: boolean
+    }
+  }
 }
 
 // Nested structure for finished goods (by location), flat for raw materials
@@ -146,21 +151,17 @@ export default function ReportsPage() {
         type: reportType,
       })
 
-      // For finished goods: fetch all locations × all dataTypes
+      // For finished goods: fetch all locations × all dataTypes (client-side filtering)
       if (reportType === 'finished-goods') {
-        // Validate prerequisites: locations must be loaded and selectedLocation must be set
+        // Validate prerequisites: locations must be loaded
         if (locations.length === 0) {
           logger.warn('Cannot fetch finished-goods report: locations not loaded yet')
           setIsLoading(false)
           return
         }
-        if (!selectedLocation) {
-          logger.warn('Cannot fetch finished-goods report: no location selected')
-          setIsLoading(false)
-          return
-        }
 
         // Create promises for all combinations: locations × dataTypes
+        // Fetch data for all locations (API filters by locationId, but we fetch all)
         const allPromises: Array<
           Promise<{
             dataType: string
@@ -173,6 +174,8 @@ export default function ReportsPage() {
           for (const dt of DATA_TYPES) {
             const params = new URLSearchParams(baseParams)
             params.append('dataType', dt.value)
+            // Pass locationId to API for server-side filtering per location
+            // We fetch all locations' data, then filter client-side by selectedLocation
             params.append('locationId', location.id)
 
             const promise = fetch(`/api/reports/stock?${params}`).then(
@@ -386,17 +389,17 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (!isLoadingYears && year && month) {
-      // For finished goods, require locations to be loaded AND selectedLocation to be set
-      // This prevents race condition where fetchAllReportData runs before selectedLocation is set
+      // For finished goods, require locations to be loaded (but not selectedLocation)
+      // We fetch all locations' data and filter client-side
       if (reportType === 'finished-goods') {
-        if (locations.length === 0 || !selectedLocation) {
+        if (locations.length === 0) {
           return
         }
       }
       fetchAllReportData() // Fetch all dataTypes (and locations for finished goods)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, year, month, isLoadingYears, locations.length, selectedLocation])
+  }, [reportType, year, month, isLoadingYears, locations.length])
   // Note: dataType removed from dependencies - filtered client-side
 
   const getReportTitle = () => {
@@ -693,10 +696,11 @@ export default function ReportsPage() {
                         </p>
                       </div>
                     </div>
-                  ) : reportData && reportData.data.length > 0 ? (
+                  ) : reportData && reportData.data && reportData.data.length > 0 ? (
                     <StockReportTable
                       data={reportData.data}
                       currentDay={reportData.meta.currentDay}
+                      adjustments={reportData.adjustments}
                     />
                   ) : (
                     <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20">

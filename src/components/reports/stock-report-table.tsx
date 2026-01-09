@@ -22,9 +22,18 @@ interface StockReportData {
 interface StockReportTableProps {
   data: StockReportData[]
   currentDay: number
+  adjustments?: {
+    [itemId: string]: {
+      [day: string]: boolean
+    }
+  }
 }
 
-export function StockReportTable({ data, currentDay }: StockReportTableProps) {
+export function StockReportTable({
+  data,
+  currentDay,
+  adjustments,
+}: StockReportTableProps) {
   const dayColumns = useMemo(() => {
     return Array.from({ length: currentDay }, (_, i) => (i + 1).toString())
   }, [currentDay])
@@ -86,6 +95,8 @@ export function StockReportTable({ data, currentDay }: StockReportTableProps) {
                     const value = item[day]
                     const numericValue = typeof value === 'number' ? value : 0
                     const hasValue = numericValue > 0
+                    const isAdjustment =
+                      adjustments?.[item.id]?.[day] === true
 
                     return (
                       <TableCell
@@ -93,13 +104,26 @@ export function StockReportTable({ data, currentDay }: StockReportTableProps) {
                         className={cn(
                           'text-center transition-colors duration-150',
                           hasValue &&
+                            !isAdjustment &&
                             'bg-green-50/50 font-medium dark:bg-green-950/20',
+                          hasValue &&
+                            isAdjustment &&
+                            'bg-amber-50/70 italic font-medium dark:bg-amber-950/30',
                           !hasValue && 'text-muted-foreground'
                         )}
                       >
-                        {hasValue
-                          ? numericValue.toLocaleString('id-ID')
-                          : '-'}
+                        {hasValue ? (
+                          <>
+                            {numericValue.toLocaleString('id-ID')}
+                            {isAdjustment && (
+                              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">
+                                *
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          '-'
+                        )}
                       </TableCell>
                     )
                   })}

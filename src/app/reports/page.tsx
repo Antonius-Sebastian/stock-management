@@ -148,8 +148,14 @@ export default function ReportsPage() {
 
       // For finished goods: fetch all locations × all dataTypes
       if (reportType === 'finished-goods') {
+        // Validate prerequisites: locations must be loaded and selectedLocation must be set
         if (locations.length === 0) {
-          toast.error('Silakan pilih lokasi terlebih dahulu')
+          logger.warn('Cannot fetch finished-goods report: locations not loaded yet')
+          setIsLoading(false)
+          return
+        }
+        if (!selectedLocation) {
+          logger.warn('Cannot fetch finished-goods report: no location selected')
           setIsLoading(false)
           return
         }
@@ -341,7 +347,10 @@ export default function ReportsPage() {
           const data = await response.json()
           setLocations(data)
           // Set default to first location if available and no location selected
-          if (data.length > 0 && !selectedLocation) {
+          // This ensures selectedLocation is set synchronously when locations are available
+          if (data.length > 0) {
+            // Always set to first location when switching to finished-goods
+            // This prevents race condition where selectedLocation might be empty
             setSelectedLocation(data[0].id)
           }
         }
@@ -350,7 +359,8 @@ export default function ReportsPage() {
       }
     }
     if (reportType === 'finished-goods') {
-      fetchLocations()
+      // Reset selectedLocation first to ensure clean state
+      setSelectedLocation('')
       // Reset allReportData structure when switching to finished goods
       setAllReportData({
         'stok-awal': {},
@@ -358,6 +368,8 @@ export default function ReportsPage() {
         'stok-keluar': {},
         'stok-sisa': {},
       })
+      // Fetch locations - selectedLocation will be set when locations are loaded
+      fetchLocations()
     } else {
       // Clear location when switching to raw materials
       setSelectedLocation('')
@@ -374,15 +386,18 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (!isLoadingYears && year && month) {
-      // For finished goods, require locations to be loaded
-      if (reportType === 'finished-goods' && locations.length === 0) {
-        return
+      // For finished goods, require locations to be loaded AND selectedLocation to be set
+      // This prevents race condition where fetchAllReportData runs before selectedLocation is set
+      if (reportType === 'finished-goods') {
+        if (locations.length === 0 || !selectedLocation) {
+          return
+        }
       }
       fetchAllReportData() // Fetch all dataTypes (and locations for finished goods)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, year, month, isLoadingYears, locations.length])
-  // Note: dataType and selectedLocation removed from dependencies - filtered client-side
+  }, [reportType, year, month, isLoadingYears, locations.length, selectedLocation])
+  // Note: dataType removed from dependencies - filtered client-side
 
   const getReportTitle = () => {
     const typeLabel =

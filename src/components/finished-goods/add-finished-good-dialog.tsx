@@ -24,7 +24,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Plus } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 
 const formSchema = z.object({
@@ -121,7 +121,14 @@ export function AddFinishedGoodDialog({
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Membuat...' : 'Buat'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Membuat...
+                  </>
+                ) : (
+                  'Buat'
+                )}
               </Button>
             </DialogFooter>
           </form>

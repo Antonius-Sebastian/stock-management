@@ -682,8 +682,14 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="h-5 w-5 animate-spin" />}
-                {isLoading ? 'Membuat...' : 'Buat Batch'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Membuat...
+                  </>
+                ) : (
+                  'Buat Batch'
+                )}
               </Button>
             </DialogFooter>
           </form>

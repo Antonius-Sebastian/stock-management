@@ -70,28 +70,35 @@ export default function FinishedGoodsPage() {
     }
   }
 
+  // Fetch locations function (can be called to refresh)
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch('/api/locations')
+      if (response.ok) {
+        const data = await response.json()
+        setLocations(data)
+        // Set default to first location or default location if available
+        if (data.length > 0) {
+          const defaultLocation =
+            data.find((loc: Location) => loc.isDefault) || data[0]
+          setSelectedLocation(defaultLocation.id)
+        }
+      }
+    } catch (error) {
+      logger.error('Error fetching locations:', error)
+    }
+  }
+
   // Fetch locations and all finished goods on mount
   useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        const response = await fetch('/api/locations')
-        if (response.ok) {
-          const data = await response.json()
-          setLocations(data)
-          // Set default to first location or default location if available
-          if (data.length > 0) {
-            const defaultLocation =
-              data.find((loc: Location) => loc.isDefault) || data[0]
-            setSelectedLocation(defaultLocation.id)
-          }
-        }
-      } catch (error) {
-        logger.error('Error fetching locations:', error)
-      }
-    }
     fetchLocations()
     fetchAllFinishedGoods()
   }, [])
+
+  // Handle location changes (refresh locations list)
+  const handleLocationsChange = () => {
+    fetchLocations()
+  }
 
   // Filter by location on client side and sort by stock
   const finishedGoods = useMemo(() => {
@@ -220,7 +227,7 @@ export default function FinishedGoodsPage() {
           )}
           {canManageFinishedGoods(userRole) && (
             <>
-              <ManageLocationsDialog />
+              <ManageLocationsDialog onLocationsChange={handleLocationsChange} />
               <AddFinishedGoodDialog onSuccess={handleSuccess} />
             </>
           )}

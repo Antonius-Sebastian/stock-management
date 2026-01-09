@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -712,7 +712,7 @@ export function EditBatchDialog({
                                                   {material.name}
                                                 </span>
                                                 {availableStock > 0 ? (
-                                                  <span className="shrink-0 font-medium whitespace-nowrap text-green-600">
+                                                  <span className="shrink-0 font-medium whitespace-nowrap text-green-600 dark:text-green-400">
                                                     (Tersedia:{' '}
                                                     {availableStock.toLocaleString()}
                                                     )
@@ -789,7 +789,14 @@ export function EditBatchDialog({
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Memperbarui...' : 'Perbarui'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memperbarui...
+                  </>
+                ) : (
+                  'Perbarui'
+                )}
               </Button>
             </DialogFooter>
           </form>

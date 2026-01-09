@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { FinishedGood } from '@prisma/client'
 import { logger } from '@/lib/logger'
+import { Loader2 } from 'lucide-react'
 
 const formSchema = z.object({
   name: z.string().min(1, 'Nama produk harus diisi'),
@@ -129,7 +130,14 @@ export function EditFinishedGoodDialog({
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Memperbarui...' : 'Perbarui'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memperbarui...
+                  </>
+                ) : (
+                  'Perbarui'
+                )}
               </Button>
             </DialogFooter>
           </form>

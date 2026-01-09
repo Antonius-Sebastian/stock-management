@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input'
 import { ItemSelector, DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
 import type { Item } from '@/lib/types'
+import { Loader2 } from 'lucide-react'
 
 interface Location {
   id: string
@@ -767,7 +768,14 @@ export function StockEntryDialog({
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Mencatat...' : 'Catat'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Mencatat...
+                  </>
+                ) : (
+                  'Catat'
+                )}
               </Button>
             </DialogFooter>
           </form>

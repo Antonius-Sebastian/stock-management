@@ -33,8 +33,15 @@ import {
 } from '@/components/ui/select'
 import { ItemSelector, DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
+import { Loader2 } from 'lucide-react'
 import type { Item } from '@/lib/types'
 import { getWIBDate } from '@/lib/timezone'
+
+interface Location {
+  id: string
+  name: string
+  isDefault: boolean
+}
 
 const createFormSchema = (
   items: Item[],
@@ -43,17 +50,20 @@ const createFormSchema = (
   z
     .object({
       itemId: z.string().min(1, 'Silakan pilih item'),
-      quantity: z.coerce
+      newStock: z.coerce
         .number({
-          required_error: 'Jumlah wajib diisi',
-          invalid_type_error: 'Jumlah harus berupa angka',
+          required_error: 'Stok baru wajib diisi',
+          invalid_type_error: 'Stok baru harus berupa angka',
         })
-        .refine((val) => !isNaN(val) && val !== 0, 'Jumlah tidak boleh nol'),
+        .min(0, 'Stok baru tidak boleh negatif'),
       date: z.date({
         required_error: 'Silakan pilih tanggal',
       }),
-      description: z.string().min(1, 'Alasan wajib diisi untuk penyesuaian stok'),
+      description: z
+        .string()
+        .min(1, 'Alasan wajib diisi untuk penyesuaian stok'),
       drumId: z.string().optional(),
+      locationId: z.string().optional(),
     })
     .refine(
       (data) => {
@@ -70,34 +80,15 @@ const createFormSchema = (
     )
     .refine(
       (data) => {
-        const selectedItem = items.find((item) => item.id === data.itemId)
-        if (itemType === 'raw-material' && data.drumId && selectedItem) {
-          // For raw materials, check drum stock
-          const itemWithDrums = selectedItem as Item & {
-            drums?: Array<{
-              id: string
-              currentQuantity: number
-            }>
-          }
-          const selectedDrum = itemWithDrums.drums?.find(
-            (d) => d.id === data.drumId
-          )
-          if (selectedDrum) {
-            const newStock = selectedDrum.currentQuantity + data.quantity
-            return newStock >= 0
-          }
-        } else if (selectedItem && 'currentStock' in selectedItem) {
-          // For finished goods, check item stock
-          const currentStock = (selectedItem as Item & { currentStock: number })
-            .currentStock
-          const newStock = currentStock + data.quantity
-          return newStock >= 0
+        // For finished goods, locationId is required
+        if (itemType === 'finished-good') {
+          return data.locationId && data.locationId.trim() !== ''
         }
         return true
       },
       {
-        message: 'Penyesuaian akan menghasilkan stok negatif',
-        path: ['quantity'],
+        message: 'Lokasi wajib dipilih untuk produk jadi',
+        path: ['locationId'],
       }
     )
 
@@ -110,6 +101,7 @@ interface StockAdjustmentDialogProps {
   children?: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  defaultLocationId?: string
 }
 
 type FormData = z.infer<ReturnType<typeof createFormSchema>>
@@ -123,9 +115,11 @@ export function StockAdjustmentDialog({
   children,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
+  defaultLocationId,
 }: StockAdjustmentDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
 
   // Use controlled or uncontrolled state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen
@@ -142,10 +136,11 @@ export function StockAdjustmentDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       itemId: entityId || '',
-      quantity: '' as unknown as number,
+      newStock: '' as unknown as number,
       date: getWIBDate(),
       description: '',
       drumId: '',
+      locationId: defaultLocationId || '',
     },
     mode: 'onSubmit',
   })
@@ -180,12 +175,43 @@ export function StockAdjustmentDialog({
     }
   }
 
+  const fetchLocations = async (signal: AbortSignal) => {
+    try {
+      const res = await fetch('/api/locations', { signal })
+      if (!res.ok) throw new Error('Failed to fetch locations')
+      const data = await res.json()
+      setLocations(data)
+
+      // Auto-select default location: use defaultLocationId prop if provided, otherwise use default location or first location
+      if (
+        defaultLocationId &&
+        data.find((l: Location) => l.id === defaultLocationId)
+      ) {
+        form.setValue('locationId', defaultLocationId)
+      } else {
+        const defaultLoc = data.find((l: Location) => l.isDefault)
+        if (defaultLoc) {
+          form.setValue('locationId', defaultLoc.id)
+        } else if (data.length > 0) {
+          form.setValue('locationId', data[0].id)
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      console.error('Failed to fetch locations', error)
+    }
+  }
+
   useEffect(() => {
     // Create AbortController for cleanup
     const controller = new AbortController()
 
     if (open) {
       fetchItems(controller.signal)
+      // Fetch locations for finished goods
+      if (actualItemType === 'finished-good') {
+        fetchLocations(controller.signal)
+      }
     }
 
     // Cleanup function to abort fetch on unmount or dependency change
@@ -206,12 +232,12 @@ export function StockAdjustmentDialog({
     onSubmit: async (data: FormData) => {
       const stockMovementData = {
         type: 'ADJUSTMENT',
-        quantity: data.quantity,
+        newStock: data.newStock,
         date: data.date.toISOString(),
         description: data.description || 'Stock adjustment',
         ...(actualItemType === 'raw-material'
           ? { rawMaterialId: data.itemId, drumId: data.drumId }
-          : { finishedGoodId: data.itemId }),
+          : { finishedGoodId: data.itemId, locationId: data.locationId }),
       }
 
       const response = await fetch('/api/stock-movements', {
@@ -231,15 +257,15 @@ export function StockAdjustmentDialog({
 
       const itemTypeLabel =
         actualItemType === 'raw-material' ? 'bahan baku' : 'produk jadi'
-      const adjustmentType = data.quantity > 0 ? 'meningkatkan' : 'mengurangi'
 
-      toast.success(`Berhasil ${adjustmentType} stok untuk ${itemTypeLabel}`)
+      toast.success(`Berhasil menyesuaikan stok untuk ${itemTypeLabel}`)
       form.reset({
         itemId: entityId || '',
-        quantity: '' as unknown as number,
+        newStock: '' as unknown as number,
         date: getWIBDate(),
         description: '',
         drumId: '',
+        locationId: defaultLocationId || '',
       })
       setOpen(false)
       onSuccess()
@@ -248,12 +274,6 @@ export function StockAdjustmentDialog({
     errorMessage: 'Failed to adjust stock',
   })
 
-  const selectedItem = items.find((item) => item.id === form.watch('itemId'))
-  const currentStock =
-    selectedItem && 'currentStock' in selectedItem
-      ? (selectedItem as Item & { currentStock: number }).currentStock
-      : null
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
@@ -261,8 +281,8 @@ export function StockAdjustmentDialog({
         <DialogHeader>
           <DialogTitle>Penyesuaian Stok</DialogTitle>
           <DialogDescription>
-            Sesuaikan level stok secara manual. Gunakan nilai positif untuk
-            menambah stok, nilai negatif untuk mengurangi stok.
+            Sesuaikan level stok secara manual. Masukkan jumlah stok baru yang
+            diinginkan. Sistem akan menghitung selisihnya secara otomatis.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -298,6 +318,50 @@ export function StockAdjustmentDialog({
               )}
             />
 
+            {/* Location selection for finished goods */}
+            {actualItemType === 'finished-good' && (
+              <FormField
+                control={form.control}
+                name="locationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lokasi</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value)
+                          // Reset newStock when location changes
+                          form.setValue('newStock', '' as unknown as number)
+                        }}
+                        value={field.value || defaultLocationId || undefined}
+                        defaultValue={
+                          field.value || defaultLocationId || undefined
+                        }
+                      >
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue placeholder="Pilih lokasi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.length === 0 ? (
+                            <div className="text-muted-foreground py-2 text-center text-sm">
+                              Memuat lokasi...
+                            </div>
+                          ) : (
+                            locations.map((loc) => (
+                              <SelectItem key={loc.id} value={loc.id}>
+                                {loc.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             {/* Drum selection for raw materials */}
             {actualItemType === 'raw-material' && (
               <FormField
@@ -326,8 +390,8 @@ export function StockAdjustmentDialog({
                         <Select
                           onValueChange={(value) => {
                             field.onChange(value)
-                            // Reset quantity when drum changes
-                            form.setValue('quantity', '' as unknown as number)
+                            // Reset newStock when drum changes
+                            form.setValue('newStock', '' as unknown as number)
                           }}
                           value={field.value || undefined}
                           disabled={!selectedItemId}
@@ -337,7 +401,7 @@ export function StockAdjustmentDialog({
                           </SelectTrigger>
                           <SelectContent>
                             {availableDrums.length === 0 ? (
-                              <div className="py-2 text-center text-sm text-muted-foreground">
+                              <div className="text-muted-foreground py-2 text-center text-sm">
                                 {!selectedItemId
                                   ? 'Pilih bahan baku terlebih dahulu'
                                   : 'Tidak ada drum tersedia'}
@@ -376,7 +440,11 @@ export function StockAdjustmentDialog({
               let displayStock: number | null = null
               let stockLabel = 'Stok Saat Ini'
 
-              if (actualItemType === 'raw-material' && selectedDrumId && selectedItem) {
+              if (
+                actualItemType === 'raw-material' &&
+                selectedDrumId &&
+                selectedItem
+              ) {
                 const itemWithDrums = selectedItem as Item & {
                   drums?: Array<{
                     id: string
@@ -391,10 +459,7 @@ export function StockAdjustmentDialog({
                   displayStock = selectedDrum.currentQuantity
                   stockLabel = 'Stok Drum Saat Ini'
                 }
-              } else if (
-                selectedItem &&
-                'currentStock' in selectedItem
-              ) {
+              } else if (selectedItem && 'currentStock' in selectedItem) {
                 displayStock = (selectedItem as Item & { currentStock: number })
                   .currentStock
               }
@@ -413,7 +478,7 @@ export function StockAdjustmentDialog({
 
             <FormField
               control={form.control}
-              name="quantity"
+              name="newStock"
               render={({ field }) => {
                 const selectedItemId = form.watch('itemId')
                 const selectedDrumId = form.watch('drumId')
@@ -421,8 +486,14 @@ export function StockAdjustmentDialog({
                   (item) => item.id === selectedItemId
                 )
 
+                const selectedLocationId =
+                  form.watch('locationId') || defaultLocationId
                 let currentStock: number | null = null
-                if (actualItemType === 'raw-material' && selectedDrumId && selectedItem) {
+                if (
+                  actualItemType === 'raw-material' &&
+                  selectedDrumId &&
+                  selectedItem
+                ) {
                   const itemWithDrums = selectedItem as Item & {
                     drums?: Array<{
                       id: string
@@ -434,51 +505,92 @@ export function StockAdjustmentDialog({
                   )
                   currentStock = selectedDrum?.currentQuantity || null
                 } else if (
-                  selectedItem &&
-                  'currentStock' in selectedItem
+                  actualItemType === 'finished-good' &&
+                  selectedLocationId &&
+                  selectedItem
                 ) {
-                  currentStock = (selectedItem as Item & { currentStock: number })
-                    .currentStock
+                  // For finished goods, get location-specific stock
+                  const itemWithStocks = selectedItem as Item & {
+                    stocks?: Array<{ locationId: string; quantity: number }>
+                  }
+                  if (itemWithStocks.stocks) {
+                    const stock = itemWithStocks.stocks.find(
+                      (s) => s.locationId === selectedLocationId
+                    )
+                    currentStock = stock?.quantity || 0
+                  }
+                } else if (selectedItem && 'currentStock' in selectedItem) {
+                  currentStock = (
+                    selectedItem as Item & { currentStock: number }
+                  ).currentStock
                 }
 
-                const isQuantityDisabled =
-                  actualItemType === 'raw-material' && !selectedDrumId
+                const isNewStockDisabled =
+                  (actualItemType === 'raw-material' && !selectedDrumId) ||
+                  (actualItemType === 'finished-good' &&
+                    !form.watch('locationId'))
+                const newStockValue = form.watch('newStock')
+                const adjustmentAmount =
+                  currentStock !== null &&
+                  newStockValue !== undefined &&
+                  typeof newStockValue === 'number' &&
+                  !isNaN(newStockValue)
+                    ? newStockValue - currentStock
+                    : null
 
                 return (
                   <FormItem>
-                    <FormLabel>Jumlah Penyesuaian</FormLabel>
+                    <FormLabel>Stok Baru</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Masukkan nilai positif atau negatif"
-                        disabled={isQuantityDisabled}
+                        min="0"
+                        placeholder="Masukkan jumlah stok baru"
+                        disabled={isNewStockDisabled}
                         {...field}
+                        value={field.value || ''}
+                        onChange={(e) => {
+                          const value =
+                            e.target.value === '' ? '' : Number(e.target.value)
+                          field.onChange(value)
+                        }}
                       />
                     </FormControl>
-                    {isQuantityDisabled && (
+                    {isNewStockDisabled && (
                       <p className="text-muted-foreground text-xs">
-                        Pilih drum terlebih dahulu
+                        {actualItemType === 'raw-material'
+                          ? 'Pilih drum terlebih dahulu'
+                          : 'Pilih lokasi terlebih dahulu'}
                       </p>
                     )}
-                    {!isQuantityDisabled && (
-                      <p className="text-muted-foreground text-xs">
-                        Nilai positif menambah stok, nilai negatif mengurangi
-                        stok
-                      </p>
-                    )}
-                    {currentStock !== null &&
-                      !isQuantityDisabled &&
-                      form.watch('quantity') && (
+                    {currentStock !== null && !isNewStockDisabled && (
+                      <div className="space-y-1">
                         <p className="text-muted-foreground text-xs">
-                          Stok Baru:{' '}
+                          Stok Saat Ini:{' '}
                           <span className="font-medium">
-                            {(
-                              currentStock + (form.watch('quantity') || 0)
-                            ).toLocaleString()}
+                            {currentStock.toLocaleString()}
                           </span>
                         </p>
-                      )}
+                        {adjustmentAmount !== null && (
+                          <p className="text-muted-foreground text-xs">
+                            Penyesuaian:{' '}
+                            <span
+                              className={`font-medium ${
+                                adjustmentAmount > 0
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : adjustmentAmount < 0
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : ''
+                              }`}
+                            >
+                              {adjustmentAmount > 0 ? '+' : ''}
+                              {adjustmentAmount.toLocaleString()}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )
@@ -529,7 +641,14 @@ export function StockAdjustmentDialog({
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Menyesuaikan...' : 'Sesuaikan Stok'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Menyesuaikan...
+                  </>
+                ) : (
+                  'Sesuaikan Stok'
+                )}
               </Button>
             </DialogFooter>
           </form>

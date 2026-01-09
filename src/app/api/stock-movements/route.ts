@@ -120,10 +120,73 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // For ADJUSTMENT type, calculate adjustment from newStock if provided
+    let adjustmentQuantity = validatedData.quantity
+    if (validatedData.type === 'ADJUSTMENT' && validatedData.newStock !== undefined) {
+      // Import prisma to get current stock
+      const { prisma } = await import('@/lib/db')
+      
+      let currentStock = 0
+      if (validatedData.rawMaterialId && validatedData.drumId) {
+        // Get drum stock
+        const drum = await prisma.drum.findUnique({
+          where: { id: validatedData.drumId },
+          select: { currentQuantity: true },
+        })
+        if (!drum) {
+          return NextResponse.json({ error: 'Drum not found' }, { status: 404 })
+        }
+        currentStock = drum.currentQuantity
+      } else if (validatedData.rawMaterialId) {
+        // Get raw material aggregate stock
+        const rawMaterial = await prisma.rawMaterial.findUnique({
+          where: { id: validatedData.rawMaterialId },
+          select: { currentStock: true },
+        })
+        if (!rawMaterial) {
+          return NextResponse.json({ error: 'Raw material not found' }, { status: 404 })
+        }
+        currentStock = rawMaterial.currentStock
+      } else if (validatedData.finishedGoodId) {
+        // Get finished good stock at location
+        if (!body.locationId) {
+          return NextResponse.json(
+            { error: 'Location is required for finished good adjustments' },
+            { status: 400 }
+          )
+        }
+        const stock = await prisma.finishedGoodStock.findUnique({
+          where: {
+            finishedGoodId_locationId: {
+              finishedGoodId: validatedData.finishedGoodId,
+              locationId: body.locationId,
+            },
+          },
+          select: { quantity: true },
+        })
+        currentStock = stock?.quantity || 0
+      }
+      
+      // Calculate adjustment: newStock - currentStock
+      adjustmentQuantity = validatedData.newStock - currentStock
+      
+      // Validate that adjustment doesn't result in negative stock
+      // Since newStock >= 0 (validated by schema), adjustmentQuantity can be negative
+      // but the final stock (currentStock + adjustmentQuantity = newStock) will be >= 0
+      // So we only need to check if the adjustment itself is valid
+      // The service layer will also validate this, but we check here for better error message
+      if (adjustmentQuantity < 0 && currentStock + adjustmentQuantity < 0) {
+        return NextResponse.json(
+          { error: `Cannot adjust: would result in negative stock. Current: ${currentStock}, New: ${validatedData.newStock}` },
+          { status: 400 }
+        )
+      }
+    }
+
     // Convert to service input format (date is already Date from transform)
     const serviceInput: StockMovementInput = {
       type: validatedData.type,
-      quantity: validatedData.quantity,
+      quantity: adjustmentQuantity!,
       date: validatedData.date,
       description: validatedData.description,
       rawMaterialId: validatedData.rawMaterialId || null,

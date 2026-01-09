@@ -1,6 +1,6 @@
 'use client'
 
-import { Info } from 'lucide-react'
+import { Info, Loader2 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -125,7 +125,8 @@ export function EditUserDialog({
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-username">
-                Nama Pengguna <span className="text-red-500">*</span>
+                Nama Pengguna{' '}
+                <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Input
                 id="edit-username"
@@ -140,7 +141,8 @@ export function EditUserDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-name">
-                Nama Lengkap <span className="text-red-500">*</span>
+                Nama Lengkap{' '}
+                <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Input
                 id="edit-name"
@@ -184,7 +186,8 @@ export function EditUserDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-role">
-                Peran <span className="text-red-500">*</span>
+                Peran{' '}
+                <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Select
                 value={formData.role}
@@ -285,7 +288,14 @@ export function EditUserDialog({
               Batal
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Memperbarui...' : 'Perbarui User'}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Memperbarui...
+                </>
+              ) : (
+                'Perbarui User'
+              )}
             </Button>
           </DialogFooter>
         </form>

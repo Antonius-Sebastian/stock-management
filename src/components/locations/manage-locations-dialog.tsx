@@ -202,11 +202,18 @@ export function ManageLocationsDialog({
                   )}
                 />
                 <div className="flex gap-2">
-                  <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Button
+                    type="submit"
+                    disabled={form.formState.isSubmitting}
+                  >
+                    {form.formState.isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {editingId ? 'Memperbarui...' : 'Membuat...'}
+                      </>
+                    ) : (
+                      editingId ? 'Perbarui Lokasi' : 'Tambah Lokasi'
                     )}
-                    {editingId ? 'Perbarui Lokasi' : 'Tambah Lokasi'}
                   </Button>
                   {editingId && (
                     <Button
@@ -235,7 +242,12 @@ export function ManageLocationsDialog({
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={2} className="h-24 text-center">
-                      Memuat...
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="text-muted-foreground text-sm">
+                          Memuat...
+                        </span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : locations.length === 0 ? (

@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { Batch, BatchUsage, RawMaterial } from '@prisma/client'
@@ -44,10 +45,40 @@ export function BatchDetailDialog({
 }: BatchDetailDialogProps) {
   if (!batch) return null
 
+  // Group batch usages by rawMaterialId
+  const groupedMaterials = batch.batchUsages.reduce(
+    (acc, usage) => {
+      const materialId = usage.rawMaterialId
+      if (!acc[materialId]) {
+        acc[materialId] = {
+          rawMaterial: usage.rawMaterial,
+          usages: [],
+          totalQuantity: 0,
+        }
+      }
+      acc[materialId].usages.push(usage)
+      acc[materialId].totalQuantity += usage.quantity
+      return acc
+    },
+    {} as Record<
+      string,
+      {
+        rawMaterial: RawMaterial
+        usages: (BatchUsage & {
+          rawMaterial: RawMaterial
+          drum: { id: string; label: string } | null
+        })[]
+        totalQuantity: number
+      }
+    >
+  )
+
   const totalMaterialsUsed = batch.batchUsages.reduce(
     (sum, usage) => sum + usage.quantity,
     0
   )
+
+  const uniqueMaterialCount = Object.keys(groupedMaterials).length
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,8 +131,8 @@ export function BatchDetailDialog({
                 Bahan Baku yang Digunakan
               </h3>
               <Badge variant="secondary">
-                {batch.batchUsages.length}{' '}
-                {batch.batchUsages.length === 1 ? 'bahan' : 'bahan'}
+                {uniqueMaterialCount}{' '}
+                {uniqueMaterialCount === 1 ? 'bahan' : 'bahan'}
               </Badge>
             </div>
 
@@ -130,36 +161,79 @@ export function BatchDetailDialog({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    batch.batchUsages.map((usage) => (
-                      <TableRow key={usage.id}>
-                        <TableCell className="font-medium">
-                          {usage.rawMaterial.kode}
-                        </TableCell>
-                        <TableCell>
-                          <Link
-                            href={`/raw-materials/${usage.rawMaterial.id}`}
-                            className="text-primary hover:underline"
+                    Object.values(groupedMaterials).map((group, groupIndex) => {
+                      const hasMultipleDrums = group.usages.length > 1
+                      return (
+                        <React.Fragment key={group.rawMaterial.id}>
+                          {/* Main material row */}
+                          <TableRow
+                            className={
+                              hasMultipleDrums
+                                ? 'bg-muted/30 dark:bg-muted/20'
+                                : ''
+                            }
                           >
-                            {usage.rawMaterial.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          {usage.drum ? (
-                            <Badge variant="outline" className="font-medium">
-                              {usage.drum.label}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {usage.quantity.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                            <TableCell className="font-medium">
+                              {group.rawMaterial.kode}
+                            </TableCell>
+                            <TableCell>
+                              <Link
+                                href={`/raw-materials/${group.rawMaterial.id}`}
+                                className="text-primary hover:underline"
+                              >
+                                {group.rawMaterial.name}
+                              </Link>
+                            </TableCell>
+                            <TableCell>
+                              {hasMultipleDrums ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {group.usages.map((usage) => (
+                                    <Badge
+                                      key={usage.id}
+                                      variant="outline"
+                                      className="font-medium"
+                                    >
+                                      {usage.drum?.label || '-'}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                group.usages[0]?.drum ? (
+                                  <Badge variant="outline" className="font-medium">
+                                    {group.usages[0].drum.label}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {group.totalQuantity.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                          {/* Drum detail rows (only if multiple drums) */}
+                          {hasMultipleDrums &&
+                            group.usages.map((usage) => (
+                              <TableRow
+                                key={usage.id}
+                                className="bg-muted/10 dark:bg-muted/5"
+                              >
+                                <TableCell />
+                                <TableCell className="pl-8 text-sm text-muted-foreground">
+                                  Drum: {usage.drum?.label || '-'}
+                                </TableCell>
+                                <TableCell />
+                                <TableCell className="text-right text-sm">
+                                  {usage.quantity.toLocaleString()}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </React.Fragment>
+                      )
+                    })
                   )}
                   {batch.batchUsages.length > 0 && (
-                    <TableRow className="bg-muted/50 font-semibold">
+                    <TableRow className="bg-muted/50 font-semibold dark:bg-muted/30">
                       <TableCell colSpan={3} className="text-right">
                         Total:
                       </TableCell>

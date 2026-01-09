@@ -19,11 +19,13 @@ export const stockMovementSchema = z.object({
 /**
  * Validation schema for stock movement API routes
  * Uses string date with WIB transform and supports ADJUSTMENT type
+ * For ADJUSTMENT type, accepts either quantity (adjustment amount) or newStock (new stock amount)
  */
 export const stockMovementSchemaAPI = z
   .object({
     type: z.enum(['IN', 'OUT', 'ADJUSTMENT']),
-    quantity: z.number(),
+    quantity: z.number().optional(), // Optional for ADJUSTMENT when newStock is provided
+    newStock: z.number().optional(), // New stock amount for ADJUSTMENT type
     date: z.string().transform((str) => parseToWIB(str)),
     description: z.string().optional(),
     rawMaterialId: z.string().optional(),
@@ -31,21 +33,41 @@ export const stockMovementSchemaAPI = z
     drumId: z.string().optional(),
     locationId: z.string().optional(),
   })
-  .refine((data) => data.quantity !== 0, {
-    message: 'Quantity cannot be zero',
-    path: ['quantity'],
-  })
   .refine(
     (data) => {
-      // IN and OUT must be positive, ADJUSTMENT can be positive or negative
-      if (data.type === 'ADJUSTMENT') return true
-      return data.quantity > 0
+      // For ADJUSTMENT, either quantity or newStock must be provided
+      if (data.type === 'ADJUSTMENT') {
+        return data.quantity !== undefined || data.newStock !== undefined
+      }
+      // For IN and OUT, quantity is required
+      return data.quantity !== undefined
     },
     {
-      message: 'Quantity must be positive for IN and OUT movements',
+      message: 'Quantity or newStock must be provided',
       path: ['quantity'],
     }
   )
+  .superRefine((data, ctx) => {
+    if (data.type === 'ADJUSTMENT') {
+      // For ADJUSTMENT, if newStock is provided, it must be >= 0
+      if (data.newStock !== undefined && data.newStock < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'New stock must be non-negative',
+          path: ['newStock'],
+        })
+      }
+    } else {
+      // For IN and OUT, quantity must be positive
+      if (data.quantity === undefined || data.quantity <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Quantity must be positive for IN and OUT movements',
+          path: ['quantity'],
+        })
+      }
+    }
+  })
   .refine((data) => data.rawMaterialId || data.finishedGoodId, {
     message: 'Either rawMaterialId or finishedGoodId must be provided',
   })

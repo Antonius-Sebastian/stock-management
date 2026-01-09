@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { RawMaterial } from '@prisma/client'
 import { logger } from '@/lib/logger'
+import { Loader2 } from 'lucide-react'
 
 const formSchema = z.object({
   kode: z.string().min(1, 'Code is required'),
@@ -166,7 +167,14 @@ export function EditRawMaterialDialog({
                 Batal
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Memperbarui...' : 'Perbarui'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memperbarui...
+                  </>
+                ) : (
+                  'Perbarui'
+                )}
               </Button>
             </DialogFooter>
           </form>

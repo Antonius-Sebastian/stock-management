@@ -1,6 +1,6 @@
 'use client'
 
-import { Info } from 'lucide-react'
+import { Info, Loader2 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -103,7 +103,8 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="username">
-                Nama Pengguna <span className="text-red-500">*</span>
+                Nama Pengguna{' '}
+                <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Input
                 id="username"
@@ -118,7 +119,8 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="name">
-                Nama Lengkap <span className="text-red-500">*</span>
+                Nama Lengkap{' '}
+                <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Input
                 id="name"
@@ -144,7 +146,8 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password">
-                Kata Sandi <span className="text-red-500">*</span>
+                Kata Sandi{' '}
+                <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Input
                 id="password"
@@ -161,7 +164,8 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
             <div className="grid gap-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="role">
-                  Peran <span className="text-red-500">*</span>
+                  Peran{' '}
+                  <span className="text-red-500 dark:text-red-400">*</span>
                 </Label>
                 <TooltipProvider>
                   <Tooltip>
@@ -226,7 +230,14 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
               Batal
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Membuat...' : 'Buat User'}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Membuat...
+                </>
+              ) : (
+                'Buat User'
+              )}
             </Button>
           </DialogFooter>
         </form>

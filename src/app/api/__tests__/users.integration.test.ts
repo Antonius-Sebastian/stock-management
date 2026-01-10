@@ -12,6 +12,7 @@ import { getUsers, createUser } from '@/lib/services'
 import { auth } from '@/auth'
 import { canManageUsers } from '@/lib/rbac'
 import { createTestUser } from '../../../../test/helpers/test-data'
+import { checkRateLimit, RateLimits, createRateLimitHeaders } from '@/lib/rate-limit'
 
 // Mock dependencies
 vi.mock('@/lib/services', () => ({
@@ -45,9 +46,28 @@ vi.mock('@/lib/audit', () => ({
   getIpAddress: vi.fn(() => '127.0.0.1'),
 }))
 
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn(),
+  RateLimits: {
+    USER_CREATION: { limit: 50, windowMs: 60 * 60 * 1000, keyPrefix: 'user:create' },
+  },
+  createRateLimitHeaders: vi.fn(() => ({
+    'X-RateLimit-Limit': '50',
+    'X-RateLimit-Remaining': '49',
+    'X-RateLimit-Reset': '1234567890',
+  })),
+}))
+
 describe('Users API Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default mock implementation for rate limiting (allowed)
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      allowed: true,
+      remaining: 49,
+      resetInMs: 3600000,
+      limit: 50,
+    })
   })
 
   describe('GET /api/users', () => {
@@ -107,6 +127,30 @@ describe('Users API Integration Tests', () => {
   })
 
   describe('POST /api/users', () => {
+    it('should return 429 when rate limit exceeded', async () => {
+      // Mock rate limit exceeded
+      vi.mocked(checkRateLimit).mockResolvedValue({
+        allowed: false,
+        remaining: 0,
+        resetInMs: 1000,
+        limit: 50,
+      })
+
+      const request = new NextRequest('http://localhost:3000/api/users', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(429)
+      expect(data).toEqual({ error: 'Too many user creation attempts. Please try again later.' })
+      expect(checkRateLimit).toHaveBeenCalled()
+      // Should stop before auth
+      expect(auth).not.toHaveBeenCalled()
+    })
+
     it('should return 401 when not authenticated', async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(auth).mockResolvedValue(null as any)
@@ -198,6 +242,7 @@ describe('Users API Integration Tests', () => {
         role: input.role,
       })
       expect(createUser).toHaveBeenCalled()
+      expect(checkRateLimit).toHaveBeenCalled()
     })
 
     it('should return 400 when validation fails', async () => {

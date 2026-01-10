@@ -238,26 +238,36 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
   return await prisma.$transaction(
     async (tx) => {
       // Step 1: Validate all raw materials exist and calculate total quantities
+      // Optimized: Batch fetch all raw materials with lock to prevent N+1 queries
+      const materialIds = data.materials.map((m) => m.rawMaterialId)
+      let rawMaterialMap = new Map<
+        string,
+        { id: string; name: string; currentStock: number }
+      >()
+
+      if (materialIds.length > 0) {
+        const rawMaterialsList = await tx.$queryRaw<
+          Array<{ id: string; name: string; currentStock: number }>
+        >`
+        SELECT id, name, "currentStock"
+        FROM raw_materials
+        WHERE id IN (${Prisma.join(materialIds)})
+        FOR UPDATE
+      `
+        rawMaterialMap = new Map(rawMaterialsList.map((rm) => [rm.id, rm]))
+      }
+
       for (const material of data.materials) {
         const totalQuantity = material.drums.reduce(
           (sum, drum) => sum + drum.quantity,
           0
         )
 
-        const rawMaterials = await tx.$queryRaw<
-          Array<{ id: string; name: string; currentStock: number }>
-        >`
-        SELECT id, name, "currentStock"
-        FROM raw_materials
-        WHERE id = ${material.rawMaterialId}
-        FOR UPDATE
-      `
+        const rawMaterial = rawMaterialMap.get(material.rawMaterialId)
 
-        if (rawMaterials.length === 0) {
+        if (!rawMaterial) {
           throw new Error(`Raw material not found: ${material.rawMaterialId}`)
         }
-
-        const rawMaterial = rawMaterials[0]
 
         if (rawMaterial.currentStock < totalQuantity) {
           throw new Error(
@@ -282,22 +292,15 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
           0
         )
 
-        // Validate Raw Material Stock (Aggregate)
-        const rawMaterials = await tx.$queryRaw<
-          Array<{ id: string; name: string; currentStock: number }>
-        >`
-        SELECT id, name, "currentStock"
-        FROM raw_materials
-        WHERE id = ${material.rawMaterialId}
-        FOR UPDATE
-      `
+        // Reuse locked raw material from Step 1
+        const rawMaterial = rawMaterialMap.get(material.rawMaterialId)
 
-        if (rawMaterials.length === 0) {
+        if (!rawMaterial) {
+          // Should not happen as we validated in Step 1
           throw new Error(`Raw material not found: ${material.rawMaterialId}`)
         }
 
-        const rawMaterial = rawMaterials[0]
-
+        // Re-check stock in case logic changes, but we already validated in Step 1.
         if (rawMaterial.currentStock < totalQuantity) {
           throw new Error(
             `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`

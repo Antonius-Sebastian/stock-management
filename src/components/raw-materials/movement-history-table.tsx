@@ -76,8 +76,15 @@ export function MovementHistoryTable({
         const type = row.getValue('type') as 'IN' | 'OUT' | 'ADJUSTMENT'
         if (type === 'ADJUSTMENT') {
           const quantity = row.original.quantity
+          const isPositive = quantity >= 0
           return (
-            <Badge variant={quantity >= 0 ? 'default' : 'destructive'}>
+            <Badge
+              className={
+                isPositive
+                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400'
+                  : 'bg-amber-200 text-amber-900 hover:bg-amber-300 dark:bg-amber-900/50 dark:text-amber-300'
+              }
+            >
               Penyesuaian
             </Badge>
           )
@@ -110,7 +117,7 @@ export function MovementHistoryTable({
           const isPositive = quantity >= 0
           return (
             <div
-              className={`font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}
+              className={`font-medium ${isPositive ? 'text-amber-600 dark:text-amber-400' : 'text-amber-700 dark:text-amber-500'}`}
             >
               {isPositive ? '+' : ''}
               {quantity.toLocaleString()}

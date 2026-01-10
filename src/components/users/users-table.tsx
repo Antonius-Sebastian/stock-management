@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import { EditUserDialog } from './edit-user-dialog'
 import { toast } from 'sonner'
-import { canManageUsers } from '@/lib/rbac'
+import { canManageUsers, getRoleDisplayName } from '@/lib/rbac'
 import type { User } from '@/app/users/page'
 
 type UsersTableProps = {
@@ -113,7 +113,7 @@ export function UsersTable({ users, onRefresh, userRole }: UsersTableProps) {
                   <TableCell>{user.email || '-'}</TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(user.role)}>
-                      {user.role}
+                      {getRoleDisplayName(user.role)}
                     </Badge>
                   </TableCell>
                   <TableCell>

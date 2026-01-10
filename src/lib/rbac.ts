@@ -3,14 +3,14 @@
  *
  * Defines permission rules for each user role to prevent data manipulation:
  * - ADMIN: Full access to everything (manager/boss)
- * - OFFICE_PURCHASING: Purchasing staff - can input raw material IN (purchases) and finished good OUT (distribution)
- * - OFFICE_WAREHOUSE: Warehouse staff - can input finished good IN (receiving) and raw material OUT (production usage)
+ * - OFFICE_PURCHASING: Purchasing staff - can input raw material IN (purchases) and finished good IN (receiving from production/purchasing)
+ * - OFFICE_WAREHOUSE: Warehouse staff - can input finished good OUT (distribution/shipping) and raw material OUT (production usage)
  *
  * Business Rules:
  * - Raw material IN: Only OFFICE_PURCHASING (when purchasing from supplier)
  * - Raw material OUT: Only OFFICE_WAREHOUSE (when using for production, typically via batch)
- * - Finished good IN: Only OFFICE_WAREHOUSE (when receiving from production)
- * - Finished good OUT: Only OFFICE_PURCHASING (when sending to distributor)
+ * - Finished good IN: Only OFFICE_PURCHASING (when receiving from production/purchasing)
+ * - Finished good OUT: Only OFFICE_WAREHOUSE (when distributing/shipping)
  */
 
 export type UserRole = 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
@@ -118,14 +118,14 @@ export function canCreateStockEntries(role: string | undefined): boolean {
  * - ADMIN: Can create all types of movements (full access)
  * - OFFICE_PURCHASING:
  *   - Raw material IN: Yes (when purchasing from supplier)
- *   - Finished good OUT: Yes (when sending to distributor)
+ *   - Finished good IN: Yes (when receiving from production/purchasing)
  *   - Raw material OUT: No
- *   - Finished good IN: No
+ *   - Finished good OUT: No
  * - OFFICE_WAREHOUSE:
- *   - Finished good IN: Yes (when receiving from production)
+ *   - Finished good OUT: Yes (when distributing/shipping)
  *   - Raw material OUT: Yes (when using for production)
  *   - Raw material IN: No
- *   - Finished good OUT: No
+ *   - Finished good IN: No
  */
 export function canCreateStockMovement(
   role: string | undefined,
@@ -140,16 +140,16 @@ export function canCreateStockMovement(
   // ADJUSTMENT type is only for ADMIN
   if (movementType === 'ADJUSTMENT') return false
 
-  // OFFICE_PURCHASING: Raw IN, Finished OUT
+  // OFFICE_PURCHASING: Raw IN, Finished IN
   if (role === 'OFFICE_PURCHASING') {
     if (itemType === 'raw-material' && movementType === 'IN') return true
-    if (itemType === 'finished-good' && movementType === 'OUT') return true
+    if (itemType === 'finished-good' && movementType === 'IN') return true
     return false
   }
 
-  // OFFICE_WAREHOUSE: Finished IN, Raw OUT
+  // OFFICE_WAREHOUSE: Finished OUT, Raw OUT
   if (role === 'OFFICE_WAREHOUSE') {
-    if (itemType === 'finished-good' && movementType === 'IN') return true
+    if (itemType === 'finished-good' && movementType === 'OUT') return true
     if (itemType === 'raw-material' && movementType === 'OUT') return true
     return false
   }
@@ -218,6 +218,26 @@ export function canManageUsers(role: string | undefined): boolean {
 }
 
 /**
+ * Get user-friendly display name for role
+ * @param role - Internal role enum value
+ * @returns Display name for UI
+ */
+export function getRoleDisplayName(role: string | undefined): string {
+  if (!role) return 'Unknown'
+
+  switch (role) {
+    case 'ADMIN':
+      return 'Admin'
+    case 'OFFICE_PURCHASING':
+      return 'Office A'
+    case 'OFFICE_WAREHOUSE':
+      return 'Office B'
+    default:
+      return role
+  }
+}
+
+/**
  * Get user-friendly error message for permission denial
  * @param action - The action being attempted
  * @param role - User's role
@@ -259,7 +279,7 @@ export const PERMISSIONS = {
     canCreateBatches: false, // ❌ Cannot create batches (batch = raw material OUT, only WAREHOUSE)
     canEditBatches: false, // ❌ Cannot edit batches
     canDeleteBatches: false, // ❌ Cannot delete batches
-    canCreateStockMovements: true, // ✅ Can create: Raw material IN, Finished good OUT
+    canCreateStockMovements: true, // ✅ Can create: Raw material IN, Finished good IN
     canCreateStockAdjustment: false, // Cannot adjust stock
     canEditStockMovements: false, // ❌ Cannot edit movements
     canDeleteStockMovements: false, // ❌ Cannot delete movements
@@ -275,7 +295,7 @@ export const PERMISSIONS = {
     canCreateBatches: true, // ✅ Can create batches
     canEditBatches: false, // ❌ Cannot edit batches
     canDeleteBatches: false, // ❌ Cannot delete batches
-    canCreateStockMovements: true, // ✅ Can create: Finished good IN, Raw material OUT
+    canCreateStockMovements: true, // ✅ Can create: Finished good OUT, Raw material OUT
     canCreateStockAdjustment: false, // Cannot adjust stock
     canEditStockMovements: false, // ❌ Cannot edit movements
     canDeleteStockMovements: false, // ❌ Cannot delete movements

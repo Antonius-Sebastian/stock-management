@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: '',
   })
 
@@ -25,13 +25,13 @@ export default function LoginPage() {
 
     try {
       const result = await signIn('credentials', {
-        username: formData.username,
+        email: formData.email,
         password: formData.password,
         redirect: false,
       })
 
       if (result?.error) {
-        toast.error('Username atau password tidak valid')
+        toast.error('Email atau password tidak valid')
       } else if (result?.ok) {
         toast.success('Login berhasil')
         router.push('/')
@@ -65,20 +65,20 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium">
-                Username
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
               </Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Masukkan username Anda"
-                value={formData.username}
+                id="email"
+                type="email"
+                placeholder="Masukkan email Anda"
+                value={formData.email}
                 onChange={(e) =>
-                  setFormData({ ...formData, username: e.target.value })
+                  setFormData({ ...formData, email: e.target.value })
                 }
                 required
                 disabled={isLoading}
-                autoComplete="username"
+                autoComplete="email"
                 className="h-11 transition-all duration-200 focus-visible:ring-2"
               />
             </div>

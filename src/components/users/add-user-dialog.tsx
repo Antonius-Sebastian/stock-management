@@ -181,16 +181,16 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                           </p>
                         </div>
                         <div>
-                          <p className="font-semibold">Office Purchasing</p>
+                          <p className="font-semibold">Office A</p>
                           <p className="mt-1 text-xs">
                             • Stok Masuk Bahan Baku
                           </p>
-                          <p className="text-xs">• Stok Keluar Produk Jadi</p>
+                          <p className="text-xs">• Stok Masuk Produk Jadi</p>
                         </div>
                         <div>
-                          <p className="font-semibold">Office Warehouse</p>
+                          <p className="font-semibold">Office B</p>
                           <p className="mt-1 text-xs">
-                            • Stok Masuk Produk Jadi
+                            • Stok Keluar Produk Jadi
                           </p>
                           <p className="text-xs">• Stok Keluar Bahan Baku</p>
                         </div>
@@ -211,10 +211,10 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="OFFICE_PURCHASING">
-                    Office Purchasing
+                    Office A
                   </SelectItem>
                   <SelectItem value="OFFICE_WAREHOUSE">
-                    Office Warehouse
+                    Office B
                   </SelectItem>
                 </SelectContent>
               </Select>

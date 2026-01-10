@@ -219,7 +219,7 @@ export function EditUserDialog({
                   </SelectItem>
                   <SelectItem value="OFFICE_PURCHASING">
                     <div className="flex items-center gap-2">
-                      <span>Office Purchasing</span>
+                      <span>Office A</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -227,12 +227,12 @@ export function EditUserDialog({
                           </TooltipTrigger>
                           <TooltipContent side="right" className="max-w-xs">
                             <p className="font-semibold">
-                              Pembelian & Penjualan
+                              Pembelian & Penerimaan
                             </p>
                             <p className="mt-1 text-xs">
                               • Stok Masuk Bahan Baku
                             </p>
-                            <p className="text-xs">• Stok Keluar Produk Jadi</p>
+                            <p className="text-xs">• Stok Masuk Produk Jadi</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -240,16 +240,16 @@ export function EditUserDialog({
                   </SelectItem>
                   <SelectItem value="OFFICE_WAREHOUSE">
                     <div className="flex items-center gap-2">
-                      <span>Office Warehouse</span>
+                      <span>Office B</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Info className="text-muted-foreground h-3 w-3" />
                           </TooltipTrigger>
                           <TooltipContent side="right" className="max-w-xs">
-                            <p className="font-semibold">Gudang & Produksi</p>
+                            <p className="font-semibold">Gudang & Distribusi</p>
                             <p className="mt-1 text-xs">
-                              • Stok Masuk Produk Jadi
+                              • Stok Keluar Produk Jadi
                             </p>
                             <p className="text-xs">• Stok Keluar Bahan Baku</p>
                           </TooltipContent>

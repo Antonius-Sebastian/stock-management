@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { logger } from '@/lib/logger'
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
+  email: z.string().email('Invalid email address').min(1, 'Email is required'),
   password: z.string().min(1, 'Password is required'),
 })
 
@@ -26,7 +26,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Credentials({
       name: 'Credentials',
       credentials: {
-        username: { label: 'Username', type: 'text' },
+        email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
@@ -37,11 +37,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null
           }
 
-          const { username, password } = validatedFields.data
+          const { email, password } = validatedFields.data
 
-          // Find user by username
+          // Find user by email
           const user = await prisma.user.findUnique({
-            where: { username },
+            where: { email },
             select: {
               id: true,
               username: true,

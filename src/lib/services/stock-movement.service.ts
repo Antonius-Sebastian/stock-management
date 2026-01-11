@@ -562,45 +562,44 @@ export async function createDrumStockIn(
 
   await prisma.$transaction(async (tx) => {
     // Check for duplicate drum labels
-    for (const drum of drums) {
-      const existing = await tx.drum.findFirst({
-        where: {
-          rawMaterialId,
-          label: drum.label,
-        },
-      })
-      if (existing) {
-        throw new Error(
-          `Drum ID ${drum.label} already exists for this material`
-        )
-      }
+    const labels = drums.map((d) => d.label)
+    const existingDrums = await tx.drum.findMany({
+      where: {
+        rawMaterialId,
+        label: { in: labels },
+      },
+      select: { label: true },
+    })
+
+    if (existingDrums.length > 0) {
+      throw new Error(
+        `Drum ID ${existingDrums[0].label} already exists for this material`
+      )
     }
 
-    // Process each drum
-    for (const drum of drums) {
-      // Create Drum
-      const newDrum = await tx.drum.create({
-        data: {
-          label: drum.label,
-          currentQuantity: drum.quantity,
-          rawMaterialId,
-          isActive: true,
-          createdAt: date,
-        },
-      })
+    // Process drums in batch
+    // Create all drums and return them to get their IDs
+    const newDrums = await tx.drum.createManyAndReturn({
+      data: drums.map((drum) => ({
+        label: drum.label,
+        currentQuantity: drum.quantity,
+        rawMaterialId,
+        isActive: true,
+        createdAt: date,
+      })),
+    })
 
-      // Create Movement tied to Drum
-      await tx.stockMovement.create({
-        data: {
-          type: 'IN',
-          quantity: drum.quantity,
-          date,
-          description: description || 'Stock In (Drum)',
-          rawMaterialId,
-          drumId: newDrum.id,
-        },
-      })
-    }
+    // Create all stock movements in batch
+    await tx.stockMovement.createMany({
+      data: newDrums.map((newDrum) => ({
+        type: 'IN',
+        quantity: newDrum.currentQuantity,
+        date,
+        description: description || 'Stock In (Drum)',
+        rawMaterialId,
+        drumId: newDrum.id,
+      })),
+    })
 
     // Update Raw Material Total Stock
     const totalQuantity = drums.reduce((sum, d) => sum + d.quantity, 0)

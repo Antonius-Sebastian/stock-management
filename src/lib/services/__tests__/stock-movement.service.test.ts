@@ -51,6 +51,16 @@ vi.mock('@/lib/db', () => ({
           findUnique: vi.fn(),
           update: vi.fn(),
         },
+        finishedGoodStock: {
+          upsert: vi.fn(),
+          findUnique: vi.fn(),
+        },
+        drum: {
+          findFirst: vi.fn(),
+          create: vi.fn(),
+          createManyAndReturn: vi.fn(),
+          findMany: vi.fn(),
+        },
         $queryRaw: vi.fn(),
       }
       return callback(txClient)
@@ -455,6 +465,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -476,6 +487,10 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
+          findUnique: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }
@@ -1163,6 +1178,16 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         drum: {
           findFirst: vi.fn().mockResolvedValue(null),
+          findMany: vi.fn().mockResolvedValue([]),
+          createManyAndReturn: vi.fn().mockImplementation((args) =>
+            Promise.resolve(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              args.data.map((d: any, i: number) => ({
+                id: `new-drum-id-${i}`,
+                ...d,
+              }))
+            )
+          ),
           create: vi
             .fn()
             .mockImplementation((args) =>
@@ -1171,6 +1196,7 @@ describe('Stock Movement Service', () => {
         },
         stockMovement: {
           create: vi.fn(),
+          createMany: vi.fn(),
         },
         rawMaterial: {
           update: vi.fn(),
@@ -1185,23 +1211,27 @@ describe('Stock Movement Service', () => {
       await createDrumStockIn(input)
 
       // Verify Drum Creation uses input DATE, not NOW
-      expect(mockTx.drum.create).toHaveBeenCalledWith(
+      expect(mockTx.drum.createManyAndReturn).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            label: 'D1',
-            createdAt: input.date,
-          }),
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              label: 'D1',
+              createdAt: input.date,
+            }),
+          ]),
         })
       )
 
       // Verify Movement Creation
-      expect(mockTx.stockMovement.create).toHaveBeenCalledWith(
+      expect(mockTx.stockMovement.createMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            date: input.date,
-            type: 'IN',
-            drumId: 'new-drum-id',
-          }),
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              date: input.date,
+              type: 'IN',
+              drumId: 'new-drum-id-0',
+            }),
+          ]),
         })
       )
 

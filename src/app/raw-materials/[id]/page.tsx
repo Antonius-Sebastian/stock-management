@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import {
   Card,
@@ -67,6 +68,8 @@ export default function RawMaterialDetailPage({
   params: Promise<{ id: string }>
 }) {
   const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
   const [materialId, setMaterialId] = useState<string>('')
   const [data, setData] = useState<MaterialMovementsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -82,27 +85,27 @@ export default function RawMaterialDetailPage({
     params.then((p) => setMaterialId(p.id))
   }, [params])
 
+  const fetchMaterialMovements = async () => {
+    if (!materialId) return
+    try {
+      const response = await fetch(
+        `/api/raw-materials/${materialId}/movements`
+      )
+      if (!response.ok) {
+        throw new Error('Failed to fetch material details')
+      }
+      const result = await response.json()
+      setData(result)
+    } catch (error) {
+      logger.error('Error fetching material movements:', error)
+      toast.error('Gagal memuat detail bahan baku. Silakan coba lagi.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!materialId) return
-
-    const fetchMaterialMovements = async () => {
-      try {
-        const response = await fetch(
-          `/api/raw-materials/${materialId}/movements`
-        )
-        if (!response.ok) {
-          throw new Error('Failed to fetch material details')
-        }
-        const result = await response.json()
-        setData(result)
-      } catch (error) {
-        logger.error('Error fetching material movements:', error)
-        toast.error('Gagal memuat detail bahan baku. Silakan coba lagi.')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchMaterialMovements()
 
     // Fetch drums for this material
@@ -350,6 +353,9 @@ export default function RawMaterialDetailPage({
           <MovementHistoryTable
             movements={movements}
             onBatchClick={handleBatchClick}
+            userRole={userRole}
+            itemType="raw-material"
+            onRefresh={fetchMaterialMovements}
           />
         </CardContent>
       </Card>

@@ -384,7 +384,7 @@ export default function ReportsPage() {
         'stok-sisa': null,
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [reportType])
 
   useEffect(() => {

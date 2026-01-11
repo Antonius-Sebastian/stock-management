@@ -229,3 +229,133 @@ export async function deleteFinishedGood(id: string): Promise<void> {
     where: { id },
   })
 }
+
+/**
+ * Get finished good movements with running balance
+ *
+ * @param id - Finished good ID
+ * @param locationId - Optional location ID to filter movements
+ * @param limit - Maximum number of movements to return (default 500)
+ * @returns Finished good info and movements with running balance
+ * @throws {Error} If finished good not found
+ *
+ * @remarks
+ * - Fetches newest movements first (DESC)
+ * - Defaults to limiting to latest 500 movements to prevent performance issues
+ * - If locationId provided, filters movements and calculates location-specific running balance
+ * - Running balance calculated working backwards from current stock
+ */
+export async function getFinishedGoodMovements(
+  id: string,
+  locationId?: string | null,
+  limit: number = 500
+): Promise<{
+  finishedGood: Pick<FinishedGood, 'id' | 'name' | 'currentStock'>
+  movements: Array<{
+    id: string
+    type: string
+    quantity: number
+    date: Date
+    description: string | null
+    batch: { id: string; code: string } | null
+    location: { id: string; name: string } | null
+    runningBalance: number
+    createdAt: Date
+  }>
+}> {
+  const finishedGood = await prisma.finishedGood.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      currentStock: true,
+    },
+  })
+
+  if (!finishedGood) {
+    throw new Error('Finished good not found')
+  }
+
+  // Get current stock at location (if locationId provided)
+  let currentStock = finishedGood.currentStock
+  if (locationId) {
+    const stock = await prisma.finishedGoodStock.findUnique({
+      where: {
+        finishedGoodId_locationId: {
+          finishedGoodId: id,
+          locationId,
+        },
+      },
+      select: { quantity: true },
+    })
+    currentStock = stock?.quantity || 0
+  }
+
+  // Fetch movements (filtered by location if provided)
+  const movements = await prisma.stockMovement.findMany({
+    where: {
+      finishedGoodId: id,
+      ...(locationId ? { locationId } : {}),
+    },
+    include: {
+      batch: {
+        select: {
+          id: true,
+          code: true,
+        },
+      },
+      location: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: [
+      { date: 'desc' },
+      { createdAt: 'desc' }, // Secondary sort for chronological order on same day
+    ],
+    take: limit,
+  })
+
+  // Calculate running balance working backwards from current stock
+  let runningBalance = currentStock
+
+  const movementsWithBalance = movements.map((movement) => {
+    // The balance displayed for this movement is the stock level AFTER this movement occurred.
+    // Which, for the most recent movement, starts at current stock.
+    const balanceForThisRow = runningBalance
+
+    // Calculate the balance BEFORE this movement, which will be the "After Balance" for the NEXT (older) row.
+    let change = 0
+    if (movement.type === 'IN') {
+      change = -movement.quantity
+    } else if (movement.type === 'OUT') {
+      change = movement.quantity
+    } else if (movement.type === 'ADJUSTMENT') {
+      // Adjustment quantity is signed (+ or -)
+      // If we added Q, reverse is -Q
+      change = -movement.quantity
+    }
+
+    runningBalance = Math.round((runningBalance + change) * 100) / 100
+
+    return {
+      id: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      date: movement.date,
+      description: movement.description,
+      batch: movement.batch,
+      location: movement.location,
+      runningBalance: Math.round(balanceForThisRow * 100) / 100, // Round to 2 decimal places
+      createdAt: movement.createdAt,
+    }
+  })
+
+  // Movements are already DESC (Newest First)
+  return {
+    finishedGood,
+    movements: movementsWithBalance,
+  }
+}

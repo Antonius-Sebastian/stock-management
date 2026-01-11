@@ -21,6 +21,9 @@ export {
   createDrumStockIn,
   deleteStockMovementsByDate,
   updateStockMovementsByDate,
+  updateStockMovement,
+  deleteStockMovement,
+  calculateStockAtDate,
   type StockMovementInput,
   type DrumStockInInput,
 } from './stock-movement.service'

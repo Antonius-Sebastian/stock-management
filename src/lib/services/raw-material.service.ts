@@ -270,9 +270,10 @@ export async function getRawMaterialMovements(
         },
       },
     },
-    orderBy: {
-      date: 'desc',
-    },
+    orderBy: [
+      { date: 'desc' },
+      { createdAt: 'desc' }, // Secondary sort for chronological order on same day
+    ],
     take: limit,
   })
 

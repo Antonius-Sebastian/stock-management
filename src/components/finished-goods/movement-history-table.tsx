@@ -33,7 +33,7 @@ interface Movement {
   date: string
   description: string | null
   batch: { id: string; code: string } | null
-  drum: { label: string } | null
+  location: { id: string; name: string } | null
   runningBalance: number
   createdAt: string
 }
@@ -42,15 +42,13 @@ interface MovementHistoryTableProps {
   movements: Movement[]
   onBatchClick?: (batchId: string) => void
   userRole?: string
-  itemType?: 'raw-material' | 'finished-good'
   onRefresh?: () => void
 }
 
-export function MovementHistoryTable({
+export function FinishedGoodMovementHistoryTable({
   movements,
   onBatchClick,
   userRole,
-  itemType = 'raw-material',
   onRefresh,
 }: MovementHistoryTableProps) {
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined)
@@ -224,14 +222,14 @@ export function MovementHistoryTable({
       },
     },
     {
-      id: 'drum',
-      header: 'Drum',
+      id: 'location',
+      header: 'Lokasi',
       cell: ({ row }) => {
-        const drum = row.original.drum
-        if (!drum) {
+        const location = row.original.location
+        if (!location) {
           return <span className="text-muted-foreground">-</span>
         }
-        return <span className="font-medium">{drum.label}</span>
+        return <span className="font-medium">{location.name}</span>
       },
     },
     {
@@ -363,10 +361,10 @@ export function MovementHistoryTable({
         <DataTable
           columns={columns}
           data={filteredMovements}
-          searchKeys={['description', 'batch.code', 'drum.label']}
-          searchPlaceholder="Cari berdasarkan drum atau batch..."
+          searchKeys={['description', 'batch.code', 'location.name']}
+          searchPlaceholder="Cari berdasarkan lokasi atau batch..."
           emptyMessage="Belum ada pergerakan stok yang tercatat."
-          tableId="movement-history"
+          tableId="finished-good-movement-history"
         />
       </div>
       {editingMovement && (
@@ -377,9 +375,9 @@ export function MovementHistoryTable({
             quantity: editingMovement.quantity,
             date: editingMovement.date,
             description: editingMovement.description,
-            locationId: undefined, // Raw materials don't use locations
+            locationId: editingMovement.location?.id || null,
           }}
-          itemType={itemType}
+          itemType="finished-good"
           open={editDialogOpen}
           onOpenChange={(open) => {
             setEditDialogOpen(open)
@@ -397,3 +395,4 @@ export function MovementHistoryTable({
     </>
   )
 }
+

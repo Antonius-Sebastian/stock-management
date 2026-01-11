@@ -124,6 +124,24 @@ export const stockMovementByDateUpdateSchema = z.object({
   quantity: z.number().min(0),
 })
 
+/**
+ * Schema for updating individual stock movements
+ */
+export const updateStockMovementSchema = z
+  .object({
+    quantity: z
+      .number()
+      .positive('Quantity must be positive')
+      .max(1000000, 'Quantity cannot exceed 1,000,000')
+      .optional(),
+    date: z.string().transform((str) => parseToWIB(str)).optional(),
+    description: z.string().nullable().optional(),
+    locationId: z.string().optional().nullable(),
+  })
+  .refine((data) => data.quantity !== undefined || data.date !== undefined || data.description !== undefined || data.locationId !== undefined, {
+    message: 'At least one field must be provided for update',
+  })
+
 export type StockMovementInput = z.infer<typeof stockMovementSchema>
 export type StockMovementInputAPI = z.infer<typeof stockMovementSchemaAPI>
 

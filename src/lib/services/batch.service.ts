@@ -10,6 +10,7 @@
 import { prisma } from '@/lib/db'
 import { Batch, Prisma } from '@prisma/client'
 import { PaginationOptions, PaginationMetadata } from './raw-material.service'
+import { calculateStockAtDate } from './stock-movement.service'
 
 /**
  * Batch input type for service layer
@@ -263,6 +264,42 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
           throw new Error(
             `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
           )
+        }
+      }
+
+      // Step 1.5: Validate stock existed on batch date (date validation)
+      // For each material/drum combination, ensure stock existed BEFORE the batch date
+      for (const material of data.materials) {
+        for (const drumEntry of material.drums) {
+          // Calculate stock at batch date (before the batch)
+          const stockAtDate = await calculateStockAtDate(
+            material.rawMaterialId,
+            'raw-material',
+            data.date,
+            null, // No location for raw materials
+            drumEntry.drumId || null
+          )
+
+          if (stockAtDate < drumEntry.quantity) {
+            const rawMaterial = await tx.rawMaterial.findUnique({
+              where: { id: material.rawMaterialId },
+              select: { name: true },
+            })
+            const materialName = rawMaterial?.name || 'Unknown'
+            const drumLabel = drumEntry.drumId
+              ? (await tx.drum.findUnique({
+                  where: { id: drumEntry.drumId },
+                  select: { label: true },
+                }))?.label
+              : null
+            const itemLabel = drumLabel
+              ? `${materialName} (Drum ${drumLabel})`
+              : materialName
+
+            throw new Error(
+              `Insufficient stock on ${data.date.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Required: ${drumEntry.quantity.toFixed(2)} for ${itemLabel}`
+            )
+          }
         }
       }
 

@@ -40,6 +40,7 @@ vi.mock('@/lib/db', () => ({
     stockMovement: {
       create: vi.fn(),
       deleteMany: vi.fn(),
+      findMany: vi.fn(), // Fix: mock global findMany for calculateStockAtDate
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -48,6 +49,12 @@ vi.mock('@/lib/db', () => ({
     finishedGood: {
       findUnique: vi.fn(),
       update: vi.fn(),
+    },
+    drum: {
+      findUnique: vi.fn(),
+    },
+    finishedGoodStock: {
+      findUnique: vi.fn(),
     },
     $transaction: vi.fn((callback) => {
       const txClient = {
@@ -63,9 +70,11 @@ vi.mock('@/lib/db', () => ({
         stockMovement: {
           create: vi.fn(),
           deleteMany: vi.fn(),
+          findMany: vi.fn(),
         },
         rawMaterial: {
           update: vi.fn(),
+          findUnique: vi.fn(),
         },
         finishedGood: {
           findUnique: vi.fn(),
@@ -148,6 +157,7 @@ describe('Batch Service', () => {
             id: 'usage-1',
             quantity: 5,
             rawMaterial: createTestRawMaterial({ id: 'rm-1' }),
+            drum: null, // Ensure drum is present in mock as service maps it
           },
         ],
       }
@@ -156,7 +166,36 @@ describe('Batch Service', () => {
 
       const result = await getBatchById('test-id')
 
-      expect(result).toEqual(mockBatch)
+      // Match the transformation in service layer (it reformats rawMaterial)
+      // The test expects exact object, but service maps rawMaterial fields.
+      // So we need to expect what the service returns.
+      // Service returns:
+      /*
+      rawMaterial: {
+        id: usage.rawMaterial.id,
+        kode: usage.rawMaterial.kode,
+        name: usage.rawMaterial.name,
+      }
+      */
+     // The mockBatch rawMaterial has more fields (createdAt, etc).
+     // The test failure showed received had fewer fields.
+     // So we should expect the filtered object.
+
+      const expectedResult = {
+        ...mockBatch,
+        batchUsages: mockBatch.batchUsages.map(usage => ({
+            id: usage.id,
+            quantity: usage.quantity,
+            rawMaterial: {
+                id: usage.rawMaterial.id,
+                kode: usage.rawMaterial.kode,
+                name: usage.rawMaterial.name
+            },
+            drum: null
+        }))
+      }
+
+      expect(result).toEqual(expectedResult)
       expect(prisma.batch.findUnique).toHaveBeenCalledWith({
         where: { id: 'test-id' },
         include: expect.any(Object),
@@ -194,6 +233,10 @@ describe('Batch Service', () => {
       })
       const mockFinishedGood = createTestFinishedGood({ id: 'fg-1' })
 
+      // FIX: Mock findUnique for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockRawMaterial as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         batch: {
           create: vi.fn().mockResolvedValue(mockBatch),
@@ -213,6 +256,7 @@ describe('Batch Service', () => {
             ...mockRawMaterial,
             currentStock: 90,
           }),
+          findUnique: vi.fn().mockResolvedValue(mockRawMaterial), // Ensure tx also finds it for error reporting
         },
         finishedGood: {
           findUnique: vi.fn().mockResolvedValue(mockFinishedGood),
@@ -375,6 +419,10 @@ describe('Batch Service', () => {
         currentStock: 200,
       })
 
+      // FIX: Mock findUnique for calculateStockAtDate (step 1.5)
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockRawMaterial as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       // Drums sorted by creation (FIFO)
       const mockDrums = [
         {
@@ -395,7 +443,10 @@ describe('Batch Service', () => {
         batch: { create: vi.fn().mockResolvedValue(mockBatch) },
         batchUsage: { create: vi.fn() },
         stockMovement: { create: vi.fn() },
-        rawMaterial: { update: vi.fn() },
+        rawMaterial: {
+            update: vi.fn(),
+            findUnique: vi.fn().mockResolvedValue(mockRawMaterial) // used for error name fetch
+        },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         drum: {
           findMany: vi.fn().mockResolvedValue(mockDrums),

@@ -1,0 +1,3 @@
+## 2024-10-27 - O(N) History Scanning in Stock Calculation
+**Learning:** Calculating stock at a historical date by summing all movements from the beginning of time (`lt: date`) is an O(N) operation that degrades linearly with history size.
+**Action:** Use a "reverse calculation" strategy: Start with the current stock snapshot (O(1)) and subtract net movements that occurred *after* the target date (`gte: date`). This makes the operation O(M) where M is recent history (usually small/zero for current operations), significantly improving performance for the most common use case (validating current operations).

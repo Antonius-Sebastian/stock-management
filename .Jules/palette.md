@@ -1,0 +1,3 @@
+## 2026-01-12 - [Tooltip Component Usage]
+**Learning:** The `Tooltip` component in `src/components/ui/tooltip.tsx` automatically wraps the `TooltipPrimitive.Root` with a `TooltipProvider`. This means each tooltip creates its own provider context, preventing them from sharing a delay group. When adding tooltips to a list of items (like delete buttons in a form array), they will each wait for the full `delayDuration` instead of showing immediately if another tooltip was just shown.
+**Action:** Use the existing `Tooltip` component for consistency, but be aware that "skip delay" behavior won't work between these tooltips. For future improvements, consider refactoring `Tooltip` to optionally accept an external provider or use a global provider.

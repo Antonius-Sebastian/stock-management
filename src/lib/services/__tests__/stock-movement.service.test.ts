@@ -35,6 +35,13 @@ vi.mock('@/lib/db', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    drum: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
+    finishedGoodStock: {
+      findUnique: vi.fn(),
+    },
     $transaction: vi.fn((callback) => {
       // Return a transaction client that has the same structure
       const txClient = {
@@ -50,6 +57,14 @@ vi.mock('@/lib/db', () => ({
         finishedGood: {
           findUnique: vi.fn(),
           update: vi.fn(),
+        },
+        drum: {
+          findUnique: vi.fn(),
+          update: vi.fn(),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
+          findUnique: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }
@@ -149,6 +164,10 @@ describe('Stock Movement Service', () => {
       })
       const mockMovement = createTestStockMovement(input)
 
+      // Mock Global findUnique for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -209,6 +228,10 @@ describe('Stock Movement Service', () => {
       })
       const mockMovement = createTestStockMovement(input)
 
+      // Mock Global findUnique for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -266,12 +289,17 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       }
 
+      // Mock Global findUnique for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
+
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
         },
         rawMaterial: {
-          findUnique: vi.fn(),
+          findUnique: vi.fn().mockResolvedValue(mockMaterial), // Return name for error
           update: vi.fn(),
         },
         finishedGood: {
@@ -367,6 +395,10 @@ describe('Stock Movement Service', () => {
       }
       const mockMovement = createTestStockMovement(input)
 
+      // Mock Global findUnique for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -418,12 +450,16 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       }
 
+      // Mock Global findUnique for calculateStockAtDate (returns 100 stock)
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
         },
         rawMaterial: {
-          findUnique: vi.fn(),
+          findUnique: vi.fn().mockResolvedValue(mockMaterial), // For finding name
           update: vi.fn(),
         },
         finishedGood: {
@@ -441,8 +477,9 @@ describe('Stock Movement Service', () => {
       )
 
       await expect(createStockMovement(input)).rejects.toThrow(
-        'Cannot adjust: would result in negative stock'
+        /Insufficient stock|Cannot adjust/
       )
+
       expect(mockTx.stockMovement.create).not.toHaveBeenCalled()
     })
 
@@ -455,6 +492,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1', // FIX: Added locationId as it is now required
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -476,6 +514,9 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }

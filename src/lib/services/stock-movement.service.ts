@@ -76,10 +76,9 @@ export async function getStockMovementsByDate(
  * @returns Stock level before the given date
  *
  * @remarks
- * - Sums all movements BEFORE the given date
- * - For finished goods: filters by locationId if provided
- * - For raw materials: filters by drumId if provided
- * - Used for date validation before creating/editing movements
+ * - OPTIMIZATION: Uses reverse calculation (Current Stock - Recent Movements) instead of history replay.
+ * - This changes complexity from O(Total History) to O(Recent History), which is effectively O(1) for daily operations.
+ * - Sums movements from startOfDay(date) until NOW to find the net change, then subtracts from Current Stock.
  */
 export async function calculateStockAtDate(
   itemId: string,
@@ -91,11 +90,55 @@ export async function calculateStockAtDate(
   const queryDate = parseToWIB(toWIBISOString(date))
   const startOfDay = startOfDayWIB(queryDate)
 
-  // Get all movements BEFORE the given date
-  const movements = await prisma.stockMovement.findMany({
+  // 1. Fetch Current Stock (Snapshot of NOW)
+  let currentStock = 0
+
+  if (itemType === 'raw-material') {
+    if (drumId) {
+      // Specific Drum Stock
+      const drum = await prisma.drum.findUnique({
+        where: { id: drumId },
+        select: { currentQuantity: true },
+      })
+      currentStock = drum?.currentQuantity || 0
+    } else {
+      // Aggregate Raw Material Stock
+      const material = await prisma.rawMaterial.findUnique({
+        where: { id: itemId },
+        select: { currentStock: true },
+      })
+      currentStock = material?.currentStock || 0
+    }
+  } else {
+    // Finished Good
+    if (locationId) {
+      // Location Specific Stock
+      const stock = await prisma.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: itemId,
+            locationId: locationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      currentStock = stock?.quantity || 0
+    } else {
+      // Global Finished Good Stock
+      const good = await prisma.finishedGood.findUnique({
+        where: { id: itemId },
+        select: { currentStock: true },
+      })
+      currentStock = good?.currentStock || 0
+    }
+  }
+
+  // 2. Fetch Movements SINCE the target date (inclusive) until NOW
+  // We want to reverse the effect of these movements to go back in time.
+  const movementsSince = await prisma.stockMovement.findMany({
     where: {
       date: {
-        lt: startOfDay, // Before the date (exclusive)
+        gte: startOfDay, // Since the start of the target day
       },
       ...(itemType === 'raw-material'
         ? {
@@ -107,25 +150,30 @@ export async function calculateStockAtDate(
             ...(locationId ? { locationId } : {}),
           }),
     },
-    orderBy: [
-      { date: 'asc' },
-      { createdAt: 'asc' }, // Secondary sort for chronological order on same day
-    ],
+    select: {
+      type: true,
+      quantity: true,
+    },
   })
 
-  // Calculate stock by summing all movements
-  let stock = 0
-  for (const movement of movements) {
+  // 3. Calculate Net Movement since startOfDay
+  let netMovement = 0
+  for (const movement of movementsSince) {
     if (movement.type === 'IN') {
-      stock += movement.quantity
+      netMovement += movement.quantity
     } else if (movement.type === 'OUT') {
-      stock -= movement.quantity
+      netMovement -= movement.quantity
     } else if (movement.type === 'ADJUSTMENT') {
-      stock += movement.quantity // Adjustment quantity is already signed
+      netMovement += movement.quantity // Adjustment is signed
     }
   }
 
-  return Math.max(0, stock) // Never return negative
+  // 4. Calculate Stock at Start of Day
+  // CurrentStock = StockAtStart + NetMovement
+  // StockAtStart = CurrentStock - NetMovement
+  const stockAtStartOfDay = currentStock - netMovement
+
+  return Math.max(0, stockAtStartOfDay)
 }
 
 export async function createStockMovement(
@@ -137,7 +185,8 @@ export async function createStockMovement(
       data.type === 'OUT' ||
       (data.type === 'ADJUSTMENT' && data.quantity < 0)
     ) {
-      const itemId = data.rawMaterialId || data.finishedGoodId!
+      const itemId = data.rawMaterialId || data.finishedGoodId
+      if (!itemId) throw new Error('Item ID required')
       const itemType = data.rawMaterialId ? 'raw-material' : 'finished-good'
       
       // Calculate stock at the movement date (before the movement)
@@ -153,10 +202,6 @@ export async function createStockMovement(
         data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
 
       if (stockAtDate < quantityToCheck) {
-        const itemName = data.rawMaterialId
-          ? (await tx.rawMaterial.findUnique({ where: { id: data.rawMaterialId }, select: { name: true } }))?.name
-          : (await tx.finishedGood.findUnique({ where: { id: data.finishedGoodId! }, select: { name: true } }))?.name
-        
         throw new Error(
           `Insufficient stock on ${data.date.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
         )
@@ -649,7 +694,7 @@ export async function updateStockMovementsByDate(
  *
  * @remarks
  * - Cannot edit movements that are part of batches (data integrity)
- * - Validates date logic (OUT movements need sufficient stock BEFORE the date)
+ * - Validates date logic (OUT movements need sufficient stock BEFORE the new date)
  * - Recalculates all affected stock values in transaction
  * - Uses FOR UPDATE locks for stock validation
  */
@@ -690,10 +735,12 @@ export async function updateStockMovement(
       )
     }
 
+    const itemId = existingMovement.rawMaterialId || existingMovement.finishedGoodId
+    if (!itemId) throw new Error('Item ID not found on movement')
+
     const itemType = existingMovement.rawMaterialId
       ? 'raw-material'
       : 'finished-good'
-    const itemId = existingMovement.rawMaterialId || existingMovement.finishedGoodId!
 
     // Determine what changed
     const oldQuantity = existingMovement.quantity
@@ -718,8 +765,6 @@ export async function updateStockMovement(
           ? newQuantity
           : -newQuantity
 
-    const quantityDifference = newQuantityChange - oldQuantityChange
-
     // Date validation: For OUT or negative ADJUSTMENT, check stock BEFORE the new date
     if (
       (existingMovement.type === 'OUT' ||
@@ -738,10 +783,6 @@ export async function updateStockMovement(
         existingMovement.type === 'ADJUSTMENT' ? Math.abs(newQuantity) : newQuantity
 
       if (stockAtDate < quantityToCheck) {
-        const itemName =
-          itemType === 'raw-material'
-            ? existingMovement.rawMaterial?.name
-            : existingMovement.finishedGood?.name
         throw new Error(
           `Insufficient stock on ${newDate.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
         )

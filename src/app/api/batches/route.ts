@@ -12,9 +12,14 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { AuditHelpers } from '@/lib/audit'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 
 /**
  * GET /api/batches
@@ -79,10 +84,12 @@ export async function GET(request: NextRequest) {
  * - Validates sufficient stock before creation
  * - Prevents duplicate materials in same batch
  * - Logs audit trail for compliance
+ * - Rate limited to prevent abuse
  *
  * @throws 401 - Unauthorized (not logged in)
  * @throws 403 - Forbidden (insufficient permissions)
  * @throws 400 - Validation error or insufficient stock
+ * @throws 429 - Too many requests
  */
 export async function POST(request: NextRequest) {
   try {
@@ -98,6 +105,20 @@ export async function POST(request: NextRequest) {
           error: getPermissionErrorMessage('create batches', session.user.role),
         },
         { status: 403 }
+      )
+    }
+
+    // Rate limiting
+    const ip = getIpAddress(request.headers) || 'unknown'
+    const rateLimit = await checkRateLimit(ip, RateLimits.BATCH_CREATION)
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
       )
     }
 
@@ -127,7 +148,10 @@ export async function POST(request: NextRequest) {
         (sum, drum) => sum + drum.quantity,
         0
       )
-      materials.push({ name: material?.name || 'Unknown', quantity: totalQuantity })
+      materials.push({
+        name: material?.name || 'Unknown',
+        quantity: totalQuantity,
+      })
     }
 
     await AuditHelpers.batchCreated(validatedData.code, '', materials, {

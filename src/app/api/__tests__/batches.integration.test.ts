@@ -22,6 +22,13 @@ import {
   createTestBatch,
   createTestUser,
 } from '../../../../test/helpers/test-data'
+import { createMockPrismaClient } from '../../../../test/helpers/prisma-mock'
+
+// Mock Prisma
+const mockPrisma = createMockPrismaClient()
+vi.mock('@/lib/db', () => ({
+  prisma: mockPrisma,
+}))
 
 // Mock dependencies
 vi.mock('@/lib/services', () => ({
@@ -58,6 +65,24 @@ vi.mock('@/lib/audit', () => ({
     batchUpdated: vi.fn().mockResolvedValue(undefined),
     batchDeleted: vi.fn().mockResolvedValue(undefined),
   },
+  getIpAddress: vi.fn().mockReturnValue('127.0.0.1'),
+}))
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 10,
+    resetInMs: 1000,
+    limit: 100,
+  }),
+  RateLimits: {
+    BATCH_CREATION: {
+      limit: 100,
+      windowMs: 60000,
+      keyPrefix: 'batch:create',
+    },
+  },
+  createRateLimitHeaders: vi.fn().mockReturnValue({}),
 }))
 
 describe('Batches API Integration Tests', () => {
@@ -222,7 +247,7 @@ describe('Batches API Integration Tests', () => {
         code: 'BATCH-001',
         date: '2024-01-15',
         description: 'Test batch',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 10 }],
+        materials: [{ rawMaterialId: 'rm-1', drums: [{ drumId: 'drum-1', quantity: 10 }] }],
       }
 
       const mockCreated = createTestBatch({ code: 'BATCH-001' })
@@ -231,6 +256,10 @@ describe('Batches API Integration Tests', () => {
       vi.mocked(auth).mockResolvedValue(mockSession as any)
       vi.mocked(canCreateBatches).mockReturnValue(true)
       vi.mocked(createBatch).mockResolvedValue(mockCreated)
+
+      // Mock DB call for audit log
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(mockPrisma.rawMaterial.findUnique).mockResolvedValue({ name: 'Material 1' } as any)
 
       const request = new NextRequest('http://localhost:3000/api/batches', {
         method: 'POST',
@@ -352,7 +381,7 @@ describe('Batches API Integration Tests', () => {
       const input = {
         code: 'BATCH-001-UPDATED',
         date: '2024-01-16',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 15 }],
+        materials: [{ rawMaterialId: 'rm-1', drums: [{ drumId: 'drum-1', quantity: 15 }] }],
       }
 
       const mockUpdated = {
@@ -364,6 +393,11 @@ describe('Batches API Integration Tests', () => {
       vi.mocked(auth).mockResolvedValue(mockSession as any)
       vi.mocked(canEditBatches).mockReturnValue(true)
       vi.mocked(updateBatch).mockResolvedValue(mockUpdated as any)
+
+       // Mock DB call for audit log
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       vi.mocked(mockPrisma.rawMaterial.findUnique).mockResolvedValue({ name: 'Material 1' } as any)
+
 
       const request = new NextRequest('http://localhost:3000/api/batches/123', {
         method: 'PUT',

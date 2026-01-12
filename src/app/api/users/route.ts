@@ -6,6 +6,11 @@ import { logger } from '@/lib/logger'
 import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { createUserSchema } from '@/lib/validations'
 import { getUsers, createUser } from '@/lib/services'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 
 export async function GET() {
   try {
@@ -49,10 +54,12 @@ export async function GET() {
  * - Hashes password with bcrypt
  * - Prevents duplicate usernames
  * - Logs audit trail
+ * - Rate limited to prevent abuse
  *
  * @throws 401 - Unauthorized (not logged in)
  * @throws 403 - Forbidden (not ADMIN)
  * @throws 400 - Validation error or duplicate username
+ * @throws 429 - Too many requests
  */
 export async function POST(request: NextRequest) {
   try {
@@ -66,6 +73,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: getPermissionErrorMessage('create users', session.user.role) },
         { status: 403 }
+      )
+    }
+
+    // Rate limiting
+    const ip = getIpAddress(request.headers) || 'unknown'
+    const rateLimit = await checkRateLimit(ip, RateLimits.USER_CREATION)
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
       )
     }
 

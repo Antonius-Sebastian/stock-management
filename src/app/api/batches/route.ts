@@ -12,7 +12,12 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { AuditHelpers } from '@/lib/audit'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
 
@@ -86,6 +91,20 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting (IP-based)
+    const ip = getIpAddress(request.headers) || '127.0.0.1'
+    const rateLimit = await checkRateLimit(ip, RateLimits.BATCH_CREATION)
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
+      )
+    }
+
     // Authentication and authorization required (ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE)
     const session = await auth()
     if (!session) {

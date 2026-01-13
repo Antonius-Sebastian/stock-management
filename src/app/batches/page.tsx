@@ -12,6 +12,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { BatchesTable } from '@/components/batches/batches-table'
 import { AddBatchDialog } from '@/components/batches/add-batch-dialog'
 import { EditBatchDialog } from '@/components/batches/edit-batch-dialog'
@@ -36,6 +46,7 @@ export default function BatchesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedBatch, setSelectedBatch] = useState<BatchWithUsage | null>(
     null
   )
@@ -76,17 +87,16 @@ export default function BatchesPage() {
     setEditDialogOpen(true)
   }
 
-  const handleDelete = async (batch: BatchWithUsage) => {
-    if (
-      !confirm(
-        `Apakah Anda yakin ingin menghapus batch "${batch.code}"? Stok bahan baku yang digunakan akan dikembalikan. Tindakan ini tidak dapat dibatalkan.`
-      )
-    ) {
-      return
-    }
+  const handleDeleteClick = (batch: BatchWithUsage) => {
+    setSelectedBatch(batch)
+    setDeleteDialogOpen(true)
+  }
+
+  const executeDelete = async () => {
+    if (!selectedBatch) return
 
     try {
-      const response = await fetch(`/api/batches/${batch.id}`, {
+      const response = await fetch(`/api/batches/${selectedBatch.id}`, {
         method: 'DELETE',
       })
 
@@ -99,6 +109,7 @@ export default function BatchesPage() {
 
       toast.success('Batch berhasil dihapus dan stok dikembalikan')
       fetchBatches()
+      setDeleteDialogOpen(false)
     } catch (error) {
       logger.error('Error deleting batch:', error)
       const message =
@@ -156,7 +167,7 @@ export default function BatchesPage() {
               data={batches}
               onView={handleView}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={handleDeleteClick}
               userRole={userRole}
             />
           </div>
@@ -175,6 +186,28 @@ export default function BatchesPage() {
         onOpenChange={setEditDialogOpen}
         onSuccess={handleSuccess}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini tidak dapat dibatalkan. Batch &quot;
+              {selectedBatch?.code}&quot; akan dihapus dan stok bahan baku yang
+              digunakan akan dikembalikan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

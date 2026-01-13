@@ -89,6 +89,10 @@ model StockMovement {
   @@index([rawMaterialId, date])
   @@index([finishedGoodId, date])
   @@index([type, date])
+  // Optimized indexes for specific stock contexts
+  @@index([drumId, date])
+  @@index([locationId, date])
+  @@index([batchId])
   @@map("stock_movements")
 }
 

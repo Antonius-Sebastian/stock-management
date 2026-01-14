@@ -32,6 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ItemSelector, DatePickerField } from '@/components/forms'
 import { useFormSubmission } from '@/lib/hooks'
@@ -290,17 +295,30 @@ function MaterialDrumsFieldArray({
                   )
                 }}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="hover:bg-destructive/10 hover:text-destructive mt-8 h-9 w-9 shrink-0"
-                onClick={() => removeDrum(drumIndex)}
-                disabled={drumFields.length === 1}
-                aria-label="Hapus drum"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="mt-8" tabIndex={0}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-destructive/10 hover:text-destructive h-9 w-9 shrink-0"
+                      onClick={() => removeDrum(drumIndex)}
+                      disabled={drumFields.length === 1}
+                      aria-label="Hapus drum"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {drumFields.length === 1
+                      ? 'Minimal satu drum diperlukan'
+                      : 'Hapus drum'}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         )
@@ -563,17 +581,30 @@ export function AddBatchDialog({ onSuccess }: AddBatchDialogProps) {
                           <CardTitle className="text-base font-semibold">
                             Bahan Baku {materialIndex + 1}
                           </CardTitle>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="hover:bg-destructive/10 hover:text-destructive h-8 w-8"
-                            onClick={() => removeMaterial(materialIndex)}
-                            disabled={materialFields.length === 1}
-                            aria-label="Hapus bahan baku"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={0}>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="hover:bg-destructive/10 hover:text-destructive h-8 w-8"
+                                  onClick={() => removeMaterial(materialIndex)}
+                                  disabled={materialFields.length === 1}
+                                  aria-label="Hapus bahan baku"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                {materialFields.length === 1
+                                  ? 'Minimal satu bahan baku diperlukan'
+                                  : 'Hapus bahan baku'}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </CardHeader>
                       <CardContent className="space-subsection pt-0">

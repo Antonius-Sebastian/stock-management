@@ -149,6 +149,10 @@ describe('Stock Movement Service', () => {
       })
       const mockMovement = createTestStockMovement(input)
 
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -364,8 +368,16 @@ describe('Stock Movement Service', () => {
         id: 'raw-mat-1',
         name: 'Test Material',
         currentStock: 100,
+        kode: 'RM-1',
+        moq: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }
       const mockMovement = createTestStockMovement(input)
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         stockMovement: {

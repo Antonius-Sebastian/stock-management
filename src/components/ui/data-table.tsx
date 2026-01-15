@@ -24,6 +24,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -271,19 +278,23 @@ export function DataTable<TData, TValue>({
             <p className="text-sm font-medium whitespace-nowrap">
               Baris per halaman
             </p>
-            <select
-              value={table.getState().pagination.pageSize}
-              onChange={(e) => {
-                table.setPageSize(Number(e.target.value))
+            <Select
+              value={`${table.getState().pagination.pageSize}`}
+              onValueChange={(value) => {
+                table.setPageSize(Number(value))
               }}
-              className="border-input bg-background h-8 w-[70px] rounded-md border px-2 text-sm"
             >
-              {[10, 20, 30, 40, 50].map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  {pageSize}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-[70px]">
+                <SelectValue placeholder={table.getState().pagination.pageSize} />
+              </SelectTrigger>
+              <SelectContent side="top">
+                {[10, 20, 30, 40, 50].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             <Button

@@ -13,6 +13,11 @@ import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { AuditHelpers } from '@/lib/audit'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
 
@@ -101,6 +106,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Rate limiting: Check if user is sending too many requests
+    // We use IP address as identifier since multiple users might be behind same IP in corporate setting
+    // and we want to prevent flood from a location, or we could use user ID.
+    // Using User ID is safer for auth'd routes.
+    const rateLimitResult = await checkRateLimit(
+      session.user.id,
+      RateLimits.BATCH_CREATION
+    )
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: 'Too many batch creation attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimitResult),
+        }
+      )
+    }
+
     const body = await request.json()
     const validatedData = batchSchemaAPI.parse(body)
 
@@ -127,7 +151,10 @@ export async function POST(request: NextRequest) {
         (sum, drum) => sum + drum.quantity,
         0
       )
-      materials.push({ name: material?.name || 'Unknown', quantity: totalQuantity })
+      materials.push({
+        name: material?.name || 'Unknown',
+        quantity: totalQuantity,
+      })
     }
 
     await AuditHelpers.batchCreated(validatedData.code, '', materials, {

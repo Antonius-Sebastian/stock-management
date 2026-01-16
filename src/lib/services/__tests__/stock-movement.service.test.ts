@@ -149,6 +149,10 @@ describe('Stock Movement Service', () => {
       })
       const mockMovement = createTestStockMovement(input)
 
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -364,8 +368,16 @@ describe('Stock Movement Service', () => {
         id: 'raw-mat-1',
         name: 'Test Material',
         currentStock: 100,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        kode: 'RM-1',
+        moq: 0,
       }
       const mockMovement = createTestStockMovement(input)
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         stockMovement: {
@@ -416,7 +428,15 @@ describe('Stock Movement Service', () => {
         id: 'raw-mat-1',
         name: 'Test Material',
         currentStock: 100,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        kode: 'RM-1',
+        moq: 0,
       }
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         stockMovement: {
@@ -441,7 +461,7 @@ describe('Stock Movement Service', () => {
       )
 
       await expect(createStockMovement(input)).rejects.toThrow(
-        'Cannot adjust: would result in negative stock'
+        'Insufficient stock'
       )
       expect(mockTx.stockMovement.create).not.toHaveBeenCalled()
     })
@@ -455,6 +475,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -476,6 +497,9 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }

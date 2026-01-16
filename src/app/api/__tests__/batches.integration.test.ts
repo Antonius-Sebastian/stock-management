@@ -222,7 +222,12 @@ describe('Batches API Integration Tests', () => {
         code: 'BATCH-001',
         date: '2024-01-15',
         description: 'Test batch',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 10 }],
+        materials: [
+          {
+            rawMaterialId: 'rm-1',
+            drums: [{ drumId: 'drum-1', quantity: 10 }],
+          },
+        ],
       }
 
       const mockCreated = createTestBatch({ code: 'BATCH-001' })
@@ -352,7 +357,12 @@ describe('Batches API Integration Tests', () => {
       const input = {
         code: 'BATCH-001-UPDATED',
         date: '2024-01-16',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 15 }],
+        materials: [
+          {
+            rawMaterialId: 'rm-1',
+            drums: [{ drumId: 'drum-1', quantity: 15 }],
+          },
+        ],
       }
 
       const mockUpdated = {

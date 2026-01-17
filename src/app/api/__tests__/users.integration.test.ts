@@ -12,6 +12,7 @@ import { getUsers, createUser } from '@/lib/services'
 import { auth } from '@/auth'
 import { canManageUsers } from '@/lib/rbac'
 import { createTestUser } from '../../../../test/helpers/test-data'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // Mock dependencies
 vi.mock('@/lib/services', () => ({
@@ -43,6 +44,23 @@ vi.mock('@/lib/audit', () => ({
     logUserAction: vi.fn(),
   },
   getIpAddress: vi.fn(() => '127.0.0.1'),
+}))
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 10,
+    resetInMs: 1000,
+    limit: 50,
+  }),
+  RateLimits: {
+    USER_CREATION: { limit: 50, windowMs: 3600000, keyPrefix: 'user:create' },
+  },
+  createRateLimitHeaders: vi.fn().mockReturnValue({
+    'X-RateLimit-Limit': '50',
+    'X-RateLimit-Remaining': '10',
+    'X-RateLimit-Reset': '2023-01-01T00:00:00.000Z',
+  }),
 }))
 
 describe('Users API Integration Tests', () => {
@@ -229,6 +247,41 @@ describe('Users API Integration Tests', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
+    })
+
+    it('should return 429 when rate limit is exceeded', async () => {
+      const mockUser = createTestUser({ role: 'ADMIN' })
+      const mockSession = {
+        user: mockUser,
+        expires: new Date(Date.now() + 86400000).toISOString(),
+      }
+
+      vi.mocked(auth).mockResolvedValue(mockSession as any)
+      vi.mocked(canManageUsers).mockReturnValue(true)
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        resetInMs: 1000,
+        limit: 50,
+      })
+
+      const request = new NextRequest('http://localhost:3000/api/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'newuser',
+          email: 'new@example.com',
+          password: 'Password123',
+          name: 'New User',
+          role: 'OFFICE_PURCHASING',
+        }),
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(429)
+      expect(data).toHaveProperty('error')
+      expect(createUser).not.toHaveBeenCalled()
     })
   })
 })

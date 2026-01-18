@@ -61,7 +61,8 @@ vi.mock('@/lib/db', () => ({
 
 describe('Stock Movement Service', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+    vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
   })
 
   describe('getStockMovementsByDate', () => {
@@ -148,6 +149,15 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       })
       const mockMovement = createTestStockMovement(input)
+
+      // Mock previous movements to satisfy date validation (need > 5 stock)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([
+        createTestStockMovement({
+          type: 'IN',
+          quantity: 10,
+          date: new Date('2024-01-10'),
+        }),
+      ])
 
       const mockTx = {
         stockMovement: {
@@ -367,16 +377,22 @@ describe('Stock Movement Service', () => {
       }
       const mockMovement = createTestStockMovement(input)
 
+      // Mock previous movements to satisfy date validation (need > 150 stock)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([
+        createTestStockMovement({
+          type: 'IN',
+          quantity: 200,
+          date: new Date('2024-01-10'),
+        }),
+      ])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
         },
         rawMaterial: {
-          findUnique: vi.fn().mockResolvedValue(mockMaterial),
-          update: vi.fn().mockResolvedValue({
-            ...mockMaterial,
-            currentStock: 95,
-          }),
+          findUnique: vi.fn(),
+          update: vi.fn(),
         },
         finishedGood: {
           findUnique: vi.fn(),
@@ -455,6 +471,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -477,6 +494,9 @@ describe('Stock Movement Service', () => {
             currentStock: 60,
           }),
         },
+        finishedGoodStock: {
+          upsert: vi.fn(),
+        },
         $queryRaw: vi.fn(),
       }
 
@@ -493,6 +513,70 @@ describe('Stock Movement Service', () => {
       expect(mockTx.finishedGood.update).toHaveBeenCalledWith({
         where: { id: 'fg-1' },
         data: { currentStock: { increment: 10 } },
+      })
+    })
+
+    it('should calculate quantity from targetStock for ADJUSTMENT', async () => {
+      const input = {
+        type: 'ADJUSTMENT' as const,
+        quantity: 0, // Ignored
+        targetStock: 120,
+        date: new Date('2024-01-15'),
+        description: 'Stock adjustment to absolute value',
+        rawMaterialId: 'raw-mat-1',
+        finishedGoodId: null,
+        batchId: null,
+      }
+      const mockMaterial = createTestRawMaterial({
+        id: 'raw-mat-1',
+        currentStock: 100,
+      })
+      // Expected calculated quantity = 120 - 100 = 20
+      const mockMovement = createTestStockMovement({
+        ...input,
+        quantity: 20,
+      })
+
+      const mockTx = {
+        stockMovement: {
+          create: vi.fn().mockResolvedValue(mockMovement),
+        },
+        rawMaterial: {
+          findUnique: vi.fn().mockResolvedValue(mockMaterial),
+          update: vi.fn().mockResolvedValue({
+            ...mockMaterial,
+            currentStock: 120,
+          }),
+        },
+        finishedGood: {
+          findUnique: vi.fn(),
+          update: vi.fn(),
+        },
+        $queryRaw: vi.fn().mockResolvedValue([
+          {
+            id: 'raw-mat-1',
+            name: mockMaterial.name,
+            currentStock: 100,
+          },
+        ]),
+      }
+
+      vi.mocked(prisma.$transaction).mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (callback: any) => {
+          return callback(mockTx)
+        }
+      )
+
+      const result = await createStockMovement(input)
+
+      expect(result).toEqual(mockMovement)
+      // Check that it queried for current stock with FOR UPDATE
+      expect(mockTx.$queryRaw).toHaveBeenCalled()
+      // Check that it updated with the delta (20)
+      expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
+        where: { id: 'raw-mat-1' },
+        data: { currentStock: { increment: 20 } },
       })
     })
   })

@@ -42,6 +42,7 @@ vi.mock('@/lib/db', () => ({
           create: vi.fn(),
           deleteMany: vi.fn(),
           updateMany: vi.fn(),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn(),
@@ -152,6 +153,7 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn().mockResolvedValue(mockMaterial),
@@ -212,6 +214,7 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn().mockResolvedValue(mockMaterial),
@@ -269,6 +272,7 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn(),
@@ -313,6 +317,7 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn().mockResolvedValue(mockMaterial),
@@ -370,6 +375,7 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn().mockResolvedValue(mockMaterial),
@@ -421,6 +427,7 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn(),
@@ -465,6 +472,7 @@ describe('Stock Movement Service', () => {
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           findUnique: vi.fn(),

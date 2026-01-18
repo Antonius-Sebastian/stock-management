@@ -104,6 +104,7 @@ describe('Stock Movements API Integration Tests', () => {
             quantity: 10,
             date: '2024-01-15',
             rawMaterialId: 'rm-1',
+            drumId: 'drum-1',
           }),
         }
       )
@@ -135,12 +136,17 @@ describe('Stock Movements API Integration Tests', () => {
             quantity: 10,
             date: '2024-01-15',
             rawMaterialId: 'rm-1',
+            drumId: 'drum-1',
           }),
         }
       )
 
       const response = await POST(request)
       const _data = await response.json()
+
+      if (response.status === 400) {
+        console.log('Validation Error:', JSON.stringify(_data, null, 2))
+      }
 
       expect(response.status).toBe(403)
       expect(createStockMovement).not.toHaveBeenCalled()
@@ -166,6 +172,7 @@ describe('Stock Movements API Integration Tests', () => {
             quantity: 10,
             date: '2024-01-15',
             rawMaterialId: 'rm-1',
+            drumId: 'drum-1',
           }),
         }
       )
@@ -189,6 +196,7 @@ describe('Stock Movements API Integration Tests', () => {
         quantity: 10,
         date: '2024-01-15',
         rawMaterialId: 'rm-1',
+        drumId: 'drum-1',
         description: 'Test movement',
       }
 

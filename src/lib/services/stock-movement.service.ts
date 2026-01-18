@@ -21,6 +21,7 @@ import {
 export interface StockMovementInput {
   type: 'IN' | 'OUT' | 'ADJUSTMENT'
   quantity: number
+  targetStock?: number // For ADJUSTMENT type, optional target stock
   date: Date
   description?: string | null
   rawMaterialId?: string | null
@@ -132,6 +133,59 @@ export async function createStockMovement(
   data: StockMovementInput
 ): Promise<StockMovement> {
   return await prisma.$transaction(async (tx) => {
+    // Handle ADJUSTMENT with targetStock
+    // Calculate quantity based on current stock (with lock)
+    if (data.type === 'ADJUSTMENT' && data.targetStock !== undefined) {
+      let currentStock = 0
+
+      if (data.drumId) {
+        const drum = await tx.$queryRaw<
+          Array<{ id: string; currentQuantity: number }>
+        >`
+          SELECT id, "currentQuantity"
+          FROM drums
+          WHERE id = ${data.drumId}
+          FOR UPDATE
+        `
+
+        if (drum.length === 0) {
+          throw new Error('Drum not found')
+        }
+        currentStock = drum[0].currentQuantity
+      } else if (data.rawMaterialId) {
+        const rawMaterials = await tx.$queryRaw<
+          Array<{ id: string; currentStock: number }>
+        >`
+          SELECT id, "currentStock"
+          FROM raw_materials
+          WHERE id = ${data.rawMaterialId}
+          FOR UPDATE
+        `
+
+        if (rawMaterials.length === 0) {
+          throw new Error('Raw material not found')
+        }
+        currentStock = rawMaterials[0].currentStock
+      } else if (data.finishedGoodId) {
+        if (!data.locationId) {
+          throw new Error('Location required for Finished Good adjustment')
+        }
+
+        const stocks = await tx.$queryRaw<Array<{ quantity: number }>>`
+          SELECT quantity
+          FROM finished_good_stocks
+          WHERE "finishedGoodId" = ${data.finishedGoodId}
+            AND "locationId" = ${data.locationId}
+          FOR UPDATE
+        `
+
+        currentStock = stocks.length > 0 ? stocks[0].quantity : 0
+      }
+
+      // Calculate quantity (delta)
+      data.quantity = data.targetStock - currentStock
+    }
+
     // Date validation: For OUT or negative ADJUSTMENT, check stock BEFORE the movement date
     if (
       data.type === 'OUT' ||

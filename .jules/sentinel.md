@@ -1,0 +1,4 @@
+## 2024-05-22 - [Race Condition in Stock Adjustments]
+**Vulnerability:** Race condition in stock adjustment logic. The API route fetched current stock, calculated the difference, and then called the service with the difference. If stock changed between fetch and write, the final stock would be incorrect.
+**Learning:** Business logic involving calculations based on current DB state (like "set to X") must be atomic. Separating the "read current state" and "write delta" across the API/Service boundary introduces race conditions.
+**Prevention:** Move the calculation logic into the Service layer inside the transaction. Use `FOR UPDATE` locking when reading the current state to ensure consistency during the calculation. API routes should pass the *intent* (e.g., "set target to 100") rather than the *mechanism* (e.g., "add 20").

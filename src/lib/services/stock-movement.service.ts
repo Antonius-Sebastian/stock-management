@@ -91,41 +91,92 @@ export async function calculateStockAtDate(
   const queryDate = parseToWIB(toWIBISOString(date))
   const startOfDay = startOfDayWIB(queryDate)
 
-  // Get all movements BEFORE the given date
-  const movements = await prisma.stockMovement.findMany({
-    where: {
-      date: {
-        lt: startOfDay, // Before the date (exclusive)
+  // OPTIMIZATION: Reverse calculation strategy
+  // Instead of summing O(N) history, we take current stock and reverse O(M) recent movements
+  // Formula: StockAtDate = CurrentStock - (Sum(IN) - Sum(OUT) + Sum(ADJUSTMENT))
+  // where movements are those happening FROM the date onwards.
+
+  // We use a transaction to ensure we get a consistent snapshot of stock and movements
+  const [currentStockData, movements] = await prisma.$transaction(async (tx) => {
+    let stockDataPromise
+
+    // 1. Fetch Current Stock
+    if (itemType === 'raw-material') {
+      if (drumId) {
+        stockDataPromise = tx.drum.findUnique({
+          where: { id: drumId },
+          select: { currentQuantity: true },
+        })
+      } else {
+        stockDataPromise = tx.rawMaterial.findUnique({
+          where: { id: itemId },
+          select: { currentStock: true },
+        })
+      }
+    } else {
+      if (locationId) {
+        stockDataPromise = tx.finishedGoodStock.findUnique({
+          where: {
+            finishedGoodId_locationId: {
+              finishedGoodId: itemId,
+              locationId,
+            },
+          },
+          select: { quantity: true },
+        })
+      } else {
+        stockDataPromise = tx.finishedGood.findUnique({
+          where: { id: itemId },
+          select: { currentStock: true },
+        })
+      }
+    }
+
+    // 2. Fetch Future Movements (inclusive of startOfDay)
+    const movementsPromise = tx.stockMovement.findMany({
+      where: {
+        date: {
+          gte: startOfDay,
+        },
+        ...(itemType === 'raw-material'
+          ? {
+              rawMaterialId: itemId,
+              ...(drumId ? { drumId } : {}),
+            }
+          : {
+              finishedGoodId: itemId,
+              ...(locationId ? { locationId } : {}),
+            }),
       },
-      ...(itemType === 'raw-material'
-        ? {
-            rawMaterialId: itemId,
-            ...(drumId ? { drumId } : {}),
-          }
-        : {
-            finishedGoodId: itemId,
-            ...(locationId ? { locationId } : {}),
-          }),
-    },
-    orderBy: [
-      { date: 'asc' },
-      { createdAt: 'asc' }, // Secondary sort for chronological order on same day
-    ],
+    })
+
+    return Promise.all([stockDataPromise, movementsPromise])
   })
 
-  // Calculate stock by summing all movements
-  let stock = 0
-  for (const movement of movements) {
-    if (movement.type === 'IN') {
-      stock += movement.quantity
-    } else if (movement.type === 'OUT') {
-      stock -= movement.quantity
-    } else if (movement.type === 'ADJUSTMENT') {
-      stock += movement.quantity // Adjustment quantity is already signed
+  // Extract current stock value
+  let currentStock = 0
+  if (currentStockData) {
+    if ('currentQuantity' in currentStockData) {
+      currentStock = (currentStockData as { currentQuantity: number }).currentQuantity
+    } else if ('currentStock' in currentStockData) {
+      currentStock = (currentStockData as { currentStock: number }).currentStock
+    } else if ('quantity' in currentStockData) {
+      currentStock = (currentStockData as { quantity: number }).quantity
     }
   }
 
-  return Math.max(0, stock) // Never return negative
+  // Reverse the movements
+  for (const movement of movements) {
+    if (movement.type === 'IN') {
+      currentStock -= movement.quantity
+    } else if (movement.type === 'OUT') {
+      currentStock += movement.quantity
+    } else if (movement.type === 'ADJUSTMENT') {
+      currentStock -= movement.quantity
+    }
+  }
+
+  return Math.max(0, currentStock)
 }
 
 export async function createStockMovement(

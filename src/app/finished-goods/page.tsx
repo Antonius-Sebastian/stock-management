@@ -227,7 +227,9 @@ export default function FinishedGoodsPage() {
           )}
           {canManageFinishedGoods(userRole) && (
             <>
-              <ManageLocationsDialog onLocationsChange={handleLocationsChange} />
+              <ManageLocationsDialog
+                onLocationsChange={handleLocationsChange}
+              />
               <AddFinishedGoodDialog onSuccess={handleSuccess} />
             </>
           )}
@@ -248,14 +250,16 @@ export default function FinishedGoodsPage() {
               {locations.map((location, index) => (
                 <Button
                   key={location.id}
-                  variant={selectedLocation === location.id ? 'default' : 'outline'}
+                  variant={
+                    selectedLocation === location.id ? 'default' : 'outline'
+                  }
                   onClick={() => setSelectedLocation(location.id)}
                   className={cn(
                     'rounded-none border-r-0 transition-all duration-200',
                     index === 0 && 'rounded-l-md',
                     index === locations.length - 1 && 'rounded-r-md border-r',
                     selectedLocation === location.id
-                      ? 'bg-primary text-primary-foreground shadow-sm z-10'
+                      ? 'bg-primary text-primary-foreground z-10 shadow-sm'
                       : 'bg-background hover:bg-muted'
                   )}
                 >

@@ -93,7 +93,11 @@ export default function UsersPage() {
               </p>
             </div>
           ) : (
-            <UsersTable users={users} onRefresh={fetchUsers} userRole={userRole} />
+            <UsersTable
+              users={users}
+              onRefresh={fetchUsers}
+              userRole={userRole}
+            />
           )}
         </CardContent>
       </Card>

@@ -287,10 +287,12 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             })
             const materialName = rawMaterial?.name || 'Unknown'
             const drumLabel = drumEntry.drumId
-              ? (await tx.drum.findUnique({
-                  where: { id: drumEntry.drumId },
-                  select: { label: true },
-                }))?.label
+              ? (
+                  await tx.drum.findUnique({
+                    where: { id: drumEntry.drumId },
+                    select: { label: true },
+                  })
+                )?.label
               : null
             const itemLabel = drumLabel
               ? `${materialName} (Drum ${drumLabel})`

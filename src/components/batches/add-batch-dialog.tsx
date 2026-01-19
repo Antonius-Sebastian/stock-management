@@ -174,15 +174,12 @@ function MaterialDrumsFieldArray({
   // Get available drums (not used in other materials, and with stock > 0)
   // Always include currently selected drums so SelectValue can display them
   const availableDrums =
-    selectedMaterial.drums?.filter(
-      (drum) => {
-        const isSelected = selectedDrumIdsInThisMaterial.has(drum.id)
-        return (
-          isSelected ||
-          (drum.currentQuantity > 0 && !usedDrumIds.has(drum.id))
-        )
-      }
-    ) || []
+    selectedMaterial.drums?.filter((drum) => {
+      const isSelected = selectedDrumIdsInThisMaterial.has(drum.id)
+      return (
+        isSelected || (drum.currentQuantity > 0 && !usedDrumIds.has(drum.id))
+      )
+    }) || []
 
   return (
     <div className="space-y-3">

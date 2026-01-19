@@ -55,7 +55,11 @@ export async function GET(
     }
 
     // Get finished good movements using service
-    const result = await getFinishedGoodMovements(validatedId, locationId, limit)
+    const result = await getFinishedGoodMovements(
+      validatedId,
+      locationId,
+      limit
+    )
 
     return NextResponse.json(result)
   } catch (error) {
@@ -82,4 +86,3 @@ export async function GET(
     )
   }
 }
-

@@ -210,12 +210,8 @@ export function AddUserDialog({ children, onSuccess }: AddUserDialogProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="OFFICE_PURCHASING">
-                    Office A
-                  </SelectItem>
-                  <SelectItem value="OFFICE_WAREHOUSE">
-                    Office B
-                  </SelectItem>
+                  <SelectItem value="OFFICE_PURCHASING">Office A</SelectItem>
+                  <SelectItem value="OFFICE_WAREHOUSE">Office B</SelectItem>
                 </SelectContent>
               </Select>
             </div>

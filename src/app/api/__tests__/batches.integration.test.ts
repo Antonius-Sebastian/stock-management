@@ -36,6 +36,33 @@ vi.mock('@/auth', () => ({
   auth: vi.fn(),
 }))
 
+vi.mock('@/lib/rate-limit', async () => {
+  const actual = await vi.importActual('@/lib/rate-limit')
+  return {
+    ...actual,
+    checkRateLimit: vi.fn().mockResolvedValue({
+      allowed: true,
+      remaining: 100,
+      resetInMs: 0,
+      limit: 100,
+    }),
+    createRateLimitHeaders: vi.fn().mockReturnValue({}),
+  }
+})
+
+vi.mock('@/lib/audit', async () => {
+  const actual = await vi.importActual('@/lib/audit')
+  return {
+    ...actual,
+    getIpAddress: vi.fn().mockReturnValue('127.0.0.1'),
+    AuditHelpers: {
+      batchCreated: vi.fn().mockResolvedValue(undefined),
+      batchUpdated: vi.fn().mockResolvedValue(undefined),
+      batchDeleted: vi.fn().mockResolvedValue(undefined),
+    },
+  }
+})
+
 vi.mock('@/lib/rbac', () => ({
   canCreateBatches: vi.fn(),
   canEditBatches: vi.fn(),
@@ -49,14 +76,6 @@ vi.mock('@/lib/rbac', () => ({
 vi.mock('@/lib/logger', () => ({
   logger: {
     error: vi.fn(),
-  },
-}))
-
-vi.mock('@/lib/audit', () => ({
-  AuditHelpers: {
-    batchCreated: vi.fn().mockResolvedValue(undefined),
-    batchUpdated: vi.fn().mockResolvedValue(undefined),
-    batchDeleted: vi.fn().mockResolvedValue(undefined),
   },
 }))
 
@@ -222,7 +241,12 @@ describe('Batches API Integration Tests', () => {
         code: 'BATCH-001',
         date: '2024-01-15',
         description: 'Test batch',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 10 }],
+        materials: [
+          {
+            rawMaterialId: 'rm-1',
+            drums: [{ drumId: 'drum-1', quantity: 10 }],
+          },
+        ],
       }
 
       const mockCreated = createTestBatch({ code: 'BATCH-001' })
@@ -352,7 +376,12 @@ describe('Batches API Integration Tests', () => {
       const input = {
         code: 'BATCH-001-UPDATED',
         date: '2024-01-16',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 15 }],
+        materials: [
+          {
+            rawMaterialId: 'rm-1',
+            drums: [{ drumId: 'drum-1', quantity: 15 }],
+          },
+        ],
       }
 
       const mockUpdated = {

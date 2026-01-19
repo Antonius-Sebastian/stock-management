@@ -607,7 +607,9 @@ export function EditBatchDialog({
                     selectedMaterial?.drums && selectedMaterial.drums.length > 0
 
                   // Get all used drums across all materials
-                  const allMaterials = form.watch('materials') as BatchFormData['materials']
+                  const allMaterials = form.watch(
+                    'materials'
+                  ) as BatchFormData['materials']
                   const usedDrumIds = new Set<string>()
                   for (const mat of allMaterials) {
                     if (mat.rawMaterialId) {
@@ -685,18 +687,20 @@ export function EditBatchDialog({
                                       <>
                                         {sortedRawMaterials.map((material) => {
                                           // Filter out already selected materials (except current one)
-                                          const isAlreadySelected = allMaterials.some(
-                                            (m, idx) =>
-                                              idx !== materialIndex &&
-                                              m.rawMaterialId === material.id
-                                          )
+                                          const isAlreadySelected =
+                                            allMaterials.some(
+                                              (m, idx) =>
+                                                idx !== materialIndex &&
+                                                m.rawMaterialId === material.id
+                                            )
                                           if (isAlreadySelected) return null
 
-                                          const availableStock = getAvailableStock(
-                                            material.id
-                                          )
+                                          const availableStock =
+                                            getAvailableStock(material.id)
                                           const isInBatch =
-                                            materialsInBatch.includes(material.id)
+                                            materialsInBatch.includes(
+                                              material.id
+                                            )
                                           const isDisabled =
                                             availableStock === 0 && !isInBatch
 

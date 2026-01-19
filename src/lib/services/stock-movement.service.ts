@@ -76,9 +76,8 @@ export async function getStockMovementsByDate(
  * @returns Stock level before the given date
  *
  * @remarks
- * - Sums all movements BEFORE the given date
- * - For finished goods: filters by locationId if provided
- * - For raw materials: filters by drumId if provided
+ * - Uses reverse calculation strategy for O(Recent) performance
+ * - Gets Current Stock and subtracts movements since the date
  * - Used for date validation before creating/editing movements
  */
 export async function calculateStockAtDate(
@@ -91,11 +90,58 @@ export async function calculateStockAtDate(
   const queryDate = parseToWIB(toWIBISOString(date))
   const startOfDay = startOfDayWIB(queryDate)
 
-  // Get all movements BEFORE the given date
+  // OPTIMIZATION: Reverse Calculation Strategy
+  // Instead of summing from 0 (O(N)), we take Current Stock and reverse movements since date (O(Recent)).
+
+  // 1. Get Current Stock
+  let currentStock = 0
+
+  if (itemType === 'raw-material') {
+    if (drumId) {
+      const drum = await prisma.drum.findUnique({
+        where: { id: drumId },
+        select: { currentQuantity: true },
+      })
+      currentStock = drum?.currentQuantity || 0
+    } else {
+      // Global Raw Material Stock
+      const rm = await prisma.rawMaterial.findUnique({
+        where: { id: itemId },
+        select: { currentStock: true },
+      })
+      currentStock = rm?.currentStock || 0
+    }
+  } else {
+    // Finished Good
+    if (locationId) {
+      const fgs = await prisma.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: itemId,
+            locationId: locationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      currentStock = fgs?.quantity || 0
+    } else {
+      // Global Finished Good Stock
+      const fg = await prisma.finishedGood.findUnique({
+        where: { id: itemId },
+        select: { currentStock: true },
+      })
+      currentStock = fg?.currentStock || 0
+    }
+  }
+
+  // 2. Get movements to reverse (From startOfDay onwards)
+  // We want stock BEFORE startOfDay.
+  // CurrentStock includes movements >= startOfDay.
+  // So we subtract them.
   const movements = await prisma.stockMovement.findMany({
     where: {
       date: {
-        lt: startOfDay, // Before the date (exclusive)
+        gte: startOfDay,
       },
       ...(itemType === 'raw-material'
         ? {
@@ -107,21 +153,18 @@ export async function calculateStockAtDate(
             ...(locationId ? { locationId } : {}),
           }),
     },
-    orderBy: [
-      { date: 'asc' },
-      { createdAt: 'asc' }, // Secondary sort for chronological order on same day
-    ],
+    orderBy: { date: 'asc' },
   })
 
-  // Calculate stock by summing all movements
-  let stock = 0
+  // 3. Reverse the movements
+  let stock = currentStock
   for (const movement of movements) {
     if (movement.type === 'IN') {
-      stock += movement.quantity
+      stock -= movement.quantity // Reverse IN -> Subtract
     } else if (movement.type === 'OUT') {
-      stock -= movement.quantity
+      stock += movement.quantity // Reverse OUT -> Add
     } else if (movement.type === 'ADJUSTMENT') {
-      stock += movement.quantity // Adjustment quantity is already signed
+      stock -= movement.quantity // Reverse ADJUSTMENT -> Subtract (since quantity is signed)
     }
   }
 

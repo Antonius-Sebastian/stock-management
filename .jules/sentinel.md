@@ -1,0 +1,6 @@
+# Sentinel's Journal
+
+## 2026-01-19 - Integration Test Mocking for Security Modules
+**Vulnerability:** Not a vulnerability in app code, but a fragility in test code. Integration tests for API routes failed with "400 Bad Request" when new security modules (like `rate-limit` or `audit`) were imported in the route handler but not properly mocked in the test environment.
+**Learning:** When adding security checks to API routes (e.g., rate limiting), existing integration tests that mock the service layer but hit the actual route handler will fail if they don't also mock the new dependencies. Specifically, `getIpAddress` from `@/lib/audit` caused failures when not mocked because it relies on headers that might be missing or structured differently in the test request context, or simply because the import itself causes side effects if not handled.
+**Prevention:** Always check `src/app/api/__tests__/` when modifying API routes. If importing new modules like `@/lib/rate-limit` or `@/lib/audit`, ensure the corresponding `vi.mock()` calls are present in the test files. For `rate-limit`, mock it to return `allowed: true` to test the happy path. For `audit`, ensure `getIpAddress` is mocked if used.

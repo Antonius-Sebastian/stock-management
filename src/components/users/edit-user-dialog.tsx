@@ -119,7 +119,8 @@ export function EditUserDialog({
           <DialogHeader>
             <DialogTitle>Ubah User</DialogTitle>
             <DialogDescription>
-              Perbarui informasi user. Biarkan password kosong untuk tetap menggunakan password saat ini.
+              Perbarui informasi user. Biarkan password kosong untuk tetap
+              menggunakan password saat ini.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -186,8 +187,7 @@ export function EditUserDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-role">
-                Peran{' '}
-                <span className="text-red-500 dark:text-red-400">*</span>
+                Peran <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Select
                 value={formData.role}

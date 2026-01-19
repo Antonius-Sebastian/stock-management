@@ -12,9 +12,14 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { AuditHelpers } from '@/lib/audit'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 
 /**
  * GET /api/batches
@@ -101,6 +106,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Rate limiting
+    const ip = getIpAddress(request.headers) || 'unknown'
+    const rateLimit = await checkRateLimit(ip, RateLimits.BATCH_CREATION)
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
+      )
+    }
+
     const body = await request.json()
     const validatedData = batchSchemaAPI.parse(body)
 
@@ -127,7 +146,10 @@ export async function POST(request: NextRequest) {
         (sum, drum) => sum + drum.quantity,
         0
       )
-      materials.push({ name: material?.name || 'Unknown', quantity: totalQuantity })
+      materials.push({
+        name: material?.name || 'Unknown',
+        quantity: totalQuantity,
+      })
     }
 
     await AuditHelpers.batchCreated(validatedData.code, '', materials, {
@@ -136,7 +158,10 @@ export async function POST(request: NextRequest) {
       role: session.user.role,
     })
 
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json(result, {
+      status: 201,
+      headers: createRateLimitHeaders(rateLimit),
+    })
   } catch (error) {
     logger.error('Error creating batch', error)
 

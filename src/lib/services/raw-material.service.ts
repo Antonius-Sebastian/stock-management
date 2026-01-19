@@ -40,9 +40,7 @@ export interface PaginationMetadata {
  * - Pagination: page (min 1), limit (1-100, default 50)
  * - Results ordered by creation date (newest first)
  */
-export async function getRawMaterials(
-  options?: PaginationOptions
-): Promise<
+export async function getRawMaterials(options?: PaginationOptions): Promise<
   | (RawMaterial & { drums?: Drum[] })[]
   | {
       data: (RawMaterial & { drums?: Drum[] })[]

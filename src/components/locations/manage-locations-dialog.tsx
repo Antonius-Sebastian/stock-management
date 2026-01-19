@@ -202,17 +202,16 @@ export function ManageLocationsDialog({
                   )}
                 />
                 <div className="flex gap-2">
-                  <Button
-                    type="submit"
-                    disabled={form.formState.isSubmitting}
-                  >
+                  <Button type="submit" disabled={form.formState.isSubmitting}>
                     {form.formState.isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         {editingId ? 'Memperbarui...' : 'Membuat...'}
                       </>
+                    ) : editingId ? (
+                      'Perbarui Lokasi'
                     ) : (
-                      editingId ? 'Perbarui Lokasi' : 'Tambah Lokasi'
+                      'Tambah Lokasi'
                     )}
                   </Button>
                   {editingId && (
@@ -243,7 +242,7 @@ export function ManageLocationsDialog({
                   <TableRow>
                     <TableCell colSpan={2} className="h-24 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
                         <span className="text-muted-foreground text-sm">
                           Memuat...
                         </span>

@@ -88,9 +88,7 @@ export default function RawMaterialDetailPage({
   const fetchMaterialMovements = async () => {
     if (!materialId) return
     try {
-      const response = await fetch(
-        `/api/raw-materials/${materialId}/movements`
-      )
+      const response = await fetch(`/api/raw-materials/${materialId}/movements`)
       if (!response.ok) {
         throw new Error('Failed to fetch material details')
       }
@@ -279,7 +277,7 @@ export default function RawMaterialDetailPage({
                 />
                 <label
                   htmlFor="show-empty-drums"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  className="cursor-pointer text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Tampilkan drum kosong
                 </label>
@@ -291,11 +289,11 @@ export default function RawMaterialDetailPage({
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 px-4 font-medium">Label</th>
-                    <th className="text-left py-2 px-4 font-medium">
+                    <th className="px-4 py-2 text-left font-medium">Label</th>
+                    <th className="px-4 py-2 text-left font-medium">
                       Stok Tersedia
                     </th>
-                    <th className="text-left py-2 px-4 font-medium">Status</th>
+                    <th className="px-4 py-2 text-left font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -311,11 +309,11 @@ export default function RawMaterialDetailPage({
                   ) : (
                     filteredDrums.map((drum) => (
                       <tr key={drum.id} className="border-b">
-                        <td className="py-2 px-4">{drum.label}</td>
-                        <td className="py-2 px-4">
+                        <td className="px-4 py-2">{drum.label}</td>
+                        <td className="px-4 py-2">
                           {drum.currentQuantity.toLocaleString()}
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="px-4 py-2">
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                               drum.isActive

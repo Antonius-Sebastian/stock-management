@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { createUserSchema } from '@/lib/validations'
 import { getUsers, createUser } from '@/lib/services'
+import { checkRateLimit, RateLimits, createRateLimitHeaders } from '@/lib/rate-limit'
 
 export async function GET() {
   try {
@@ -55,6 +56,21 @@ export async function GET() {
  * @throws 400 - Validation error or duplicate username
  */
 export async function POST(request: NextRequest) {
+  const ip = getIpAddress(request.headers) || 'unknown'
+
+  // Rate limit user creation
+  const rateLimit = await checkRateLimit(ip, RateLimits.USER_CREATION)
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many user creation attempts. Please try again later.' },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimit),
+      }
+    )
+  }
+
   try {
     // Authentication and authorization required (ADMIN only)
     const session = await auth()
@@ -84,10 +100,12 @@ export async function POST(request: NextRequest) {
         name: session.user.name || session.user.username,
         role: session.user.role,
       },
-      getIpAddress(request.headers)
+      ip
     )
 
-    return NextResponse.json(user)
+    return NextResponse.json(user, {
+      headers: createRateLimitHeaders(rateLimit),
+    })
   } catch (error) {
     logger.error('Error creating user:', error)
 
@@ -95,17 +113,17 @@ export async function POST(request: NextRequest) {
       const firstError = error.errors[0]
       return NextResponse.json(
         { error: firstError.message || 'Validation failed' },
-        { status: 400 }
+        { status: 400, headers: createRateLimitHeaders(rateLimit) }
       )
     }
 
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: error.message }, { status: 400, headers: createRateLimitHeaders(rateLimit) })
     }
 
     return NextResponse.json(
       { error: 'Failed to create user' },
-      { status: 500 }
+      { status: 500, headers: createRateLimitHeaders(rateLimit) }
     )
   }
 }

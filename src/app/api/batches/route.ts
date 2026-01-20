@@ -12,9 +12,10 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { AuditHelpers } from '@/lib/audit'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
+import { checkRateLimit, RateLimits, createRateLimitHeaders } from '@/lib/rate-limit'
 
 /**
  * GET /api/batches
@@ -85,6 +86,21 @@ export async function GET(request: NextRequest) {
  * @throws 400 - Validation error or insufficient stock
  */
 export async function POST(request: NextRequest) {
+  const ip = getIpAddress(request.headers) || 'unknown'
+
+  // Rate limit batch creation
+  const rateLimit = await checkRateLimit(ip, RateLimits.BATCH_CREATION)
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many batch creation attempts. Please try again later.' },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimit),
+      }
+    )
+  }
+
   try {
     // Authentication and authorization required (ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE)
     const session = await auth()
@@ -136,7 +152,7 @@ export async function POST(request: NextRequest) {
       role: session.user.role,
     })
 
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json(result, { status: 201, headers: createRateLimitHeaders(rateLimit) })
   } catch (error) {
     logger.error('Error creating batch', error)
 
@@ -144,17 +160,17 @@ export async function POST(request: NextRequest) {
       const firstError = error.errors[0]
       return NextResponse.json(
         { error: firstError.message || 'Validation failed' },
-        { status: 400 }
+        { status: 400, headers: createRateLimitHeaders(rateLimit) }
       )
     }
 
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: error.message }, { status: 400, headers: createRateLimitHeaders(rateLimit) })
     }
 
     return NextResponse.json(
       { error: 'Failed to create batch' },
-      { status: 500 }
+      { status: 500, headers: createRateLimitHeaders(rateLimit) }
     )
   }
 }

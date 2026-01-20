@@ -17,6 +17,8 @@ import {
   stockMovementSchemaAPI,
   stockMovementQuerySchema,
 } from '@/lib/validations'
+import { checkRateLimit, RateLimits, createRateLimitHeaders } from '@/lib/rate-limit'
+import { getIpAddress } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,6 +64,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = getIpAddress(request.headers) || 'unknown'
+
+  // Rate limit stock movement creation (API_GENERAL)
+  const rateLimit = await checkRateLimit(ip, RateLimits.API_GENERAL)
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimit),
+      }
+    )
+  }
+
   try {
     // Authentication required
     const session = await auth()
@@ -79,7 +96,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'Lokasi harus dipilih untuk stok masuk produk jadi' },
-        { status: 400 }
+        { status: 400, headers: createRateLimitHeaders(rateLimit) }
       )
     }
 
@@ -100,7 +117,7 @@ export async function POST(request: NextRequest) {
               session.user.role
             ),
           },
-          { status: 403 }
+          { status: 403, headers: createRateLimitHeaders(rateLimit) }
         )
       }
     } else {
@@ -116,7 +133,7 @@ export async function POST(request: NextRequest) {
                 session.user.role
               )
 
-        return NextResponse.json({ error: restriction }, { status: 403 })
+        return NextResponse.json({ error: restriction }, { status: 403, headers: createRateLimitHeaders(rateLimit) })
       }
     }
 
@@ -134,7 +151,7 @@ export async function POST(request: NextRequest) {
           select: { currentQuantity: true },
         })
         if (!drum) {
-          return NextResponse.json({ error: 'Drum not found' }, { status: 404 })
+          return NextResponse.json({ error: 'Drum not found' }, { status: 404, headers: createRateLimitHeaders(rateLimit) })
         }
         currentStock = drum.currentQuantity
       } else if (validatedData.rawMaterialId) {
@@ -144,7 +161,7 @@ export async function POST(request: NextRequest) {
           select: { currentStock: true },
         })
         if (!rawMaterial) {
-          return NextResponse.json({ error: 'Raw material not found' }, { status: 404 })
+          return NextResponse.json({ error: 'Raw material not found' }, { status: 404, headers: createRateLimitHeaders(rateLimit) })
         }
         currentStock = rawMaterial.currentStock
       } else if (validatedData.finishedGoodId) {
@@ -152,7 +169,7 @@ export async function POST(request: NextRequest) {
         if (!body.locationId) {
           return NextResponse.json(
             { error: 'Location is required for finished good adjustments' },
-            { status: 400 }
+            { status: 400, headers: createRateLimitHeaders(rateLimit) }
           )
         }
         const stock = await prisma.finishedGoodStock.findUnique({
@@ -178,7 +195,7 @@ export async function POST(request: NextRequest) {
       if (adjustmentQuantity < 0 && currentStock + adjustmentQuantity < 0) {
         return NextResponse.json(
           { error: `Cannot adjust: would result in negative stock. Current: ${currentStock}, New: ${validatedData.newStock}` },
-          { status: 400 }
+          { status: 400, headers: createRateLimitHeaders(rateLimit) }
         )
       }
     }
@@ -199,7 +216,7 @@ export async function POST(request: NextRequest) {
     // Create stock movement using service
     const result = await createStockMovement(serviceInput)
 
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json(result, { status: 201, headers: createRateLimitHeaders(rateLimit) })
   } catch (error) {
     logger.error('Error creating stock movement:', error)
 
@@ -207,17 +224,17 @@ export async function POST(request: NextRequest) {
       const firstError = error.errors[0]
       return NextResponse.json(
         { error: firstError.message || 'Validation failed' },
-        { status: 400 }
+        { status: 400, headers: createRateLimitHeaders(rateLimit) }
       )
     }
 
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: error.message }, { status: 400, headers: createRateLimitHeaders(rateLimit) })
     }
 
     return NextResponse.json(
       { error: 'Failed to create stock movement' },
-      { status: 500 }
+      { status: 500, headers: createRateLimitHeaders(rateLimit) }
     )
   }
 }

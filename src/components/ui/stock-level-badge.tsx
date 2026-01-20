@@ -1,4 +1,9 @@
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface StockLevelBadgeProps {
   stock: number
@@ -6,34 +11,70 @@ interface StockLevelBadgeProps {
 }
 
 export function StockLevelBadge({ stock, moq }: StockLevelBadgeProps) {
-  // Handle edge case where MOQ is 0 to prevent division by zero
   if (moq === 0) {
     return (
-      <Badge variant="outline" className="text-muted-foreground">
-        Tidak Ada MOQ
-      </Badge>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            className="inline-flex cursor-default outline-none"
+          >
+            <Badge variant="outline" className="text-muted-foreground">
+              Tidak Ada MOQ
+            </Badge>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Minimum Order Quantity (MOQ) belum diatur</p>
+        </TooltipContent>
+      </Tooltip>
     )
   }
 
   const ratio = stock / moq
+  const percentage = Math.round(ratio * 100)
 
+  let badge
   if (ratio >= 1) {
-    return (
+    badge = (
       <Badge variant="success" className="font-semibold">
         Baik
       </Badge>
     )
   } else if (ratio >= 0.5) {
-    return (
+    badge = (
       <Badge variant="warning" className="font-semibold">
         Rendah
       </Badge>
     )
   } else {
-    return (
+    badge = (
       <Badge variant="destructive" className="font-semibold">
         Kritis
       </Badge>
     )
   }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="inline-flex cursor-help outline-none"
+          role="status"
+          aria-label={`Stok: ${stock}, MOQ: ${moq} (${percentage}%)`}
+        >
+          {badge}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="font-medium">
+          Stok: {stock.toLocaleString()} / MOQ: {moq.toLocaleString()}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          ({percentage}% dari target)
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  )
 }

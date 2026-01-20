@@ -91,11 +91,56 @@ export async function calculateStockAtDate(
   const queryDate = parseToWIB(toWIBISOString(date))
   const startOfDay = startOfDayWIB(queryDate)
 
-  // Get all movements BEFORE the given date
+  // OPTIMIZATION: Reverse calculation strategy
+  // Instead of summing from 0 to Date (O(N)), we start from Current Stock
+  // and subtract movements from Date to Now (O(small)).
+  // Stock(Date) = CurrentStock - Sum(Movements >= Date)
+
+  // 1. Get Current Stock
+  let currentStock = 0
+
+  if (itemType === 'raw-material') {
+    if (drumId) {
+      const drum = await prisma.drum.findUnique({
+        where: { id: drumId },
+        select: { currentQuantity: true },
+      })
+      currentStock = drum?.currentQuantity || 0
+    } else {
+      const material = await prisma.rawMaterial.findUnique({
+        where: { id: itemId },
+        select: { currentStock: true },
+      })
+      currentStock = material?.currentStock || 0
+    }
+  } else {
+    // Finished Good
+    if (locationId) {
+      const stock = await prisma.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: itemId,
+            locationId: locationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      currentStock = stock?.quantity || 0
+    } else {
+      const good = await prisma.finishedGood.findUnique({
+        where: { id: itemId },
+        select: { currentStock: true },
+      })
+      currentStock = good?.currentStock || 0
+    }
+  }
+
+  // 2. Get movements FROM the date onwards (inclusive)
+  // We want to subtract everything that happened ON or AFTER this date to get back to the start of the date.
   const movements = await prisma.stockMovement.findMany({
     where: {
       date: {
-        lt: startOfDay, // Before the date (exclusive)
+        gte: startOfDay, // On or after the date
       },
       ...(itemType === 'raw-material'
         ? {
@@ -107,25 +152,21 @@ export async function calculateStockAtDate(
             ...(locationId ? { locationId } : {}),
           }),
     },
-    orderBy: [
-      { date: 'asc' },
-      { createdAt: 'asc' }, // Secondary sort for chronological order on same day
-    ],
   })
 
-  // Calculate stock by summing all movements
-  let stock = 0
+  // 3. Reverse calculations
+  // CurrentStock includes these movements. We need to UN-DO them.
   for (const movement of movements) {
     if (movement.type === 'IN') {
-      stock += movement.quantity
+      currentStock -= movement.quantity
     } else if (movement.type === 'OUT') {
-      stock -= movement.quantity
+      currentStock += movement.quantity
     } else if (movement.type === 'ADJUSTMENT') {
-      stock += movement.quantity // Adjustment quantity is already signed
+      currentStock -= movement.quantity
     }
   }
 
-  return Math.max(0, stock) // Never return negative
+  return Math.max(0, currentStock) // Never return negative
 }
 
 export async function createStockMovement(

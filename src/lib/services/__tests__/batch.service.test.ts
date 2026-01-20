@@ -40,6 +40,7 @@ vi.mock('@/lib/db', () => ({
     stockMovement: {
       create: vi.fn(),
       deleteMany: vi.fn(),
+      findMany: vi.fn(),
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -193,6 +194,10 @@ describe('Batch Service', () => {
         currentStock: 100,
       })
       const mockFinishedGood = createTestFinishedGood({ id: 'fg-1' })
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockRawMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         batch: {
@@ -375,6 +380,10 @@ describe('Batch Service', () => {
         currentStock: 200,
       })
 
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockRawMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       // Drums sorted by creation (FIFO)
       const mockDrums = [
         {
@@ -522,16 +531,16 @@ describe('Batch Service', () => {
           .fn()
           .mockResolvedValueOnce([
             {
-              id: 'fg-1',
-              name: 'Finished Good 1',
-              currentStock: 5,
+              id: 'rm-1',
+              name: 'Material 1',
+              currentStock: 100,
             },
           ])
           .mockResolvedValueOnce([
             {
-              id: 'rm-1',
-              name: 'Material 1',
-              currentStock: 100,
+              id: 'fg-1',
+              name: 'Finished Good 1',
+              currentStock: 5,
             },
           ]),
         drum: {

@@ -35,6 +35,17 @@ vi.mock('@/lib/db', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    finishedGoodStock: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+      update: vi.fn(),
+    },
+    drum: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
     $transaction: vi.fn((callback) => {
       // Return a transaction client that has the same structure
       const txClient = {
@@ -49,6 +60,17 @@ vi.mock('@/lib/db', () => ({
         },
         finishedGood: {
           findUnique: vi.fn(),
+          update: vi.fn(),
+        },
+        finishedGoodStock: {
+          findUnique: vi.fn(),
+          upsert: vi.fn(),
+          update: vi.fn(),
+        },
+        drum: {
+          findUnique: vi.fn(),
+          findFirst: vi.fn(),
+          create: vi.fn(),
           update: vi.fn(),
         },
         $queryRaw: vi.fn(),
@@ -149,6 +171,10 @@ describe('Stock Movement Service', () => {
       })
       const mockMovement = createTestStockMovement(input)
 
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -209,6 +235,10 @@ describe('Stock Movement Service', () => {
       })
       const mockMovement = createTestStockMovement(input)
 
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -260,11 +290,15 @@ describe('Stock Movement Service', () => {
         finishedGoodId: null,
         batchId: null,
       }
-      const mockMaterial = {
+      const mockMaterial = createTestRawMaterial({
         id: 'raw-mat-1',
         name: 'Test Material',
         currentStock: 100,
-      }
+      })
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         stockMovement: {
@@ -360,12 +394,16 @@ describe('Stock Movement Service', () => {
         finishedGoodId: null,
         batchId: null,
       }
-      const mockMaterial = {
+      const mockMaterial = createTestRawMaterial({
         id: 'raw-mat-1',
         name: 'Test Material',
         currentStock: 100,
-      }
+      })
       const mockMovement = createTestStockMovement(input)
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         stockMovement: {
@@ -412,11 +450,15 @@ describe('Stock Movement Service', () => {
         finishedGoodId: null,
         batchId: null,
       }
-      const mockMaterial = {
+      const mockMaterial = createTestRawMaterial({
         id: 'raw-mat-1',
         name: 'Test Material',
         currentStock: 100,
-      }
+      })
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.rawMaterial.findUnique).mockResolvedValue(mockMaterial)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         stockMovement: {
@@ -441,7 +483,7 @@ describe('Stock Movement Service', () => {
       )
 
       await expect(createStockMovement(input)).rejects.toThrow(
-        'Cannot adjust: would result in negative stock'
+        'Insufficient stock'
       )
       expect(mockTx.stockMovement.create).not.toHaveBeenCalled()
     })
@@ -455,12 +497,25 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
         currentStock: 50,
       })
       const mockMovement = createTestStockMovement(input)
+
+      // Mock global prisma for calculateStockAtDate
+      vi.mocked(prisma.finishedGoodStock.findUnique).mockResolvedValue({
+        id: 'fgs-1',
+        finishedGoodId: 'fg-1',
+        locationId: 'loc-1',
+        quantity: 50,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      vi.mocked(prisma.finishedGood.findUnique).mockResolvedValue(mockFinishedGood)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockTx = {
         stockMovement: {
@@ -476,6 +531,9 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }

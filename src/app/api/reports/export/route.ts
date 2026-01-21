@@ -6,6 +6,12 @@ import { auth } from '@/auth'
 import { canExportReports, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { toWIB, getMonthRangeWIB, getWIBDate } from '@/lib/timezone'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
+import { getIpAddress } from '@/lib/audit'
 
 const exportReportSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2030),
@@ -38,6 +44,19 @@ interface ItemData {
 
 export async function GET(request: NextRequest) {
   try {
+    const ip = getIpAddress(request.headers) || 'unknown'
+    const rateLimit = await checkRateLimit(ip, RateLimits.REPORT_EXPORT)
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many export attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
+      )
+    }
+
     // Authentication and authorization required (all authenticated users can export reports)
     const session = await auth()
     if (!session) {

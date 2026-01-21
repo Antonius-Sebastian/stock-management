@@ -22,6 +22,7 @@ import {
   createTestBatch,
   createTestUser,
 } from '../../../../test/helpers/test-data'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // Mock dependencies
 vi.mock('@/lib/services', () => ({
@@ -58,11 +59,36 @@ vi.mock('@/lib/audit', () => ({
     batchUpdated: vi.fn().mockResolvedValue(undefined),
     batchDeleted: vi.fn().mockResolvedValue(undefined),
   },
+  getIpAddress: vi.fn().mockReturnValue('127.0.0.1'),
+}))
+
+// Mock rate limit
+vi.mock('@/lib/rate-limit', () => ({
+  RateLimits: {
+    BATCH_CREATION: {
+      limit: 200,
+      windowMs: 60 * 60 * 1000,
+      keyPrefix: 'batch:create',
+    },
+  },
+  checkRateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 10,
+    resetInMs: 1000,
+    limit: 10,
+  }),
+  createRateLimitHeaders: vi.fn().mockReturnValue({}),
 }))
 
 describe('Batches API Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      allowed: true,
+      remaining: 10,
+      resetInMs: 1000,
+      limit: 10,
+    })
   })
 
   describe('GET /api/batches', () => {
@@ -222,7 +248,12 @@ describe('Batches API Integration Tests', () => {
         code: 'BATCH-001',
         date: '2024-01-15',
         description: 'Test batch',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 10 }],
+        materials: [
+          {
+            rawMaterialId: 'rm-1',
+            drums: [{ drumId: 'drum-1', quantity: 10 }],
+          },
+        ],
       }
 
       const mockCreated = createTestBatch({ code: 'BATCH-001' })
@@ -243,6 +274,27 @@ describe('Batches API Integration Tests', () => {
       expect(response.status).toBe(201)
       expect(data).toMatchObject({ code: 'BATCH-001' })
       expect(createBatch).toHaveBeenCalled()
+    })
+
+    it('should return 429 when rate limit exceeded', async () => {
+      vi.mocked(checkRateLimit).mockResolvedValue({
+        allowed: false,
+        remaining: 0,
+        resetInMs: 1000,
+        limit: 10,
+      })
+
+      const request = new NextRequest('http://localhost:3000/api/batches', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: 'BATCH-001',
+          date: '2024-01-15',
+          materials: [],
+        }),
+      })
+
+      const response = await POST(request)
+      expect(response.status).toBe(429)
     })
   })
 
@@ -352,7 +404,9 @@ describe('Batches API Integration Tests', () => {
       const input = {
         code: 'BATCH-001-UPDATED',
         date: '2024-01-16',
-        materials: [{ rawMaterialId: 'rm-1', quantity: 15 }],
+        materials: [
+          { rawMaterialId: 'rm-1', drums: [{ drumId: 'drum-1', quantity: 15 }] },
+        ],
       }
 
       const mockUpdated = {

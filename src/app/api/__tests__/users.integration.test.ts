@@ -12,6 +12,7 @@ import { getUsers, createUser } from '@/lib/services'
 import { auth } from '@/auth'
 import { canManageUsers } from '@/lib/rbac'
 import { createTestUser } from '../../../../test/helpers/test-data'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // Mock dependencies
 vi.mock('@/lib/services', () => ({
@@ -45,9 +46,33 @@ vi.mock('@/lib/audit', () => ({
   getIpAddress: vi.fn(() => '127.0.0.1'),
 }))
 
+// Mock rate limit
+vi.mock('@/lib/rate-limit', () => ({
+  RateLimits: {
+    USER_CREATION: {
+      limit: 50,
+      windowMs: 60 * 60 * 1000,
+      keyPrefix: 'user:create',
+    },
+  },
+  checkRateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 10,
+    resetInMs: 1000,
+    limit: 10,
+  }),
+  createRateLimitHeaders: vi.fn().mockReturnValue({}),
+}))
+
 describe('Users API Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      allowed: true,
+      remaining: 10,
+      resetInMs: 1000,
+      limit: 10,
+    })
   })
 
   describe('GET /api/users', () => {
@@ -229,6 +254,29 @@ describe('Users API Integration Tests', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
+    })
+
+    it('should return 429 when rate limit exceeded', async () => {
+      vi.mocked(checkRateLimit).mockResolvedValue({
+        allowed: false,
+        remaining: 0,
+        resetInMs: 1000,
+        limit: 10,
+      })
+
+      const request = new NextRequest('http://localhost:3000/api/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'newuser',
+          email: 'new@example.com',
+          password: 'Password123',
+          name: 'New User',
+          role: 'OFFICE_PURCHASING',
+        }),
+      })
+
+      const response = await POST(request)
+      expect(response.status).toBe(429)
     })
   })
 })

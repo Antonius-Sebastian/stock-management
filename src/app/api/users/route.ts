@@ -6,6 +6,11 @@ import { logger } from '@/lib/logger'
 import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { createUserSchema } from '@/lib/validations'
 import { getUsers, createUser } from '@/lib/services'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 
 export async function GET() {
   try {
@@ -56,6 +61,19 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const ip = getIpAddress(request.headers) || 'unknown'
+    const rateLimit = await checkRateLimit(ip, RateLimits.USER_CREATION)
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many user creation attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
+      )
+    }
+
     // Authentication and authorization required (ADMIN only)
     const session = await auth()
     if (!session) {
@@ -84,7 +102,7 @@ export async function POST(request: NextRequest) {
         name: session.user.name || session.user.username,
         role: session.user.role,
       },
-      getIpAddress(request.headers)
+      ip
     )
 
     return NextResponse.json(user)

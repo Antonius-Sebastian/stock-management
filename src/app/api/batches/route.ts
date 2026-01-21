@@ -12,9 +12,14 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { canCreateBatches, getPermissionErrorMessage } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { AuditHelpers } from '@/lib/audit'
+import { AuditHelpers, getIpAddress } from '@/lib/audit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 
 /**
  * GET /api/batches
@@ -86,6 +91,19 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const ip = getIpAddress(request.headers) || 'unknown'
+    const rateLimit = await checkRateLimit(ip, RateLimits.BATCH_CREATION)
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many batch creation attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
+      )
+    }
+
     // Authentication and authorization required (ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE)
     const session = await auth()
     if (!session) {
@@ -127,7 +145,10 @@ export async function POST(request: NextRequest) {
         (sum, drum) => sum + drum.quantity,
         0
       )
-      materials.push({ name: material?.name || 'Unknown', quantity: totalQuantity })
+      materials.push({
+        name: material?.name || 'Unknown',
+        quantity: totalQuantity,
+      })
     }
 
     await AuditHelpers.batchCreated(validatedData.code, '', materials, {

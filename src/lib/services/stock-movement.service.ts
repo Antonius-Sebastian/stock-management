@@ -153,10 +153,6 @@ export async function createStockMovement(
         data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
 
       if (stockAtDate < quantityToCheck) {
-        const itemName = data.rawMaterialId
-          ? (await tx.rawMaterial.findUnique({ where: { id: data.rawMaterialId }, select: { name: true } }))?.name
-          : (await tx.finishedGood.findUnique({ where: { id: data.finishedGoodId! }, select: { name: true } }))?.name
-        
         throw new Error(
           `Insufficient stock on ${data.date.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
         )
@@ -718,8 +714,6 @@ export async function updateStockMovement(
           ? newQuantity
           : -newQuantity
 
-    const quantityDifference = newQuantityChange - oldQuantityChange
-
     // Date validation: For OUT or negative ADJUSTMENT, check stock BEFORE the new date
     if (
       (existingMovement.type === 'OUT' ||
@@ -738,10 +732,6 @@ export async function updateStockMovement(
         existingMovement.type === 'ADJUSTMENT' ? Math.abs(newQuantity) : newQuantity
 
       if (stockAtDate < quantityToCheck) {
-        const itemName =
-          itemType === 'raw-material'
-            ? existingMovement.rawMaterial?.name
-            : existingMovement.finishedGood?.name
         throw new Error(
           `Insufficient stock on ${newDate.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
         )
@@ -1091,46 +1081,47 @@ export async function createDrumStockIn(
   const { rawMaterialId, date, description, drums } = input
 
   await prisma.$transaction(async (tx) => {
-    // Check for duplicate drum labels
-    for (const drum of drums) {
-      const existing = await tx.drum.findFirst({
-        where: {
-          rawMaterialId,
-          label: drum.label,
-        },
-      })
-      if (existing) {
-        throw new Error(
-          `Drum ID ${drum.label} already exists for this material`
-        )
-      }
+    // Check for duplicate drum labels (Batch)
+    const drumLabels = drums.map((d) => d.label)
+    const existingDrums = await tx.drum.findMany({
+      where: {
+        rawMaterialId,
+        label: { in: drumLabels },
+      },
+      select: { label: true },
+    })
+
+    if (existingDrums.length > 0) {
+      throw new Error(
+        `Drum ID ${existingDrums[0].label} already exists for this material`
+      )
     }
 
-    // Process each drum
-    for (const drum of drums) {
-      // Create Drum
-      const newDrum = await tx.drum.create({
-        data: {
-          label: drum.label,
-          currentQuantity: drum.quantity,
-          rawMaterialId,
-          isActive: true,
-          createdAt: date,
-        },
-      })
+    // Create Drums (Batch)
+    const createdDrums = await tx.drum.createManyAndReturn({
+      data: drums.map((drum) => ({
+        label: drum.label,
+        currentQuantity: drum.quantity,
+        rawMaterialId,
+        isActive: true,
+        createdAt: date,
+      })),
+    })
 
-      // Create Movement tied to Drum
-      await tx.stockMovement.create({
-        data: {
-          type: 'IN',
-          quantity: drum.quantity,
-          date,
-          description: description || 'Stock In (Drum)',
-          rawMaterialId,
-          drumId: newDrum.id,
-        },
-      })
-    }
+    // Map created drums by label to get their IDs
+    const drumIdMap = new Map(createdDrums.map((d) => [d.label, d.id]))
+
+    // Create Stock Movements (Batch)
+    await tx.stockMovement.createMany({
+      data: drums.map((drum) => ({
+        type: 'IN',
+        quantity: drum.quantity,
+        date,
+        description: description || 'Stock In (Drum)',
+        rawMaterialId,
+        drumId: drumIdMap.get(drum.label),
+      })),
+    })
 
     // Update Raw Material Total Stock
     const totalQuantity = drums.reduce((sum, d) => sum + d.quantity, 0)

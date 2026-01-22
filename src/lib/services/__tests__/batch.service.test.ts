@@ -40,6 +40,7 @@ vi.mock('@/lib/db', () => ({
     stockMovement: {
       create: vi.fn(),
       deleteMany: vi.fn(),
+      groupBy: vi.fn(),
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -185,6 +186,11 @@ describe('Batch Service', () => {
           },
         ],
       }
+
+      // Mock groupBy for calculateStockAtDate (Optimization)
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
 
       const mockBatch = createTestBatch({ code: 'BATCH-001' })
       const mockRawMaterial = createTestRawMaterial({
@@ -368,6 +374,11 @@ describe('Batch Service', () => {
         ],
       }
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 200 } },
+      ] as any)
+
       const mockBatch = createTestBatch({ code: 'BATCH-FIFO' })
       const mockRawMaterial = createTestRawMaterial({
         id: 'rm-1',
@@ -469,6 +480,11 @@ describe('Batch Service', () => {
           },
         ],
       }
+
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
 
       const existingBatch = {
         ...createTestBatch({ id: batchId, code: 'BATCH-001' }),

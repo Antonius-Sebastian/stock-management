@@ -26,6 +26,7 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
       deleteMany: vi.fn(),
       updateMany: vi.fn(),
+      groupBy: vi.fn(),
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -48,6 +49,11 @@ vi.mock('@/lib/db', () => ({
           update: vi.fn(),
         },
         finishedGood: {
+          findUnique: vi.fn(),
+          update: vi.fn(),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
           findUnique: vi.fn(),
           update: vi.fn(),
         },
@@ -148,6 +154,11 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       })
       const mockMovement = createTestStockMovement(input)
+
+      // Mock groupBy for calculateStockAtDate (Optimization)
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
 
       const mockTx = {
         stockMovement: {
@@ -266,6 +277,11 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       }
 
+      // Mock groupBy for calculateStockAtDate (Optimization)
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
+
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
@@ -367,6 +383,11 @@ describe('Stock Movement Service', () => {
       }
       const mockMovement = createTestStockMovement(input)
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -418,6 +439,13 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       }
 
+      // Mock groupBy for calculateStockAtDate
+      // Mock sufficient stock at date (200) so we pass the date validation
+      // and hit the current stock validation (100) which should fail
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 200 } },
+      ] as any)
+
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
@@ -455,6 +483,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -476,6 +505,9 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }

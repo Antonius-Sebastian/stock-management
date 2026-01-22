@@ -91,8 +91,10 @@ export async function calculateStockAtDate(
   const queryDate = parseToWIB(toWIBISOString(date))
   const startOfDay = startOfDayWIB(queryDate)
 
-  // Get all movements BEFORE the given date
-  const movements = await prisma.stockMovement.findMany({
+  // Aggregate movements BEFORE the given date
+  // Uses groupBy to let the database handle the summation, reducing data transfer and memory usage
+  const aggregated = await prisma.stockMovement.groupBy({
+    by: ['type'],
     where: {
       date: {
         lt: startOfDay, // Before the date (exclusive)
@@ -107,21 +109,21 @@ export async function calculateStockAtDate(
             ...(locationId ? { locationId } : {}),
           }),
     },
-    orderBy: [
-      { date: 'asc' },
-      { createdAt: 'asc' }, // Secondary sort for chronological order on same day
-    ],
+    _sum: {
+      quantity: true,
+    },
   })
 
-  // Calculate stock by summing all movements
+  // Calculate stock by processing aggregated results
   let stock = 0
-  for (const movement of movements) {
-    if (movement.type === 'IN') {
-      stock += movement.quantity
-    } else if (movement.type === 'OUT') {
-      stock -= movement.quantity
-    } else if (movement.type === 'ADJUSTMENT') {
-      stock += movement.quantity // Adjustment quantity is already signed
+  for (const group of aggregated) {
+    const qty = group._sum.quantity || 0
+    if (group.type === 'IN') {
+      stock += qty
+    } else if (group.type === 'OUT') {
+      stock -= qty
+    } else if (group.type === 'ADJUSTMENT') {
+      stock += qty // Adjustment quantity is already signed
     }
   }
 

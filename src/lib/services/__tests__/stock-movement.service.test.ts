@@ -26,6 +26,7 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
       deleteMany: vi.fn(),
       updateMany: vi.fn(),
+      groupBy: vi.fn(),
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -149,6 +150,12 @@ describe('Stock Movement Service', () => {
       })
       const mockMovement = createTestStockMovement(input)
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 100 } } as any,
+      ])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -266,6 +273,12 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       }
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 100 } } as any,
+      ])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
@@ -367,6 +380,12 @@ describe('Stock Movement Service', () => {
       }
       const mockMovement = createTestStockMovement(input)
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 100 } } as any,
+      ])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn().mockResolvedValue(mockMovement),
@@ -418,6 +437,12 @@ describe('Stock Movement Service', () => {
         currentStock: 100,
       }
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 100 } } as any,
+      ])
+
       const mockTx = {
         stockMovement: {
           create: vi.fn(),
@@ -441,7 +466,7 @@ describe('Stock Movement Service', () => {
       )
 
       await expect(createStockMovement(input)).rejects.toThrow(
-        'Cannot adjust: would result in negative stock'
+        'Insufficient stock'
       )
       expect(mockTx.stockMovement.create).not.toHaveBeenCalled()
     })
@@ -455,6 +480,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -476,6 +502,9 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }

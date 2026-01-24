@@ -16,6 +16,16 @@
 export type UserRole = 'ADMIN' | 'OFFICE_PURCHASING' | 'OFFICE_WAREHOUSE'
 
 /**
+ * Check if user can create/edit locations
+ * @param role - User's role
+ * @returns true if ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE
+ */
+export function canManageLocations(role: string | undefined): boolean {
+  if (!role) return false
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
+}
+
+/**
  * Check if user can create/edit raw materials
  * @param role - User's role
  * @returns true if ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE
@@ -256,6 +266,7 @@ export function getPermissionErrorMessage(
  */
 export const PERMISSIONS = {
   ADMIN: {
+    canManageLocations: true, // Create/edit locations
     canManageMaterials: true, // Create/edit material metadata
     canDeleteMaterials: true, // Delete materials
     canManageFinishedGoods: true, // Create/edit product metadata
@@ -272,6 +283,7 @@ export const PERMISSIONS = {
     canManageUsers: true,
   },
   OFFICE_PURCHASING: {
+    canManageLocations: true, // ✅ Can create/edit locations
     canManageMaterials: true, // ✅ Can create/edit materials
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products
@@ -288,6 +300,7 @@ export const PERMISSIONS = {
     canManageUsers: false,
   },
   OFFICE_WAREHOUSE: {
+    canManageLocations: true, // ✅ Can create/edit locations
     canManageMaterials: true, // ✅ Can create/edit materials
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products

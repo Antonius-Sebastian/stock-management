@@ -23,6 +23,7 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     stockMovement: {
       findMany: vi.fn(),
+      groupBy: vi.fn(),
       create: vi.fn(),
       deleteMany: vi.fn(),
       updateMany: vi.fn(),
@@ -34,6 +35,11 @@ vi.mock('@/lib/db', () => ({
     finishedGood: {
       findUnique: vi.fn(),
       update: vi.fn(),
+    },
+    finishedGoodStock: {
+      upsert: vi.fn(),
+      update: vi.fn(),
+      findUnique: vi.fn(),
     },
     $transaction: vi.fn((callback) => {
       // Return a transaction client that has the same structure
@@ -51,6 +57,11 @@ vi.mock('@/lib/db', () => ({
           findUnique: vi.fn(),
           update: vi.fn(),
         },
+        finishedGoodStock: {
+          upsert: vi.fn(),
+          update: vi.fn(),
+          findUnique: vi.fn(),
+        },
         $queryRaw: vi.fn(),
       }
       return callback(txClient)
@@ -62,6 +73,8 @@ vi.mock('@/lib/db', () => ({
 describe('Stock Movement Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+    vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([])
   })
 
   describe('getStockMovementsByDate', () => {
@@ -207,6 +220,15 @@ describe('Stock Movement Service', () => {
         name: 'Test Material',
         currentStock: 100,
       })
+
+      // Mock existing stock via groupBy
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        {
+          type: 'IN',
+          _sum: { quantity: 100 },
+        },
+      ] as any)
+
       const mockMovement = createTestStockMovement(input)
 
       const mockTx = {
@@ -265,6 +287,16 @@ describe('Stock Movement Service', () => {
         name: 'Test Material',
         currentStock: 100,
       }
+
+      // Mock existing stock to be sufficient for the first check
+      const movements = [
+        createTestStockMovement({
+          type: 'IN',
+          quantity: 200,
+          date: new Date('2024-01-14'),
+        }),
+      ]
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue(movements)
 
       const mockTx = {
         stockMovement: {
@@ -365,6 +397,15 @@ describe('Stock Movement Service', () => {
         name: 'Test Material',
         currentStock: 100,
       }
+
+      // Mock existing stock via groupBy
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        {
+          type: 'IN',
+          _sum: { quantity: 100 },
+        },
+      ] as any)
+
       const mockMovement = createTestStockMovement(input)
 
       const mockTx = {
@@ -455,6 +496,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -476,6 +518,11 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
+          update: vi.fn(),
+          findUnique: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }

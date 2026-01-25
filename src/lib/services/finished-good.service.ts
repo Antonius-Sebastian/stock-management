@@ -234,21 +234,24 @@ export async function deleteFinishedGood(id: string): Promise<void> {
  * Get finished good movements with running balance
  *
  * @param id - Finished good ID
- * @param locationId - Optional location ID to filter movements
- * @param limit - Maximum number of movements to return (default 500)
- * @returns Finished good info and movements with running balance
+ * @param options - Optional location filter and pagination parameters
+ * @returns Finished good info and movements with running balance, with pagination metadata if pagination is used
  * @throws {Error} If finished good not found
  *
  * @remarks
  * - Fetches newest movements first (DESC)
- * - Defaults to limiting to latest 500 movements to prevent performance issues
+ * - Default: page=1, limit=50, max limit=500
+ * - If no pagination options provided, uses default limit of 500
  * - If locationId provided, filters movements and calculates location-specific running balance
  * - Running balance calculated working backwards from current stock
  */
 export async function getFinishedGoodMovements(
   id: string,
-  locationId?: string | null,
-  limit: number = 500
+  options?: {
+    locationId?: string | null
+    page?: number
+    limit?: number
+  }
 ): Promise<{
   finishedGood: Pick<FinishedGood, 'id' | 'name' | 'currentStock'>
   movements: Array<{
@@ -262,6 +265,7 @@ export async function getFinishedGoodMovements(
     runningBalance: number
     createdAt: Date
   }>
+  pagination?: PaginationMetadata
 }> {
   const finishedGood = await prisma.finishedGood.findUnique({
     where: { id },
@@ -275,6 +279,8 @@ export async function getFinishedGoodMovements(
   if (!finishedGood) {
     throw new Error('Finished good not found')
   }
+
+  const locationId = options?.locationId
 
   // Get current stock at location (if locationId provided)
   let currentStock = finishedGood.currentStock
@@ -290,6 +296,23 @@ export async function getFinishedGoodMovements(
     })
     currentStock = stock?.quantity || 0
   }
+
+  // Pagination logic
+  const page = options?.page ? Math.max(1, options.page) : 1
+  const limit = options?.limit
+    ? Math.min(500, Math.max(1, options.limit))
+    : options?.page
+      ? 50 // Default limit when pagination is used
+      : 500 // Default limit when no pagination
+  const skip = (page - 1) * limit
+
+  // Get total count
+  const total = await prisma.stockMovement.count({
+    where: {
+      finishedGoodId: id,
+      ...(locationId ? { locationId } : {}),
+    },
+  })
 
   // Fetch movements (filtered by location if provided)
   const movements = await prisma.stockMovement.findMany({
@@ -315,11 +338,45 @@ export async function getFinishedGoodMovements(
       { date: 'desc' },
       { createdAt: 'desc' }, // Secondary sort for chronological order on same day
     ],
+    skip,
     take: limit,
   })
 
   // Calculate running balance working backwards from current stock
+  // If paginating, we need to account for movements on previous pages
   let runningBalance = currentStock
+
+  // If we're on a page beyond the first, calculate stock level at start of this page
+  // by summing all movements that come before (on previous pages)
+  if (skip > 0) {
+    const previousMovements = await prisma.stockMovement.findMany({
+      where: {
+        finishedGoodId: id,
+        ...(locationId ? { locationId } : {}),
+      },
+      select: {
+        type: true,
+        quantity: true,
+      },
+      orderBy: [
+        { date: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: skip, // Get all movements before current page
+    })
+
+    // Sum up the effect of previous movements
+    for (const prevMovement of previousMovements) {
+      if (prevMovement.type === 'IN') {
+        runningBalance -= prevMovement.quantity
+      } else if (prevMovement.type === 'OUT') {
+        runningBalance += prevMovement.quantity
+      } else if (prevMovement.type === 'ADJUSTMENT') {
+        runningBalance -= prevMovement.quantity // Adjustment is signed
+      }
+    }
+    runningBalance = Math.round(runningBalance * 100) / 100
+  }
 
   const movementsWithBalance = movements.map((movement) => {
     // The balance displayed for this movement is the stock level AFTER this movement occurred.
@@ -354,8 +411,38 @@ export async function getFinishedGoodMovements(
   })
 
   // Movements are already DESC (Newest First)
-  return {
-    finishedGood,
+  const result: {
+    finishedGood: Pick<FinishedGood, 'id' | 'name' | 'currentStock'>
+    movements: Array<{
+      id: string
+      type: string
+      quantity: number
+      date: Date
+      description: string | null
+      batch: { id: string; code: string } | null
+      location: { id: string; name: string } | null
+      runningBalance: number
+      createdAt: Date
+    }>
+    pagination?: PaginationMetadata
+  } = {
+    finishedGood: {
+      ...finishedGood,
+      currentStock, // Use the location-specific stock if locationId was provided
+    },
     movements: movementsWithBalance,
   }
+
+  // Add pagination metadata if pagination is used
+  if (options?.page || options?.limit) {
+    result.pagination = {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + movements.length < total,
+    }
+  }
+
+  return result
 }

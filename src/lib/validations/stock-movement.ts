@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { parseToWIB } from '@/lib/timezone'
+import { parseToWIB, getWIBDate } from '@/lib/timezone'
 
 /**
  * Validation schema for creating stock movements (frontend forms)
@@ -66,17 +66,41 @@ export const stockMovementSchemaAPI = z
           path: ['newStock'],
         })
       }
+      // For ADJUSTMENT, if quantity is provided, it must not be zero
+      if (data.quantity !== undefined && data.quantity === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Quantity cannot be zero for ADJUSTMENT movements',
+          path: ['quantity'],
+        })
+      }
     } else {
-      // For IN and OUT, quantity must be positive
+      // For IN and OUT, quantity must be greater than zero (strict)
       if (data.quantity === undefined || data.quantity <= 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Quantity must be positive for IN and OUT movements',
+          message: 'Quantity must be greater than zero for IN and OUT movements',
           path: ['quantity'],
         })
       }
     }
   })
+  .refine(
+    (data) => {
+      const today = getWIBDate()
+      const movementDate = data.date
+      // Compare dates (ignore time) - movement date must be <= today
+      const todayStart = new Date(today)
+      todayStart.setHours(0, 0, 0, 0)
+      const movementDateStart = new Date(movementDate)
+      movementDateStart.setHours(0, 0, 0, 0)
+      return movementDateStart <= todayStart
+    },
+    {
+      message: 'Movement date cannot be in the future',
+      path: ['date'],
+    }
+  )
   .refine((data) => data.rawMaterialId || data.finishedGoodId, {
     message: 'Either rawMaterialId or finishedGoodId must be provided',
   })
@@ -134,12 +158,48 @@ export const updateStockMovementSchema = z
       .positive('Quantity must be positive')
       .max(1000000, 'Quantity cannot exceed 1,000,000')
       .optional(),
-    date: z.string().transform((str) => parseToWIB(str)).optional(),
+    date: z
+      .string()
+      .transform((str) => parseToWIB(str))
+      .optional(),
     description: z.string().nullable().optional(),
     locationId: z.string().optional().nullable(),
   })
-  .refine((data) => data.quantity !== undefined || data.date !== undefined || data.description !== undefined || data.locationId !== undefined, {
-    message: 'At least one field must be provided for update',
+  .refine(
+    (data) =>
+      data.quantity !== undefined ||
+      data.date !== undefined ||
+      data.description !== undefined ||
+      data.locationId !== undefined,
+    {
+      message: 'At least one field must be provided for update',
+    }
+  )
+  .superRefine((data, ctx) => {
+    // Validate future date if date is provided
+    if (data.date !== undefined) {
+      const today = getWIBDate()
+      const movementDate = data.date
+      const todayStart = new Date(today)
+      todayStart.setHours(0, 0, 0, 0)
+      const movementDateStart = new Date(movementDate)
+      movementDateStart.setHours(0, 0, 0, 0)
+      if (movementDateStart > todayStart) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Movement date cannot be in the future',
+          path: ['date'],
+        })
+      }
+    }
+    // Validate zero quantity if quantity is provided
+    if (data.quantity !== undefined && data.quantity <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Quantity must be greater than zero',
+        path: ['quantity'],
+      })
+    }
   })
 
 export type StockMovementInput = z.infer<typeof stockMovementSchema>

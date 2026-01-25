@@ -43,19 +43,33 @@ export async function GET(
     // Parse query params
     const { searchParams } = new URL(request.url)
     const locationId = searchParams.get('locationId') || undefined
+    const pageParam = searchParams.get('page')
     const limitParam = searchParams.get('limit')
-    const limit = limitParam ? parseInt(limitParam, 10) : 500
 
-    // Validate limit
-    if (isNaN(limit) || limit < 1 || limit > 5000) {
+    const page = pageParam ? parseInt(pageParam, 10) : undefined
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined
+
+    // Validate pagination params
+    if (page !== undefined && (isNaN(page) || page < 1)) {
       return NextResponse.json(
-        { error: 'Limit must be between 1 and 5000' },
+        { error: 'Page must be a positive integer' },
+        { status: 400 }
+      )
+    }
+
+    if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 500)) {
+      return NextResponse.json(
+        { error: 'Limit must be between 1 and 500' },
         { status: 400 }
       )
     }
 
     // Get finished good movements using service
-    const result = await getFinishedGoodMovements(validatedId, locationId, limit)
+    const result = await getFinishedGoodMovements(validatedId, {
+      ...(locationId && { locationId }),
+      ...(page !== undefined && { page }),
+      ...(limit !== undefined && { limit }),
+    })
 
     return NextResponse.json(result)
   } catch (error) {
@@ -82,4 +96,3 @@ export async function GET(
     )
   }
 }
-

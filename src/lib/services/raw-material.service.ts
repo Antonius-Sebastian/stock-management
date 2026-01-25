@@ -40,9 +40,7 @@ export interface PaginationMetadata {
  * - Pagination: page (min 1), limit (1-100, default 50)
  * - Results ordered by creation date (newest first)
  */
-export async function getRawMaterials(
-  options?: PaginationOptions
-): Promise<
+export async function getRawMaterials(options?: PaginationOptions): Promise<
   | (RawMaterial & { drums?: Drum[] })[]
   | {
       data: (RawMaterial & { drums?: Drum[] })[]
@@ -211,18 +209,22 @@ export async function deleteRawMaterial(id: string): Promise<void> {
  * Get stock movement history for a raw material with running balance
  *
  * @param id - Raw material ID
- * @param limit - Optional limit of movements to fetch (default: 500)
- * @returns Material info and movements with running balance
+ * @param options - Optional pagination parameters (page, limit)
+ * @returns Material info and movements with running balance, with pagination metadata if pagination is used
  * @throws {Error} If raw material not found
  *
  * @remarks
  * - Optimized to work backwards from current stock
  * - Fetches newest movements first (DESC)
- * - Defaults to limiting to latest 500 movements to prevent performance issues with large history
+ * - Default: page=1, limit=50, max limit=500
+ * - If no pagination options provided, uses default limit of 500
  */
 export async function getRawMaterialMovements(
   id: string,
-  limit: number = 500
+  options?: {
+    page?: number
+    limit?: number
+  }
 ): Promise<{
   material: Pick<RawMaterial, 'id' | 'kode' | 'name' | 'currentStock' | 'moq'>
   movements: Array<{
@@ -236,6 +238,7 @@ export async function getRawMaterialMovements(
     runningBalance: number
     createdAt: Date
   }>
+  pagination?: PaginationMetadata
 }> {
   const material = await prisma.rawMaterial.findUnique({
     where: { id },
@@ -251,6 +254,20 @@ export async function getRawMaterialMovements(
   if (!material) {
     throw new Error('Raw material not found')
   }
+
+  // Pagination logic
+  const page = options?.page ? Math.max(1, options.page) : 1
+  const limit = options?.limit
+    ? Math.min(500, Math.max(1, options.limit))
+    : options?.page
+      ? 50 // Default limit when pagination is used
+      : 500 // Default limit when no pagination
+  const skip = (page - 1) * limit
+
+  // Get total count
+  const total = await prisma.stockMovement.count({
+    where: { rawMaterialId: id },
+  })
 
   // Fetch movements Newest -> Oldest
   const movements = await prisma.stockMovement.findMany({
@@ -274,11 +291,44 @@ export async function getRawMaterialMovements(
       { date: 'desc' },
       { createdAt: 'desc' }, // Secondary sort for chronological order on same day
     ],
+    skip,
     take: limit,
   })
 
   // Calculate running balance working backwards from current stock
+  // If paginating, we need to account for movements on previous pages
   let runningBalance = material.currentStock
+
+  // If we're on a page beyond the first, calculate stock level at start of this page
+  // by summing all movements that come before (on previous pages)
+  if (skip > 0) {
+    const previousMovements = await prisma.stockMovement.findMany({
+      where: {
+        rawMaterialId: id,
+      },
+      select: {
+        type: true,
+        quantity: true,
+      },
+      orderBy: [
+        { date: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: skip, // Get all movements before current page
+    })
+
+    // Sum up the effect of previous movements
+    for (const prevMovement of previousMovements) {
+      if (prevMovement.type === 'IN') {
+        runningBalance -= prevMovement.quantity
+      } else if (prevMovement.type === 'OUT') {
+        runningBalance += prevMovement.quantity
+      } else if (prevMovement.type === 'ADJUSTMENT') {
+        runningBalance -= prevMovement.quantity // Adjustment is signed
+      }
+    }
+    runningBalance = Math.round(runningBalance * 100) / 100
+  }
 
   const movementsWithBalance = movements.map((movement) => {
     // The balance displayed for this movement is the stock level AFTER this movement occurred.
@@ -313,10 +363,37 @@ export async function getRawMaterialMovements(
   })
 
   // movements are already DESC (Newest First)
-  return {
+  const result: {
+    material: Pick<RawMaterial, 'id' | 'kode' | 'name' | 'currentStock' | 'moq'>
+    movements: Array<{
+      id: string
+      type: string
+      quantity: number
+      date: Date
+      description: string | null
+      batch: { id: string; code: string } | null
+      drum: { label: string } | null
+      runningBalance: number
+      createdAt: Date
+    }>
+    pagination?: PaginationMetadata
+  } = {
     material,
     movements: movementsWithBalance,
   }
+
+  // Add pagination metadata if pagination is used
+  if (options?.page || options?.limit) {
+    result.pagination = {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + movements.length < total,
+    }
+  }
+
+  return result
 }
 
 /**

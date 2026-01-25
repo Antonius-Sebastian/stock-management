@@ -73,10 +73,13 @@ export async function getStockMovementsByDate(
  * @param date - Date to calculate stock before (exclusive)
  * @param locationId - Optional location ID for finished goods
  * @param drumId - Optional drum ID for raw materials
+ * @param excludeMovementId - Optional movement ID to exclude from calculation (for edit operations)
+ * @param movementCreatedAt - Optional creation timestamp to handle same-day movements chronologically
  * @returns Stock level before the given date
  *
  * @remarks
- * - Sums all movements BEFORE the given date
+ * - Sums all movements BEFORE the given date chronologically
+ * - For same-day movements, includes movements created before movementCreatedAt
  * - For finished goods: filters by locationId if provided
  * - For raw materials: filters by drumId if provided
  * - Used for date validation before creating/editing movements
@@ -86,26 +89,33 @@ export async function calculateStockAtDate(
   itemType: 'raw-material' | 'finished-good',
   date: Date,
   locationId?: string | null,
-  drumId?: string | null
+  drumId?: string | null,
+  excludeMovementId?: string | null,
+  movementCreatedAt?: Date | null
 ): Promise<number> {
   const queryDate = parseToWIB(toWIBISOString(date))
   const startOfDay = startOfDayWIB(queryDate)
+  const endOfDay = endOfDayWIB(queryDate)
+
+  // Base where clause
+  const baseWhere = itemType === 'raw-material'
+    ? {
+        rawMaterialId: itemId,
+        ...(drumId ? { drumId } : {}),
+      }
+    : {
+        finishedGoodId: itemId,
+        ...(locationId ? { locationId } : {}),
+      }
 
   // Get all movements BEFORE the given date
-  const movements = await prisma.stockMovement.findMany({
+  const movementsBefore = await prisma.stockMovement.findMany({
     where: {
       date: {
         lt: startOfDay, // Before the date (exclusive)
       },
-      ...(itemType === 'raw-material'
-        ? {
-            rawMaterialId: itemId,
-            ...(drumId ? { drumId } : {}),
-          }
-        : {
-            finishedGoodId: itemId,
-            ...(locationId ? { locationId } : {}),
-          }),
+      ...baseWhere,
+      ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
     },
     orderBy: [
       { date: 'asc' },
@@ -113,9 +123,35 @@ export async function calculateStockAtDate(
     ],
   })
 
-  // Calculate stock by summing all movements
+  // Get movements ON the same day that were created BEFORE this movement
+  const sameDayMovements = movementCreatedAt
+    ? await prisma.stockMovement.findMany({
+        where: {
+          date: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          createdAt: { lt: movementCreatedAt },
+          ...baseWhere,
+          ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
+        },
+        orderBy: [
+          { date: 'asc' },
+          { createdAt: 'asc' },
+        ],
+      })
+    : []
+
+  // Combine and sort all movements chronologically
+  const allMovements = [...movementsBefore, ...sameDayMovements].sort((a, b) => {
+    const dateDiff = a.date.getTime() - b.date.getTime()
+    if (dateDiff !== 0) return dateDiff
+    return a.createdAt.getTime() - b.createdAt.getTime()
+  })
+
+  // Calculate stock by summing all movements chronologically
   let stock = 0
-  for (const movement of movements) {
+  for (const movement of allMovements) {
     if (movement.type === 'IN') {
       stock += movement.quantity
     } else if (movement.type === 'OUT') {
@@ -128,25 +164,79 @@ export async function calculateStockAtDate(
   return Math.max(0, stock) // Never return negative
 }
 
+/**
+ * Ensure raw material aggregate stock equals sum of drum stocks
+ *
+ * @param rawMaterialId - Raw material ID
+ * @param tx - Prisma transaction client
+ * @returns void
+ * @throws {Error} If aggregate doesn't match sum of drums
+ *
+ * @remarks
+ * - Validation function to ensure data consistency
+ * - Can be disabled via ENABLE_STOCK_CONSISTENCY_CHECK env var (default: true in development)
+ * - Allows small floating point differences (0.01) to account for rounding
+ */
+export async function validateRawMaterialStockConsistency(
+  rawMaterialId: string,
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+): Promise<void> {
+  // Check if validation is enabled (default: true, can be disabled in production for performance)
+  const enableCheck =
+    process.env.ENABLE_STOCK_CONSISTENCY_CHECK !== 'false'
+
+  if (!enableCheck) {
+    return // Skip validation if disabled
+  }
+
+  // Get sum of all drum stocks
+  const drumSum = await tx.drum.aggregate({
+    where: { rawMaterialId },
+    _sum: { currentQuantity: true },
+  })
+
+  const totalDrumStock = drumSum._sum.currentQuantity || 0
+
+  // Get aggregate stock
+  const rawMaterial = await tx.rawMaterial.findUnique({
+    where: { id: rawMaterialId },
+    select: { currentStock: true },
+  })
+
+  if (rawMaterial && Math.abs(rawMaterial.currentStock - totalDrumStock) > 0.01) {
+    // Allow small floating point differences
+    throw new Error(
+      `Stock inconsistency detected for raw material. Aggregate: ${rawMaterial.currentStock}, Sum of drums: ${totalDrumStock}`
+    )
+  }
+}
+
 export async function createStockMovement(
   data: StockMovementInput
 ): Promise<StockMovement> {
   return await prisma.$transaction(async (tx) => {
     // Date validation: For OUT or negative ADJUSTMENT, check stock BEFORE the movement date
+    // Use chronological calculation to handle same-day movements correctly
     if (
       data.type === 'OUT' ||
       (data.type === 'ADJUSTMENT' && data.quantity < 0)
     ) {
       const itemId = data.rawMaterialId || data.finishedGoodId!
       const itemType = data.rawMaterialId ? 'raw-material' : 'finished-good'
-      
-      // Calculate stock at the movement date (before the movement)
+
+      // Get current timestamp to compare against same-day movements
+      // This movement will be created now, so we compare against current time
+      const now = new Date()
+
+      // Calculate stock at the movement date (before the movement) chronologically
       const stockAtDate = await calculateStockAtDate(
         itemId,
         itemType,
         data.date,
         itemType === 'finished-good' ? data.locationId : null,
-        itemType === 'raw-material' ? data.drumId : null
+        itemType === 'raw-material' ? data.drumId : null,
+        null, // excludeMovementId (not created yet)
+        now // movementCreatedAt (will be created now, so compare against current time)
       )
 
       const quantityToCheck =
@@ -154,107 +244,22 @@ export async function createStockMovement(
 
       if (stockAtDate < quantityToCheck) {
         const itemName = data.rawMaterialId
-          ? (await tx.rawMaterial.findUnique({ where: { id: data.rawMaterialId }, select: { name: true } }))?.name
-          : (await tx.finishedGood.findUnique({ where: { id: data.finishedGoodId! }, select: { name: true } }))?.name
-        
+          ? (
+              await tx.rawMaterial.findUnique({
+                where: { id: data.rawMaterialId },
+                select: { name: true },
+              })
+            )?.name
+          : (
+              await tx.finishedGood.findUnique({
+                where: { id: data.finishedGoodId! },
+                select: { name: true },
+              })
+            )?.name
+
         throw new Error(
-          `Insufficient stock on ${data.date.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
+          `Insufficient stock for ${itemName || 'item'} on ${data.date.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
         )
-      }
-    }
-
-    // Validate stock for OUT movements or negative ADJUSTMENT (current stock validation as fallback)
-    if (
-      data.type === 'OUT' ||
-      (data.type === 'ADJUSTMENT' && data.quantity < 0)
-    ) {
-      if (data.drumId) {
-        // ... drum logic (unchanged) ...
-        const drum = await tx.drum.findUnique({
-          where: { id: data.drumId },
-        })
-
-        if (!drum) {
-          throw new Error('Drum not found')
-        }
-
-        const quantityToCheck =
-          data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
-
-        if (drum.currentQuantity < quantityToCheck) {
-          throw new Error(
-            `Insufficient stock in drum ${drum.label}. Available: ${drum.currentQuantity}, Requested: ${data.quantity}`
-          )
-        }
-      }
-
-      // For raw materials, if drumId is provided, skip aggregate stock validation
-      // (drum stock validation is sufficient)
-      if (data.rawMaterialId && !data.drumId) {
-        // Only validate aggregate stock if no drumId is provided
-        // (This should not happen for raw materials now, but kept for safety)
-        const rawMaterials = await tx.$queryRaw<
-          Array<{ id: string; name: string; currentStock: number }>
-        >`
-          SELECT id, name, "currentStock"
-          FROM raw_materials
-          WHERE id = ${data.rawMaterialId}
-          FOR UPDATE
-        `
-
-        if (rawMaterials.length === 0) {
-          throw new Error('Raw material not found')
-        }
-
-        const rawMaterial = rawMaterials[0]
-        const quantityToCheck =
-          data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
-
-        if (rawMaterial.currentStock < quantityToCheck) {
-          throw new Error(
-            data.type === 'ADJUSTMENT'
-              ? `Cannot adjust: would result in negative stock for ${rawMaterial.name}. Current: ${rawMaterial.currentStock}, Adjustment: ${data.quantity}`
-              : `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Requested: ${data.quantity}`
-          )
-        }
-      }
-
-      if (data.finishedGoodId) {
-        // LOCATION AWARE LOGIC
-        if (!data.locationId) {
-          // Fallback for legacy calls? Or strict?
-          // Strict for now per requirements.
-          throw new Error(
-            'Location is required for Finished Good transactions.'
-          )
-        }
-
-        const finishedGoodStocks = await tx.finishedGoodStock.findUnique({
-          where: {
-            finishedGoodId_locationId: {
-              finishedGoodId: data.finishedGoodId,
-              locationId: data.locationId,
-            },
-          },
-        })
-
-        // Also fetch the global good to get the Name for error messages
-        const finishedGoodInfo = await tx.finishedGood.findUnique({
-          where: { id: data.finishedGoodId },
-          select: { name: true },
-        })
-
-        const currentStock = finishedGoodStocks?.quantity || 0
-        const quantityToCheck =
-          data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
-
-        if (currentStock < quantityToCheck) {
-          throw new Error(
-            data.type === 'ADJUSTMENT'
-              ? `Cannot adjust: would result in negative stock for ${finishedGoodInfo?.name} at location. Current: ${currentStock}, Adjustment: ${data.quantity}`
-              : `Insufficient stock for ${finishedGoodInfo?.name} at location. Available: ${currentStock}, Requested: ${data.quantity}`
-          )
-        }
       }
     }
 
@@ -299,6 +304,9 @@ export async function createStockMovement(
           },
         },
       })
+
+      // Validate consistency: aggregate stock should equal sum of drums
+      await validateRawMaterialStockConsistency(data.rawMaterialId, tx)
     }
 
     // Update Finished Good Stock (Location Aware)
@@ -326,15 +334,7 @@ export async function createStockMovement(
         },
       })
 
-      // Update Global Aggregate (Keep it in sync)
-      await tx.finishedGood.update({
-        where: { id: data.finishedGoodId },
-        data: {
-          currentStock: {
-            increment: quantityChange,
-          },
-        },
-      })
+      // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }
 
     return stockMovement
@@ -432,37 +432,93 @@ export async function deleteStockMovementsByDate(
           },
         },
       })
+
+      // Validate consistency: aggregate stock should equal sum of drums
+      await validateRawMaterialStockConsistency(itemId, tx)
     } else {
-      const items = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
-        SELECT id, name, "currentStock"
-        FROM finished_goods
-        WHERE id = ${itemId}
-        FOR UPDATE
-      `
+      // For finished goods, update location-specific stock
+      // Get all unique locations from the movements being deleted
+      const uniqueLocationIds = [
+        ...new Set(
+          movements
+            .map((m) => m.locationId)
+            .filter((id): id is string => id !== null)
+        ),
+      ]
 
-      if (items.length === 0) {
-        throw new Error('Finished good not found')
-      }
-
-      const item = items[0]
-      const newStock = item.currentStock + stockChange
-
-      if (newStock < 0) {
+      if (uniqueLocationIds.length === 0) {
         throw new Error(
-          `Cannot delete movements: would result in negative stock for ${item.name} (${newStock.toFixed(2)})`
+          'Cannot delete finished good movements: no location information found'
         )
       }
 
-      await tx.finishedGood.update({
-        where: { id: itemId },
-        data: {
-          currentStock: {
-            increment: stockChange,
+      // Update stock for each location
+      for (const locationId of uniqueLocationIds) {
+        // Get movements for this location
+        const locationMovements = movements.filter(
+          (m) => m.locationId === locationId
+        )
+        const locationTotalQuantity = locationMovements.reduce(
+          (sum, m) => sum + m.quantity,
+          0
+        )
+        const locationStockChange =
+          movementType === 'IN' ? -locationTotalQuantity : locationTotalQuantity
+
+        // Get current stock at this location
+        const stock = await tx.finishedGoodStock.findUnique({
+          where: {
+            finishedGoodId_locationId: {
+              finishedGoodId: itemId,
+              locationId,
+            },
           },
-        },
-      })
+          select: { quantity: true },
+        })
+
+        const currentStock = stock?.quantity || 0
+        const newStock = currentStock + locationStockChange
+
+        if (newStock < 0) {
+          const finishedGood = await tx.finishedGood.findUnique({
+            where: { id: itemId },
+            select: { name: true },
+          })
+          const location = await tx.location.findUnique({
+            where: { id: locationId },
+            select: { name: true },
+          })
+          throw new Error(
+            `Cannot delete movements: would result in negative stock for ${finishedGood?.name || 'item'} at ${location?.name || 'location'} (${newStock.toFixed(2)})`
+          )
+        }
+
+        // Update location stock
+        if (stock) {
+          await tx.finishedGoodStock.update({
+            where: {
+              finishedGoodId_locationId: {
+                finishedGoodId: itemId,
+                locationId,
+              },
+            },
+            data: {
+              quantity: { increment: locationStockChange },
+            },
+          })
+        } else if (locationStockChange > 0) {
+          // Create stock record if it doesn't exist and we're adding stock
+          await tx.finishedGoodStock.create({
+            data: {
+              finishedGoodId: itemId,
+              locationId,
+              quantity: locationStockChange,
+            },
+          })
+        }
+      }
+
+      // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }
   })
 }
@@ -550,18 +606,44 @@ export async function updateStockMovementsByDate(
         })
       }
 
-      // Create a single new movement with the new quantity
-      await tx.stockMovement.create({
-        data: {
-          type: movementType,
-          quantity,
-          date: startOfDay,
-          description: `Updated via report (${movementType})`,
-          ...(itemType === 'raw-material'
-            ? { rawMaterialId: itemId }
-            : { finishedGoodId: itemId }),
-        },
-      })
+      // For finished goods, we need locationId from existing movements
+      // For raw materials, we can create without locationId
+      if (itemType === 'finished-good') {
+        // Get locationId from existing movement (should only be one due to safety check above)
+        const locationId =
+          existingMovements.length > 0
+            ? existingMovements[0].locationId
+            : null
+
+        if (!locationId) {
+          throw new Error(
+            'Cannot update finished good movement: location information is required'
+          )
+        }
+
+        // Create a single new movement with the new quantity and locationId
+        await tx.stockMovement.create({
+          data: {
+            type: movementType,
+            quantity,
+            date: startOfDay,
+            description: `Updated via report (${movementType})`,
+            finishedGoodId: itemId,
+            locationId,
+          },
+        })
+      } else {
+        // Create a single new movement with the new quantity
+        await tx.stockMovement.create({
+          data: {
+            type: movementType,
+            quantity,
+            date: startOfDay,
+            description: `Updated via report (${movementType})`,
+            rawMaterialId: itemId,
+          },
+        })
+      }
     }
 
     // Update current stock based on the difference
@@ -599,37 +681,74 @@ export async function updateStockMovementsByDate(
           },
         },
       })
+
+      // Validate consistency: aggregate stock should equal sum of drums
+      await validateRawMaterialStockConsistency(itemId, tx)
     } else {
-      const items = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
-        SELECT id, name, "currentStock"
-        FROM finished_goods
-        WHERE id = ${itemId}
-        FOR UPDATE
-      `
+      // For finished goods, update location-specific stock
+      // Get locationId from existing movement (should only be one due to safety check above)
+      const locationId =
+        existingMovements.length > 0 ? existingMovements[0].locationId : null
 
-      if (items.length === 0) {
-        throw new Error('Finished good not found')
-      }
-
-      const item = items[0]
-      const newStock = item.currentStock + stockChange
-
-      if (newStock < 0) {
+      if (!locationId) {
         throw new Error(
-          `Cannot update movements: would result in negative stock for ${item.name} (${newStock.toFixed(2)})`
+          'Cannot update finished good movement: location information is required'
         )
       }
 
-      await tx.finishedGood.update({
-        where: { id: itemId },
-        data: {
-          currentStock: {
-            increment: stockChange,
+      // Get current stock at this location
+      const stock = await tx.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: itemId,
+            locationId,
           },
         },
+        select: { quantity: true },
       })
+
+      const currentStock = stock?.quantity || 0
+      const newStock = currentStock + stockChange
+
+      if (newStock < 0) {
+        const finishedGood = await tx.finishedGood.findUnique({
+          where: { id: itemId },
+          select: { name: true },
+        })
+        const location = await tx.location.findUnique({
+          where: { id: locationId },
+          select: { name: true },
+        })
+        throw new Error(
+          `Cannot update movements: would result in negative stock for ${finishedGood?.name || 'item'} at ${location?.name || 'location'} (${newStock.toFixed(2)})`
+        )
+      }
+
+      // Update location stock
+      if (stock) {
+        await tx.finishedGoodStock.update({
+          where: {
+            finishedGoodId_locationId: {
+              finishedGoodId: itemId,
+              locationId,
+            },
+          },
+          data: {
+            quantity: { increment: stockChange },
+          },
+        })
+      } else if (stockChange > 0) {
+        // Create stock record if it doesn't exist and we're adding stock
+        await tx.finishedGoodStock.create({
+          data: {
+            finishedGoodId: itemId,
+            locationId,
+            quantity: stockChange,
+          },
+        })
+      }
+
+      // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }
 
     return { oldTotal, newTotal: quantity, difference }
@@ -643,15 +762,15 @@ export async function updateStockMovementsByDate(
  * @param data - Update data (quantity, date, description, locationId)
  * @returns Updated stock movement
  * @throws {Error} If movement not found
- * @throws {Error} If movement is part of a batch
  * @throws {Error} If date validation fails (insufficient stock)
  * @throws {Error} If update would cause negative stock
  *
  * @remarks
- * - Cannot edit movements that are part of batches (data integrity)
+ * - Can edit movements that are part of batches (updates BatchUsage accordingly)
  * - Validates date logic (OUT movements need sufficient stock BEFORE the date)
  * - Recalculates all affected stock values in transaction
  * - Uses FOR UPDATE locks for stock validation
+ * - If movement is linked to a batch and quantity changes, updates the corresponding BatchUsage
  */
 export async function updateStockMovement(
   movementId: string,
@@ -683,17 +802,11 @@ export async function updateStockMovement(
       throw new Error('Stock movement not found')
     }
 
-    // Prevent editing batch movements
-    if (existingMovement.batchId) {
-      throw new Error(
-        'This movement is part of a batch. Edit the batch instead.'
-      )
-    }
-
     const itemType = existingMovement.rawMaterialId
       ? 'raw-material'
       : 'finished-good'
-    const itemId = existingMovement.rawMaterialId || existingMovement.finishedGoodId!
+    const itemId =
+      existingMovement.rawMaterialId || existingMovement.finishedGoodId!
 
     // Determine what changed
     const oldQuantity = existingMovement.quantity
@@ -718,24 +831,34 @@ export async function updateStockMovement(
           ? newQuantity
           : -newQuantity
 
-    const quantityDifference = newQuantityChange - oldQuantityChange
-
     // Date validation: For OUT or negative ADJUSTMENT, check stock BEFORE the new date
+    // Use chronological calculation to handle same-day movements correctly
     if (
       (existingMovement.type === 'OUT' ||
         (existingMovement.type === 'ADJUSTMENT' && newQuantity < 0)) &&
       newQuantity > 0
     ) {
+      // Calculate stock chronologically, excluding this movement
+      // If date hasn't changed, use original createdAt; otherwise use null (new date means different day)
+      const movementCreatedAt =
+        newDate.getTime() === oldDate.getTime()
+          ? existingMovement.createdAt
+          : null
+
       const stockAtDate = await calculateStockAtDate(
         itemId,
         itemType,
         newDate,
         itemType === 'finished-good' ? newLocationId : null,
-        itemType === 'raw-material' ? existingMovement.drumId : null
+        itemType === 'raw-material' ? existingMovement.drumId : null,
+        movementId, // Exclude this movement from calculation
+        movementCreatedAt // Use original createdAt if same day, null if different day
       )
 
       const quantityToCheck =
-        existingMovement.type === 'ADJUSTMENT' ? Math.abs(newQuantity) : newQuantity
+        existingMovement.type === 'ADJUSTMENT'
+          ? Math.abs(newQuantity)
+          : newQuantity
 
       if (stockAtDate < quantityToCheck) {
         const itemName =
@@ -743,7 +866,7 @@ export async function updateStockMovement(
             ? existingMovement.rawMaterial?.name
             : existingMovement.finishedGood?.name
         throw new Error(
-          `Insufficient stock on ${newDate.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
+          `Insufficient stock for ${itemName || 'item'} on ${newDate.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
         )
       }
     }
@@ -754,8 +877,14 @@ export async function updateStockMovement(
       data: {
         quantity: newQuantity,
         date: newDate,
-        description: data.description !== undefined ? data.description : existingMovement.description,
-        locationId: itemType === 'finished-good' ? newLocationId : existingMovement.locationId,
+        description:
+          data.description !== undefined
+            ? data.description
+            : existingMovement.description,
+        locationId:
+          itemType === 'finished-good'
+            ? newLocationId
+            : existingMovement.locationId,
       },
     })
 
@@ -779,34 +908,36 @@ export async function updateStockMovement(
           currentStock: { increment: -oldQuantityChange },
         },
       })
+
+      // Validate consistency: aggregate stock should equal sum of drums
+      await validateRawMaterialStockConsistency(
+        existingMovement.rawMaterialId,
+        tx
+      )
     }
 
     // Update Finished Good Stock (Location Aware)
     if (existingMovement.finishedGoodId) {
       // Reverse old location stock
       if (oldLocationId) {
-        await tx.finishedGoodStock.update({
-          where: {
-            finishedGoodId_locationId: {
-              finishedGoodId: existingMovement.finishedGoodId,
-              locationId: oldLocationId,
+        await tx.finishedGoodStock
+          .update({
+            where: {
+              finishedGoodId_locationId: {
+                finishedGoodId: existingMovement.finishedGoodId,
+                locationId: oldLocationId,
+              },
             },
-          },
-          data: {
-            quantity: { increment: -oldQuantityChange },
-          },
-        }).catch(() => {
-          // If stock doesn't exist, ignore (shouldn't happen, but safe)
-        })
+            data: {
+              quantity: { increment: -oldQuantityChange },
+            },
+          })
+          .catch(() => {
+            // If stock doesn't exist, ignore (shouldn't happen, but safe)
+          })
       }
 
-      // Update global aggregate
-      await tx.finishedGood.update({
-        where: { id: existingMovement.finishedGoodId },
-        data: {
-          currentStock: { increment: -oldQuantityChange },
-        },
-      })
+      // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }
 
     // Apply new movement effect
@@ -818,7 +949,7 @@ export async function updateStockMovement(
       })
       if (!drum) throw new Error('Drum not found')
       const newQuantity = drum.currentQuantity + newQuantityChange
-      
+
       await tx.drum.update({
         where: { id: existingMovement.drumId },
         data: {
@@ -836,6 +967,12 @@ export async function updateStockMovement(
           currentStock: { increment: newQuantityChange },
         },
       })
+
+      // Validate consistency: aggregate stock should equal sum of drums
+      await validateRawMaterialStockConsistency(
+        existingMovement.rawMaterialId,
+        tx
+      )
     }
 
     // Update Finished Good Stock (Location Aware)
@@ -862,13 +999,29 @@ export async function updateStockMovement(
         },
       })
 
-      // Update global aggregate
-      await tx.finishedGood.update({
-        where: { id: existingMovement.finishedGoodId },
-        data: {
-          currentStock: { increment: newQuantityChange },
+      // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
+    }
+
+    // If movement is linked to batch, update batch usage
+    if (existingMovement.batchId && data.quantity !== undefined) {
+      // Find batch usage for this movement
+      const batchUsage = await tx.batchUsage.findFirst({
+        where: {
+          batchId: existingMovement.batchId,
+          rawMaterialId: existingMovement.rawMaterialId || undefined,
+          drumId: existingMovement.drumId || undefined,
         },
       })
+
+      if (batchUsage) {
+        // Update batch usage quantity to match the new movement quantity
+        await tx.batchUsage.update({
+          where: { id: batchUsage.id },
+          data: {
+            quantity: newQuantity,
+          },
+        })
+      }
     }
 
     return updatedMovement
@@ -881,13 +1034,14 @@ export async function updateStockMovement(
  * @param movementId - Stock movement ID
  * @returns void
  * @throws {Error} If movement not found
- * @throws {Error} If movement is part of a batch
  * @throws {Error} If deletion would cause negative stock
  *
  * @remarks
- * - Cannot delete movements that are part of batches (data integrity)
+ * - Can delete movements that are part of batches (deletes BatchUsage accordingly)
  * - Reverses the movement's effect on all stock values
  * - Uses transaction for atomicity
+ * - If movement is linked to a batch, deletes the corresponding BatchUsage
+ * - Orphaned batches (with no movements) are left intact for manual cleanup
  */
 export async function deleteStockMovement(movementId: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
@@ -909,13 +1063,6 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
 
     if (!existingMovement) {
       throw new Error('Stock movement not found')
-    }
-
-    // Prevent deleting batch movements
-    if (existingMovement.batchId) {
-      throw new Error(
-        'This movement is part of a batch. Delete the batch instead.'
-      )
     }
 
     // Calculate quantity change to reverse
@@ -990,6 +1137,12 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
           currentStock: { increment: reverseChange },
         },
       })
+
+      // Validate consistency: aggregate stock should equal sum of drums
+      await validateRawMaterialStockConsistency(
+        existingMovement.rawMaterialId,
+        tx
+      )
     }
 
     // Update Finished Good Stock (Location Aware)
@@ -998,9 +1151,7 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
         throw new Error('Location is required for finished good movements')
       }
 
-      const stocks = await tx.$queryRaw<
-        Array<{ quantity: number }>
-      >`
+      const stocks = await tx.$queryRaw<Array<{ quantity: number }>>`
         SELECT quantity
         FROM finished_good_stocks
         WHERE "finishedGoodId" = ${existingMovement.finishedGoodId}
@@ -1034,35 +1185,31 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
         })
       }
 
-      // Update global aggregate
-      const items = await tx.$queryRaw<
-        Array<{ id: string; name: string; currentStock: number }>
-      >`
-        SELECT id, name, "currentStock"
-        FROM finished_goods
-        WHERE id = ${existingMovement.finishedGoodId}
-        FOR UPDATE
-      `
+      // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
+    }
 
-      if (items.length === 0) {
-        throw new Error('Finished good not found')
-      }
-
-      const item = items[0]
-      const newStock = item.currentStock + reverseChange
-
-      if (newStock < 0) {
-        throw new Error(
-          `Cannot delete movement: would result in negative stock for ${item.name} (${newStock.toFixed(2)})`
-        )
-      }
-
-      await tx.finishedGood.update({
-        where: { id: existingMovement.finishedGoodId },
-        data: {
-          currentStock: { increment: reverseChange },
+    // If movement is linked to batch, delete batch usage and optionally batch
+    if (existingMovement.batchId) {
+      // Delete batch usage
+      await tx.batchUsage.deleteMany({
+        where: {
+          batchId: existingMovement.batchId,
+          rawMaterialId: existingMovement.rawMaterialId || undefined,
+          drumId: existingMovement.drumId || undefined,
         },
       })
+
+      // Check if batch has any remaining movements
+      // For now, we'll leave the batch (orphaned batches can be cleaned up separately)
+      // If you want to auto-delete, uncomment:
+      // const remainingMovements = await tx.stockMovement.count({
+      //   where: { batchId: existingMovement.batchId },
+      // })
+      // if (remainingMovements === 0) {
+      //   await tx.batch.delete({
+      //     where: { id: existingMovement.batchId },
+      //   })
+      // }
     }
 
     // Delete the movement
@@ -1142,5 +1289,8 @@ export async function createDrumStockIn(
         },
       },
     })
+
+    // Validate consistency: aggregate stock should equal sum of drums
+    await validateRawMaterialStockConsistency(rawMaterialId, tx)
   })
 }

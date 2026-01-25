@@ -10,7 +10,10 @@
 import { prisma } from '@/lib/db'
 import { Batch, Prisma } from '@prisma/client'
 import { PaginationOptions, PaginationMetadata } from './raw-material.service'
-import { calculateStockAtDate } from './stock-movement.service'
+import {
+  calculateStockAtDate,
+  validateRawMaterialStockConsistency,
+} from './stock-movement.service'
 
 /**
  * Batch input type for service layer
@@ -272,12 +275,16 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       for (const material of data.materials) {
         for (const drumEntry of material.drums) {
           // Calculate stock at batch date (before the batch)
+          // For batch validation, we check stock BEFORE the batch date
+          // Same-day movements aren't relevant here since batch movements will be created on that date
           const stockAtDate = await calculateStockAtDate(
             material.rawMaterialId,
             'raw-material',
             data.date,
             null, // No location for raw materials
-            drumEntry.drumId || null
+            drumEntry.drumId || null,
+            null, // excludeMovementId (not needed for batch validation)
+            null // movementCreatedAt (not needed - checking stock before date)
           )
 
           if (stockAtDate < drumEntry.quantity) {
@@ -287,10 +294,12 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             })
             const materialName = rawMaterial?.name || 'Unknown'
             const drumLabel = drumEntry.drumId
-              ? (await tx.drum.findUnique({
-                  where: { id: drumEntry.drumId },
-                  select: { label: true },
-                }))?.label
+              ? (
+                  await tx.drum.findUnique({
+                    where: { id: drumEntry.drumId },
+                    select: { label: true },
+                  })
+                )?.label
               : null
             const itemLabel = drumLabel
               ? `${materialName} (Drum ${drumLabel})`
@@ -410,6 +419,9 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             },
           },
         })
+
+        // Validate consistency: aggregate stock should equal sum of drums
+        await validateRawMaterialStockConsistency(material.rawMaterialId, tx)
       }
 
       return batch
@@ -497,6 +509,8 @@ export async function updateBatch(
   return await prisma.$transaction(
     async (tx) => {
       // Step 1: Restore stock for all old materials and drums
+      // Track which materials we've restored to validate once per material
+      const restoredMaterials = new Set<string>()
       for (const oldUsage of existingBatch.batchUsages) {
         // Restore raw material stock
         await tx.rawMaterial.update({
@@ -528,6 +542,15 @@ export async function updateBatch(
             rawMaterialId: oldUsage.rawMaterialId,
           },
         })
+
+        // Validate consistency after restoring this material (once per material)
+        if (!restoredMaterials.has(oldUsage.rawMaterialId)) {
+          await validateRawMaterialStockConsistency(
+            oldUsage.rawMaterialId,
+            tx
+          )
+          restoredMaterials.add(oldUsage.rawMaterialId)
+        }
       }
 
       // Step 2: Delete all old batch usages
@@ -633,6 +656,9 @@ export async function updateBatch(
             },
           },
         })
+
+        // Validate consistency: aggregate stock should equal sum of drums
+        await validateRawMaterialStockConsistency(material.rawMaterialId, tx)
       }
 
       // Step 4: Update batch info
@@ -712,6 +738,8 @@ export async function deleteBatch(id: string): Promise<void> {
   // Transaction: Delete batch and restore stock
   await prisma.$transaction(async (tx) => {
     // Step 1: Restore raw material stock (and Drum stock)
+    // Track which materials we've restored to validate once per material
+    const restoredMaterials = new Set<string>()
     for (const batchUsage of existingBatch.batchUsages) {
       await tx.rawMaterial.update({
         where: { id: batchUsage.rawMaterialId },
@@ -733,6 +761,15 @@ export async function deleteBatch(id: string): Promise<void> {
             isActive: true, // Reactivate if it was deactivated (simple logic)
           },
         })
+      }
+
+      // Validate consistency after restoring this material (once per material)
+      if (!restoredMaterials.has(batchUsage.rawMaterialId)) {
+        await validateRawMaterialStockConsistency(
+          batchUsage.rawMaterialId,
+          tx
+        )
+        restoredMaterials.add(batchUsage.rawMaterialId)
       }
     }
 

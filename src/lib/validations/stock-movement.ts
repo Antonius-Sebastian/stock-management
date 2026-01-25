@@ -79,7 +79,8 @@ export const stockMovementSchemaAPI = z
       if (data.quantity === undefined || data.quantity <= 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Quantity must be greater than zero for IN and OUT movements',
+          message:
+            'Quantity must be greater than zero for IN and OUT movements',
           path: ['quantity'],
         })
       }

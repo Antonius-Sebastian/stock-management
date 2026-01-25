@@ -17,6 +17,10 @@
     "test:coverage": "vitest run --coverage",
     "postinstall": "prisma generate",
     "db:reset": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/reset-db.ts",
+    "db:reset-stock-movements": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/reset-stock-movements.ts",
+    "db:reset-all-except-users": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/reset-all-except-users.ts",
+    "db:seed-finished-goods": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/seed-finished-goods.ts",
+    "db:seed-raw-materials": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/seed-raw-materials.ts",
     "db:create-admin": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/create-admin.ts"
   },
   "dependencies": {

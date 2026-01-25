@@ -358,10 +358,7 @@ export async function getFinishedGoodMovements(
         type: true,
         quantity: true,
       },
-      orderBy: [
-        { date: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       take: skip, // Get all movements before current page
     })
 

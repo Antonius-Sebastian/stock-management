@@ -136,7 +136,10 @@ export async function POST(request: NextRequest) {
             select: { currentQuantity: true },
           })
           if (!drum) {
-            return NextResponse.json({ error: 'Drum not found' }, { status: 404 })
+            return NextResponse.json(
+              { error: 'Drum not found' },
+              { status: 404 }
+            )
           }
           currentStock = drum.currentQuantity
         } else if (validatedData.rawMaterialId) {
@@ -191,7 +194,10 @@ export async function POST(request: NextRequest) {
       } else if (validatedData.quantity === undefined) {
         // Neither newStock nor quantity provided (should be caught by schema, but double-check)
         return NextResponse.json(
-          { error: 'Either newStock or quantity must be provided for ADJUSTMENT' },
+          {
+            error:
+              'Either newStock or quantity must be provided for ADJUSTMENT',
+          },
           { status: 400 }
         )
       }

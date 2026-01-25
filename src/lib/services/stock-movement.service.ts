@@ -98,15 +98,16 @@ export async function calculateStockAtDate(
   const endOfDay = endOfDayWIB(queryDate)
 
   // Base where clause
-  const baseWhere = itemType === 'raw-material'
-    ? {
-        rawMaterialId: itemId,
-        ...(drumId ? { drumId } : {}),
-      }
-    : {
-        finishedGoodId: itemId,
-        ...(locationId ? { locationId } : {}),
-      }
+  const baseWhere =
+    itemType === 'raw-material'
+      ? {
+          rawMaterialId: itemId,
+          ...(drumId ? { drumId } : {}),
+        }
+      : {
+          finishedGoodId: itemId,
+          ...(locationId ? { locationId } : {}),
+        }
 
   // Get all movements BEFORE the given date
   const movementsBefore = await prisma.stockMovement.findMany({
@@ -135,19 +136,18 @@ export async function calculateStockAtDate(
           ...baseWhere,
           ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
         },
-        orderBy: [
-          { date: 'asc' },
-          { createdAt: 'asc' },
-        ],
+        orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
       })
     : []
 
   // Combine and sort all movements chronologically
-  const allMovements = [...movementsBefore, ...sameDayMovements].sort((a, b) => {
-    const dateDiff = a.date.getTime() - b.date.getTime()
-    if (dateDiff !== 0) return dateDiff
-    return a.createdAt.getTime() - b.createdAt.getTime()
-  })
+  const allMovements = [...movementsBefore, ...sameDayMovements].sort(
+    (a, b) => {
+      const dateDiff = a.date.getTime() - b.date.getTime()
+      if (dateDiff !== 0) return dateDiff
+      return a.createdAt.getTime() - b.createdAt.getTime()
+    }
+  )
 
   // Calculate stock by summing all movements chronologically
   let stock = 0
@@ -182,8 +182,7 @@ export async function validateRawMaterialStockConsistency(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 ): Promise<void> {
   // Check if validation is enabled (default: true, can be disabled in production for performance)
-  const enableCheck =
-    process.env.ENABLE_STOCK_CONSISTENCY_CHECK !== 'false'
+  const enableCheck = process.env.ENABLE_STOCK_CONSISTENCY_CHECK !== 'false'
 
   if (!enableCheck) {
     return // Skip validation if disabled
@@ -203,7 +202,10 @@ export async function validateRawMaterialStockConsistency(
     select: { currentStock: true },
   })
 
-  if (rawMaterial && Math.abs(rawMaterial.currentStock - totalDrumStock) > 0.01) {
+  if (
+    rawMaterial &&
+    Math.abs(rawMaterial.currentStock - totalDrumStock) > 0.01
+  ) {
     // Allow small floating point differences
     throw new Error(
       `Stock inconsistency detected for raw material. Aggregate: ${rawMaterial.currentStock}, Sum of drums: ${totalDrumStock}`
@@ -611,9 +613,7 @@ export async function updateStockMovementsByDate(
       if (itemType === 'finished-good') {
         // Get locationId from existing movement (should only be one due to safety check above)
         const locationId =
-          existingMovements.length > 0
-            ? existingMovements[0].locationId
-            : null
+          existingMovements.length > 0 ? existingMovements[0].locationId : null
 
         if (!locationId) {
           throw new Error(

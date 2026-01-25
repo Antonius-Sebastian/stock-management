@@ -545,10 +545,7 @@ export async function updateBatch(
 
         // Validate consistency after restoring this material (once per material)
         if (!restoredMaterials.has(oldUsage.rawMaterialId)) {
-          await validateRawMaterialStockConsistency(
-            oldUsage.rawMaterialId,
-            tx
-          )
+          await validateRawMaterialStockConsistency(oldUsage.rawMaterialId, tx)
           restoredMaterials.add(oldUsage.rawMaterialId)
         }
       }
@@ -765,10 +762,7 @@ export async function deleteBatch(id: string): Promise<void> {
 
       // Validate consistency after restoring this material (once per material)
       if (!restoredMaterials.has(batchUsage.rawMaterialId)) {
-        await validateRawMaterialStockConsistency(
-          batchUsage.rawMaterialId,
-          tx
-        )
+        await validateRawMaterialStockConsistency(batchUsage.rawMaterialId, tx)
         restoredMaterials.add(batchUsage.rawMaterialId)
       }
     }

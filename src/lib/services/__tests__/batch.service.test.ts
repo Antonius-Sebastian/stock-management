@@ -14,6 +14,7 @@ import {
   deleteBatch,
 } from '../batch.service'
 import { prisma } from '@/lib/db'
+import { calculateStockAtDate } from '../stock-movement.service'
 import {
   createTestBatch,
   createTestRawMaterial,
@@ -35,10 +36,14 @@ vi.mock('@/lib/db', () => ({
     },
     batchUsage: {
       create: vi.fn(),
+      createMany: vi.fn(),
       deleteMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      groupBy: vi.fn(),
     },
     stockMovement: {
       create: vi.fn(),
+      createMany: vi.fn(),
       deleteMany: vi.fn(),
     },
     rawMaterial: {
@@ -58,10 +63,13 @@ vi.mock('@/lib/db', () => ({
         },
         batchUsage: {
           create: vi.fn(),
+          createMany: vi.fn(),
           deleteMany: vi.fn(),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         stockMovement: {
           create: vi.fn(),
+          createMany: vi.fn(),
           deleteMany: vi.fn(),
         },
         rawMaterial: {
@@ -82,6 +90,10 @@ vi.mock('@/lib/db', () => ({
     }),
     $queryRaw: vi.fn(),
   },
+}))
+
+vi.mock('../stock-movement.service', () => ({
+  calculateStockAtDate: vi.fn().mockResolvedValue(1000),
 }))
 
 describe('Batch Service', () => {
@@ -148,6 +160,7 @@ describe('Batch Service', () => {
             id: 'usage-1',
             quantity: 5,
             rawMaterial: createTestRawMaterial({ id: 'rm-1' }),
+            drum: null,
           },
         ],
       }
@@ -200,6 +213,7 @@ describe('Batch Service', () => {
         },
         batchUsage: {
           create: vi.fn().mockResolvedValue(createTestBatchUsage()),
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         stockMovement: {
           create: vi.fn().mockResolvedValue({
@@ -207,6 +221,8 @@ describe('Batch Service', () => {
             type: 'OUT',
             quantity: 10,
           }),
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findMany: vi.fn().mockResolvedValue([]),
         },
         rawMaterial: {
           update: vi.fn().mockResolvedValue({
@@ -251,8 +267,8 @@ describe('Batch Service', () => {
           description: input.description,
         },
       })
-      expect(mockTx.batchUsage.create).toHaveBeenCalled()
-      expect(mockTx.stockMovement.create).toHaveBeenCalledTimes(1) // OUT for material only
+      expect(mockTx.batchUsage.createMany).toHaveBeenCalled()
+      expect(mockTx.stockMovement.createMany).toHaveBeenCalledTimes(1) // OUT for material only
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'rm-1' },
         data: { currentStock: { decrement: 10 } },
@@ -304,8 +320,8 @@ describe('Batch Service', () => {
 
       const mockTx = {
         batch: { create: vi.fn() },
-        batchUsage: { create: vi.fn() },
-        stockMovement: { create: vi.fn() },
+        batchUsage: { create: vi.fn(), createMany: vi.fn() },
+        stockMovement: { create: vi.fn(), createMany: vi.fn() },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([]), // No material found
@@ -335,8 +351,8 @@ describe('Batch Service', () => {
 
       const mockTx = {
         batch: { create: vi.fn() },
-        batchUsage: { create: vi.fn() },
-        stockMovement: { create: vi.fn() },
+        batchUsage: { create: vi.fn(), createMany: vi.fn() },
+        stockMovement: { create: vi.fn(), createMany: vi.fn() },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([
@@ -393,8 +409,8 @@ describe('Batch Service', () => {
 
       const mockTx = {
         batch: { create: vi.fn().mockResolvedValue(mockBatch) },
-        batchUsage: { create: vi.fn() },
-        stockMovement: { create: vi.fn() },
+        batchUsage: { create: vi.fn(), createMany: vi.fn() },
+        stockMovement: { create: vi.fn(), createMany: vi.fn() },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         drum: {
@@ -420,11 +436,6 @@ describe('Batch Service', () => {
       expect(mockTx.drum.findMany).toHaveBeenCalled()
 
       // Drum 1 Usage (100)
-      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ drumId: 'drum-1', quantity: 100 }),
-        })
-      )
       expect(mockTx.drum.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'drum-1' },
@@ -435,17 +446,20 @@ describe('Batch Service', () => {
       )
 
       // Drum 2 Usage (50)
-      expect(mockTx.batchUsage.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ drumId: 'drum-2', quantity: 50 }),
-        })
-      )
       expect(mockTx.drum.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'drum-2' },
           data: expect.objectContaining({ currentQuantity: { decrement: 50 } }),
         })
       )
+
+      // Verify batch insertions
+      expect(mockTx.batchUsage.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({ drumId: 'drum-1', quantity: 100 }),
+          expect.objectContaining({ drumId: 'drum-2', quantity: 50 }),
+        ]),
+      })
 
       // Total Material Deduction (150)
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
@@ -489,6 +503,7 @@ describe('Batch Service', () => {
             id: 'usage-1',
             quantity: 15,
             rawMaterial: createTestRawMaterial({ id: 'rm-1' }),
+            drum: null,
           },
         ],
       }
@@ -499,10 +514,12 @@ describe('Batch Service', () => {
         },
         batchUsage: {
           create: vi.fn().mockResolvedValue(createTestBatchUsage()),
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
           deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         stockMovement: {
           create: vi.fn().mockResolvedValue({ id: 'movement-1' }),
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
           deleteMany: vi.fn().mockResolvedValue({ count: 2 }),
         },
         rawMaterial: {
@@ -520,13 +537,6 @@ describe('Batch Service', () => {
         },
         $queryRaw: vi
           .fn()
-          .mockResolvedValueOnce([
-            {
-              id: 'fg-1',
-              name: 'Finished Good 1',
-              currentStock: 5,
-            },
-          ])
           .mockResolvedValueOnce([
             {
               id: 'rm-1',
@@ -643,8 +653,16 @@ describe('Batch Service', () => {
 
       const mockTx = {
         batch: { update: vi.fn() },
-        batchUsage: { create: vi.fn(), deleteMany: vi.fn() },
-        stockMovement: { create: vi.fn(), deleteMany: vi.fn() },
+        batchUsage: {
+          create: vi.fn(),
+          createMany: vi.fn(),
+          deleteMany: vi.fn(),
+        },
+        stockMovement: {
+          create: vi.fn(),
+          createMany: vi.fn(),
+          deleteMany: vi.fn(),
+        },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([]), // Not found
@@ -681,8 +699,16 @@ describe('Batch Service', () => {
 
       const mockTx = {
         batch: { update: vi.fn() },
-        batchUsage: { create: vi.fn(), deleteMany: vi.fn() },
-        stockMovement: { create: vi.fn(), deleteMany: vi.fn() },
+        batchUsage: {
+          create: vi.fn(),
+          createMany: vi.fn(),
+          deleteMany: vi.fn(),
+        },
+        stockMovement: {
+          create: vi.fn(),
+          createMany: vi.fn(),
+          deleteMany: vi.fn(),
+        },
         rawMaterial: { update: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([

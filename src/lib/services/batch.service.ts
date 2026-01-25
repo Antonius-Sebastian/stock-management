@@ -313,6 +313,9 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       })
 
       // Step 3: Process each raw material and its drums
+      const batchUsages: Prisma.BatchUsageCreateManyInput[] = []
+      const stockMovements: Prisma.StockMovementCreateManyInput[] = []
+
       for (const material of data.materials) {
         const totalQuantity = material.drums.reduce(
           (sum, drum) => sum + drum.quantity,
@@ -364,27 +367,23 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             }
           }
 
-          // Create batch usage
-          await tx.batchUsage.create({
-            data: {
-              batchId: batch.id,
-              rawMaterialId: material.rawMaterialId,
-              quantity: drumEntry.quantity,
-              drumId: drumEntry.drumId,
-            },
+          // Queue batch usage for creation
+          batchUsages.push({
+            batchId: batch.id,
+            rawMaterialId: material.rawMaterialId,
+            quantity: drumEntry.quantity,
+            drumId: drumEntry.drumId,
           })
 
-          // Create stock OUT movement
-          await tx.stockMovement.create({
-            data: {
-              type: 'OUT',
-              quantity: drumEntry.quantity,
-              date: data.date,
-              description: `Batch production: ${data.code}`,
-              rawMaterialId: material.rawMaterialId,
-              batchId: batch.id,
-              drumId: drumEntry.drumId,
-            },
+          // Queue stock OUT movement for creation
+          stockMovements.push({
+            type: 'OUT',
+            quantity: drumEntry.quantity,
+            date: data.date,
+            description: `Batch production: ${data.code}`,
+            rawMaterialId: material.rawMaterialId,
+            batchId: batch.id,
+            drumId: drumEntry.drumId,
           })
 
           // Update Drum Stock if drumId exists (reuse the drum object from validation)
@@ -410,6 +409,15 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             },
           },
         })
+      }
+
+      // Execute batch inserts
+      if (batchUsages.length > 0) {
+        await tx.batchUsage.createMany({ data: batchUsages })
+      }
+
+      if (stockMovements.length > 0) {
+        await tx.stockMovement.createMany({ data: stockMovements })
       }
 
       return batch
@@ -536,6 +544,9 @@ export async function updateBatch(
       })
 
       // Step 3: Create new batch usages and deduct stock
+      const batchUsages: Prisma.BatchUsageCreateManyInput[] = []
+      const stockMovements: Prisma.StockMovementCreateManyInput[] = []
+
       for (const material of data.materials) {
         const totalQuantity = material.drums.reduce(
           (sum, drum) => sum + drum.quantity,
@@ -587,27 +598,23 @@ export async function updateBatch(
             }
           }
 
-          // Create batch usage
-          await tx.batchUsage.create({
-            data: {
-              batchId: id,
-              rawMaterialId: material.rawMaterialId,
-              quantity: drumEntry.quantity,
-              drumId: drumEntry.drumId,
-            },
+          // Queue batch usage
+          batchUsages.push({
+            batchId: id,
+            rawMaterialId: material.rawMaterialId,
+            quantity: drumEntry.quantity,
+            drumId: drumEntry.drumId,
           })
 
-          // Create stock movement (OUT)
-          await tx.stockMovement.create({
-            data: {
-              type: 'OUT',
-              quantity: drumEntry.quantity,
-              date: data.date,
-              rawMaterialId: material.rawMaterialId,
-              batchId: id,
-              description: `Batch ${data.code} production`,
-              drumId: drumEntry.drumId,
-            },
+          // Queue stock movement (OUT)
+          stockMovements.push({
+            type: 'OUT',
+            quantity: drumEntry.quantity,
+            date: data.date,
+            rawMaterialId: material.rawMaterialId,
+            batchId: id,
+            description: `Batch ${data.code} production`,
+            drumId: drumEntry.drumId,
           })
 
           // Update Drum Stock if drumId exists (reuse the drum object from validation)
@@ -633,6 +640,15 @@ export async function updateBatch(
             },
           },
         })
+      }
+
+      // Execute batch inserts
+      if (batchUsages.length > 0) {
+        await tx.batchUsage.createMany({ data: batchUsages })
+      }
+
+      if (stockMovements.length > 0) {
+        await tx.stockMovement.createMany({ data: stockMovements })
       }
 
       // Step 4: Update batch info

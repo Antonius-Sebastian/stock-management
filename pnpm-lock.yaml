@@ -189,6 +189,9 @@ importers:
       eslint-plugin-react-hooks:
         specifier: ^7.0.1
         version: 7.0.1(eslint@9.39.2(jiti@2.6.1))
+      fast-csv:
+        specifier: ^4.3.6
+        version: 4.3.6
       happy-dom:
         specifier: ^20.0.11
         version: 20.0.11

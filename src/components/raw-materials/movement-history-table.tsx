@@ -14,7 +14,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ArrowUpDown, CalendarIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react'
+import {
+  ArrowUpDown,
+  CalendarIcon,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+} from 'lucide-react'
 import {
   Popover,
   PopoverContent,
@@ -68,7 +74,9 @@ export function MovementHistoryTable({
   const handleDelete = async (movement: Movement) => {
     // Prevent deleting batch movements
     if (movement.batch) {
-      toast.error('Tidak dapat menghapus pergerakan yang terkait dengan batch. Hapus batch terlebih dahulu.')
+      toast.error(
+        'Tidak dapat menghapus pergerakan yang terkait dengan batch. Hapus batch terlebih dahulu.'
+      )
       return
     }
 
@@ -86,7 +94,9 @@ export function MovementHistoryTable({
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: 'Unknown error' }))
         throw new Error(errorData.error || 'Failed to delete movement')
       }
 

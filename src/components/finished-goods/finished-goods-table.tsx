@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { ColumnDef } from '@tanstack/react-table'
 import { FinishedGood } from '@prisma/client'
 import { DataTable } from '@/components/ui/data-table'
@@ -91,6 +92,18 @@ export function FinishedGoodsTable({
             Nama Produk
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
+        )
+      },
+      cell: ({ row }) => {
+        const product = row.original
+        return (
+          <Link
+            href={`/finished-goods/${product.id}`}
+            className="text-primary block max-w-md truncate overflow-hidden font-medium hover:underline"
+            title={product.name}
+          >
+            {product.name}
+          </Link>
         )
       },
     },

@@ -127,7 +127,10 @@ export async function POST(request: NextRequest) {
         (sum, drum) => sum + drum.quantity,
         0
       )
-      materials.push({ name: material?.name || 'Unknown', quantity: totalQuantity })
+      materials.push({
+        name: material?.name || 'Unknown',
+        quantity: totalQuantity,
+      })
     }
 
     await AuditHelpers.batchCreated(validatedData.code, '', materials, {

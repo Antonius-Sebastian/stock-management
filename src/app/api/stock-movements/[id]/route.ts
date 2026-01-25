@@ -7,10 +7,7 @@ import {
   getPermissionErrorMessage,
 } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import {
-  updateStockMovement,
-  deleteStockMovement,
-} from '@/lib/services'
+import { updateStockMovement, deleteStockMovement } from '@/lib/services'
 import { updateStockMovementSchema } from '@/lib/validations'
 
 /**
@@ -185,4 +182,3 @@ export async function DELETE(
     )
   }
 }
-

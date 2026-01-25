@@ -46,7 +46,10 @@ const createFormSchema = (itemType: 'raw-material' | 'finished-good') =>
         required_error: 'Jumlah wajib diisi',
         invalid_type_error: 'Jumlah harus berupa angka',
       })
-      .refine((val) => !isNaN(val) && val > 0, 'Jumlah harus lebih besar dari nol')
+      .refine(
+        (val) => !isNaN(val) && val > 0,
+        'Jumlah harus lebih besar dari nol'
+      )
       .refine((val) => val <= 1000000, 'Jumlah tidak boleh melebihi 1,000,000'),
     date: z.date({
       required_error: 'Silakan pilih tanggal',
@@ -173,7 +176,9 @@ export function EditMovementDialog({
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: 'Unknown error' }))
         throw new Error(errorData.error || 'Failed to update stock movement')
       }
 
@@ -219,7 +224,9 @@ export function EditMovementDialog({
                       placeholder="Masukkan jumlah"
                       {...field}
                       value={field.value ?? ''}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      onChange={(e) =>
+                        field.onChange(parseFloat(e.target.value) || 0)
+                      }
                       disabled={isSubmitting}
                     />
                   </FormControl>
@@ -320,7 +327,9 @@ export function EditMovementDialog({
                 Batal
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Simpan
               </Button>
             </DialogFooter>
@@ -330,4 +339,3 @@ export function EditMovementDialog({
     </Dialog>
   )
 }
-

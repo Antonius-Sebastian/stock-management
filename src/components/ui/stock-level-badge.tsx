@@ -1,4 +1,9 @@
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface StockLevelBadgeProps {
   stock: number
@@ -16,24 +21,45 @@ export function StockLevelBadge({ stock, moq }: StockLevelBadgeProps) {
   }
 
   const ratio = stock / moq
+  const percentage = Math.round(ratio * 100)
 
+  let badge
   if (ratio >= 1) {
-    return (
+    badge = (
       <Badge variant="success" className="font-semibold">
         Baik
       </Badge>
     )
   } else if (ratio >= 0.5) {
-    return (
+    badge = (
       <Badge variant="warning" className="font-semibold">
         Rendah
       </Badge>
     )
   } else {
-    return (
+    badge = (
       <Badge variant="destructive" className="font-semibold">
         Kritis
       </Badge>
     )
   }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="ring-offset-background focus:ring-ring inline-flex cursor-help rounded-md outline-none focus:ring-2 focus:ring-offset-2"
+        >
+          {badge}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>
+          Stok: {stock.toLocaleString()} | MOQ: {moq.toLocaleString()} (
+          {percentage}%)
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  )
 }

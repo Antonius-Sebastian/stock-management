@@ -298,7 +298,10 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [
-          { rawMaterialId: 'non-existent', drums: [{ drumId: '', quantity: 10 }] },
+          {
+            rawMaterialId: 'non-existent',
+            drums: [{ drumId: '', quantity: 10 }],
+          },
         ],
       }
 
@@ -632,7 +635,10 @@ describe('Batch Service', () => {
         code: 'BATCH-001',
         date: new Date('2024-01-15'),
         materials: [
-          { rawMaterialId: 'non-existent', drums: [{ drumId: '', quantity: 10 }] },
+          {
+            rawMaterialId: 'non-existent',
+            drums: [{ drumId: '', quantity: 10 }],
+          },
         ],
       }
 

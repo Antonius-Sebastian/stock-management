@@ -155,7 +155,9 @@ export default function ReportsPage() {
       if (reportType === 'finished-goods') {
         // Validate prerequisites: locations must be loaded
         if (locations.length === 0) {
-          logger.warn('Cannot fetch finished-goods report: locations not loaded yet')
+          logger.warn(
+            'Cannot fetch finished-goods report: locations not loaded yet'
+          )
           setIsLoading(false)
           return
         }
@@ -299,7 +301,9 @@ export default function ReportsPage() {
           const latestYearData = dates[dates.length - 1]
           setYear(latestYearData.year.toString())
           if (latestYearData.months.length > 0) {
-            setMonth(latestYearData.months[latestYearData.months.length - 1].toString())
+            setMonth(
+              latestYearData.months[latestYearData.months.length - 1].toString()
+            )
             setAvailableMonths(latestYearData.months)
           }
         }
@@ -384,7 +388,6 @@ export default function ReportsPage() {
         'stok-sisa': null,
       })
     }
-     
   }, [reportType])
 
   useEffect(() => {
@@ -413,7 +416,6 @@ export default function ReportsPage() {
 
     return `${typeLabel} - ${dataTypeLabel} - ${monthLabel} ${year}`
   }
-
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -489,7 +491,10 @@ export default function ReportsPage() {
                   onValueChange={setYear}
                   disabled={isLoadingYears || availableYears.length === 0}
                 >
-                  <SelectTrigger id="year-select" className="w-full sm:w-[120px]">
+                  <SelectTrigger
+                    id="year-select"
+                    className="w-full sm:w-[120px]"
+                  >
                     <SelectValue
                       placeholder={isLoadingYears ? 'Loading...' : 'Tahun'}
                     />
@@ -521,7 +526,10 @@ export default function ReportsPage() {
                   onValueChange={setMonth}
                   disabled={!year || availableMonths.length === 0}
                 >
-                  <SelectTrigger id="month-select" className="w-full sm:w-[160px]">
+                  <SelectTrigger
+                    id="month-select"
+                    className="w-full sm:w-[160px]"
+                  >
                     <SelectValue
                       placeholder={
                         !year
@@ -564,8 +572,8 @@ export default function ReportsPage() {
 
           {/* Active filters summary */}
           {(year || month || reportType) && (
-            <div className="flex flex-wrap gap-2 pt-2 border-t">
-              <span className="text-muted-foreground text-sm font-medium flex items-center">
+            <div className="flex flex-wrap gap-2 border-t pt-2">
+              <span className="text-muted-foreground flex items-center text-sm font-medium">
                 Filter aktif:
               </span>
               {year && (
@@ -610,7 +618,7 @@ export default function ReportsPage() {
               <TabsTrigger
                 value="raw-materials"
                 className={cn(
-                  'text-xs sm:text-sm transition-all duration-200',
+                  'text-xs transition-all duration-200 sm:text-sm',
                   'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
                 )}
               >
@@ -621,7 +629,7 @@ export default function ReportsPage() {
               <TabsTrigger
                 value="finished-goods"
                 className={cn(
-                  'text-xs sm:text-sm transition-all duration-200',
+                  'text-xs transition-all duration-200 sm:text-sm',
                   'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
                 )}
               >
@@ -646,7 +654,7 @@ export default function ReportsPage() {
                           key={loc.id}
                           value={loc.id}
                           className={cn(
-                            'flex-1 sm:flex-initial transition-all duration-200',
+                            'flex-1 transition-all duration-200 sm:flex-initial',
                             'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
                           )}
                         >
@@ -659,13 +667,13 @@ export default function ReportsPage() {
               )}
 
               <Tabs value={dataType} onValueChange={setDataType}>
-                <TabsList className="mb-6 grid h-auto w-full grid-cols-2 gap-2 justify-start sm:grid-cols-4 sm:gap-2">
+                <TabsList className="mb-6 grid h-auto w-full grid-cols-2 justify-start gap-2 sm:grid-cols-4 sm:gap-2">
                   {DATA_TYPES.map((dt) => (
                     <TabsTrigger
                       key={dt.value}
                       value={dt.value}
                       className={cn(
-                        'text-xs sm:text-sm transition-all duration-200',
+                        'text-xs transition-all duration-200 sm:text-sm',
                         'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm'
                       )}
                     >
@@ -687,7 +695,7 @@ export default function ReportsPage() {
                           }}
                         />
                       </div>
-                      <div className="text-center space-y-1">
+                      <div className="space-y-1 text-center">
                         <p className="text-muted-foreground animate-pulse text-sm font-medium">
                           Memuat laporan...
                         </p>
@@ -696,15 +704,17 @@ export default function ReportsPage() {
                         </p>
                       </div>
                     </div>
-                  ) : reportData && reportData.data && reportData.data.length > 0 ? (
+                  ) : reportData &&
+                    reportData.data &&
+                    reportData.data.length > 0 ? (
                     <StockReportTable
                       data={reportData.data}
                       currentDay={reportData.meta.currentDay}
                       adjustments={reportData.adjustments}
                     />
                   ) : (
-                    <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20">
-                      <div className="text-muted-foreground rounded-full bg-muted/50 p-3">
+                    <div className="bg-muted/20 flex h-64 flex-col items-center justify-center gap-3 rounded-lg border border-dashed">
+                      <div className="text-muted-foreground bg-muted/50 rounded-full p-3">
                         <BarChart3 className="h-6 w-6" />
                       </div>
                       <div className="text-center">

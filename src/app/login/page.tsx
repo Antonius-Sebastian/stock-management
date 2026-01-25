@@ -47,11 +47,11 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 px-3 py-8 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="rounded-xl bg-white p-5 shadow-xl ring-1 ring-slate-200/50 dark:bg-slate-950 dark:ring-slate-800 sm:p-8">
+      <div className="animate-in fade-in slide-in-from-bottom-4 w-full max-w-md duration-500">
+        <div className="rounded-xl bg-white p-5 shadow-xl ring-1 ring-slate-200/50 sm:p-8 dark:bg-slate-950 dark:ring-slate-800">
           <div className="mb-8 text-center">
             <div className="mb-4 flex justify-center">
-              <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-2xl ring-4 ring-primary/5 dark:bg-primary/20">
+              <div className="bg-primary/10 ring-primary/5 dark:bg-primary/20 flex h-16 w-16 items-center justify-center rounded-2xl ring-4">
                 <Package className="text-primary h-8 w-8" />
               </div>
             </div>
@@ -105,7 +105,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isLoading}
-                  className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 transition-colors disabled:pointer-events-none disabled:opacity-50"
+                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1.5 transition-colors disabled:pointer-events-none disabled:opacity-50"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (

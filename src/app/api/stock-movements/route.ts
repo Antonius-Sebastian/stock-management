@@ -122,10 +122,13 @@ export async function POST(request: NextRequest) {
 
     // For ADJUSTMENT type, calculate adjustment from newStock if provided
     let adjustmentQuantity = validatedData.quantity
-    if (validatedData.type === 'ADJUSTMENT' && validatedData.newStock !== undefined) {
+    if (
+      validatedData.type === 'ADJUSTMENT' &&
+      validatedData.newStock !== undefined
+    ) {
       // Import prisma to get current stock
       const { prisma } = await import('@/lib/db')
-      
+
       let currentStock = 0
       if (validatedData.rawMaterialId && validatedData.drumId) {
         // Get drum stock
@@ -144,7 +147,10 @@ export async function POST(request: NextRequest) {
           select: { currentStock: true },
         })
         if (!rawMaterial) {
-          return NextResponse.json({ error: 'Raw material not found' }, { status: 404 })
+          return NextResponse.json(
+            { error: 'Raw material not found' },
+            { status: 404 }
+          )
         }
         currentStock = rawMaterial.currentStock
       } else if (validatedData.finishedGoodId) {
@@ -166,10 +172,10 @@ export async function POST(request: NextRequest) {
         })
         currentStock = stock?.quantity || 0
       }
-      
+
       // Calculate adjustment: newStock - currentStock
       adjustmentQuantity = validatedData.newStock - currentStock
-      
+
       // Validate that adjustment doesn't result in negative stock
       // Since newStock >= 0 (validated by schema), adjustmentQuantity can be negative
       // but the final stock (currentStock + adjustmentQuantity = newStock) will be >= 0
@@ -177,7 +183,9 @@ export async function POST(request: NextRequest) {
       // The service layer will also validate this, but we check here for better error message
       if (adjustmentQuantity < 0 && currentStock + adjustmentQuantity < 0) {
         return NextResponse.json(
-          { error: `Cannot adjust: would result in negative stock. Current: ${currentStock}, New: ${validatedData.newStock}` },
+          {
+            error: `Cannot adjust: would result in negative stock. Current: ${currentStock}, New: ${validatedData.newStock}`,
+          },
           { status: 400 }
         )
       }

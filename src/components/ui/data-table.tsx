@@ -188,7 +188,7 @@ export function DataTable<TData, TValue>({
         </DropdownMenu>
       </div>
       <div className="relative -mx-4 overflow-x-auto sm:mx-0 sm:rounded-md">
-        <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+        <div className="inline-block min-w-full px-4 align-middle sm:px-0">
           <div className="overflow-hidden rounded-md border">
             <Table>
               <TableHeader>
@@ -233,7 +233,7 @@ export function DataTable<TData, TValue>({
                       className="h-32 text-center"
                     >
                       <div className="flex flex-col items-center justify-center gap-3 py-8">
-                        <div className="text-muted-foreground rounded-full bg-muted/50 p-3">
+                        <div className="text-muted-foreground bg-muted/50 rounded-full p-3">
                           <Package className="h-6 w-6" />
                         </div>
                         <div className="space-y-1">
@@ -250,7 +250,7 @@ export function DataTable<TData, TValue>({
           </div>
         </div>
         {/* Scroll indicator for mobile */}
-        <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-background to-transparent sm:hidden" />
+        <div className="from-background pointer-events-none absolute top-0 right-0 h-full w-8 bg-gradient-to-l to-transparent sm:hidden" />
       </div>
       <div className="flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="text-muted-foreground text-sm">

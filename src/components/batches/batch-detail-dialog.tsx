@@ -197,14 +197,15 @@ export function BatchDetailDialog({
                                     </Badge>
                                   ))}
                                 </div>
+                              ) : group.usages[0]?.drum ? (
+                                <Badge
+                                  variant="outline"
+                                  className="font-medium"
+                                >
+                                  {group.usages[0].drum.label}
+                                </Badge>
                               ) : (
-                                group.usages[0]?.drum ? (
-                                  <Badge variant="outline" className="font-medium">
-                                    {group.usages[0].drum.label}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )
+                                <span className="text-muted-foreground">-</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right font-medium">
@@ -219,7 +220,7 @@ export function BatchDetailDialog({
                                 className="bg-muted/10 dark:bg-muted/5"
                               >
                                 <TableCell />
-                                <TableCell className="pl-8 text-sm text-muted-foreground">
+                                <TableCell className="text-muted-foreground pl-8 text-sm">
                                   Drum: {usage.drum?.label || '-'}
                                 </TableCell>
                                 <TableCell />
@@ -233,7 +234,7 @@ export function BatchDetailDialog({
                     })
                   )}
                   {batch.batchUsages.length > 0 && (
-                    <TableRow className="bg-muted/50 font-semibold dark:bg-muted/30">
+                    <TableRow className="bg-muted/50 dark:bg-muted/30 font-semibold">
                       <TableCell colSpan={3} className="text-right">
                         Total:
                       </TableCell>

@@ -139,7 +139,7 @@ export async function createStockMovement(
     ) {
       const itemId = data.rawMaterialId || data.finishedGoodId!
       const itemType = data.rawMaterialId ? 'raw-material' : 'finished-good'
-      
+
       // Calculate stock at the movement date (before the movement)
       const stockAtDate = await calculateStockAtDate(
         itemId,
@@ -154,9 +154,19 @@ export async function createStockMovement(
 
       if (stockAtDate < quantityToCheck) {
         const itemName = data.rawMaterialId
-          ? (await tx.rawMaterial.findUnique({ where: { id: data.rawMaterialId }, select: { name: true } }))?.name
-          : (await tx.finishedGood.findUnique({ where: { id: data.finishedGoodId! }, select: { name: true } }))?.name
-        
+          ? (
+              await tx.rawMaterial.findUnique({
+                where: { id: data.rawMaterialId },
+                select: { name: true },
+              })
+            )?.name
+          : (
+              await tx.finishedGood.findUnique({
+                where: { id: data.finishedGoodId! },
+                select: { name: true },
+              })
+            )?.name
+
         throw new Error(
           `Insufficient stock on ${data.date.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Requested: ${quantityToCheck.toFixed(2)}`
         )
@@ -693,7 +703,8 @@ export async function updateStockMovement(
     const itemType = existingMovement.rawMaterialId
       ? 'raw-material'
       : 'finished-good'
-    const itemId = existingMovement.rawMaterialId || existingMovement.finishedGoodId!
+    const itemId =
+      existingMovement.rawMaterialId || existingMovement.finishedGoodId!
 
     // Determine what changed
     const oldQuantity = existingMovement.quantity
@@ -735,7 +746,9 @@ export async function updateStockMovement(
       )
 
       const quantityToCheck =
-        existingMovement.type === 'ADJUSTMENT' ? Math.abs(newQuantity) : newQuantity
+        existingMovement.type === 'ADJUSTMENT'
+          ? Math.abs(newQuantity)
+          : newQuantity
 
       if (stockAtDate < quantityToCheck) {
         const itemName =
@@ -754,8 +767,14 @@ export async function updateStockMovement(
       data: {
         quantity: newQuantity,
         date: newDate,
-        description: data.description !== undefined ? data.description : existingMovement.description,
-        locationId: itemType === 'finished-good' ? newLocationId : existingMovement.locationId,
+        description:
+          data.description !== undefined
+            ? data.description
+            : existingMovement.description,
+        locationId:
+          itemType === 'finished-good'
+            ? newLocationId
+            : existingMovement.locationId,
       },
     })
 
@@ -785,19 +804,21 @@ export async function updateStockMovement(
     if (existingMovement.finishedGoodId) {
       // Reverse old location stock
       if (oldLocationId) {
-        await tx.finishedGoodStock.update({
-          where: {
-            finishedGoodId_locationId: {
-              finishedGoodId: existingMovement.finishedGoodId,
-              locationId: oldLocationId,
+        await tx.finishedGoodStock
+          .update({
+            where: {
+              finishedGoodId_locationId: {
+                finishedGoodId: existingMovement.finishedGoodId,
+                locationId: oldLocationId,
+              },
             },
-          },
-          data: {
-            quantity: { increment: -oldQuantityChange },
-          },
-        }).catch(() => {
-          // If stock doesn't exist, ignore (shouldn't happen, but safe)
-        })
+            data: {
+              quantity: { increment: -oldQuantityChange },
+            },
+          })
+          .catch(() => {
+            // If stock doesn't exist, ignore (shouldn't happen, but safe)
+          })
       }
 
       // Update global aggregate
@@ -818,7 +839,7 @@ export async function updateStockMovement(
       })
       if (!drum) throw new Error('Drum not found')
       const newQuantity = drum.currentQuantity + newQuantityChange
-      
+
       await tx.drum.update({
         where: { id: existingMovement.drumId },
         data: {
@@ -998,9 +1019,7 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
         throw new Error('Location is required for finished good movements')
       }
 
-      const stocks = await tx.$queryRaw<
-        Array<{ quantity: number }>
-      >`
+      const stocks = await tx.$queryRaw<Array<{ quantity: number }>>`
         SELECT quantity
         FROM finished_good_stocks
         WHERE "finishedGoodId" = ${existingMovement.finishedGoodId}

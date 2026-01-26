@@ -40,6 +40,8 @@ vi.mock('@/lib/db', () => ({
     stockMovement: {
       create: vi.fn(),
       deleteMany: vi.fn(),
+      groupBy: vi.fn(),
+      findMany: vi.fn(),
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -87,6 +89,11 @@ vi.mock('@/lib/db', () => ({
 describe('Batch Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('ENABLE_STOCK_CONSISTENCY_CHECK', 'false')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   describe('getBatches', () => {
@@ -185,6 +192,12 @@ describe('Batch Service', () => {
           },
         ],
       }
+
+      // Mock groupBy for calculateStockAtDate (sufficient stock)
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockBatch = createTestBatch({ code: 'BATCH-001' })
       const mockRawMaterial = createTestRawMaterial({
@@ -370,6 +383,12 @@ describe('Batch Service', () => {
           { rawMaterialId: 'rm-1', drums: [{ drumId: '', quantity: 150 }] },
         ],
       }
+
+      // Mock groupBy for calculateStockAtDate (sufficient stock)
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 200 } },
+      ] as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       const mockBatch = createTestBatch({ code: 'BATCH-FIFO' })
       const mockRawMaterial = createTestRawMaterial({

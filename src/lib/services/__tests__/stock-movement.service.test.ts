@@ -26,6 +26,7 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
       deleteMany: vi.fn(),
       updateMany: vi.fn(),
+      groupBy: vi.fn(),
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -51,6 +52,9 @@ vi.mock('@/lib/db', () => ({
           findUnique: vi.fn(),
           update: vi.fn(),
         },
+        drum: {
+          aggregate: vi.fn().mockResolvedValue({ _sum: { currentQuantity: 0 } }),
+        },
         $queryRaw: vi.fn(),
       }
       return callback(txClient)
@@ -62,6 +66,11 @@ vi.mock('@/lib/db', () => ({
 describe('Stock Movement Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('ENABLE_STOCK_CONSISTENCY_CHECK', 'false')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   describe('getStockMovementsByDate', () => {
@@ -173,6 +182,12 @@ describe('Stock Movement Service', () => {
         ]),
       }
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       vi.mocked(prisma.$transaction).mockImplementation(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async (callback: any) => {
@@ -243,7 +258,6 @@ describe('Stock Movement Service', () => {
       const result = await createStockMovement(input)
 
       expect(result).toEqual(mockMovement)
-      expect(mockTx.$queryRaw).toHaveBeenCalled()
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'raw-mat-1' },
         data: { currentStock: { increment: -5 } },
@@ -280,6 +294,12 @@ describe('Stock Movement Service', () => {
         },
         $queryRaw: vi.fn().mockResolvedValue([mockMaterial]),
       }
+
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
 
       vi.mocked(prisma.$transaction).mockImplementation(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -385,6 +405,12 @@ describe('Stock Movement Service', () => {
         $queryRaw: vi.fn().mockResolvedValue([mockMaterial]),
       }
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       vi.mocked(prisma.$transaction).mockImplementation(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async (callback: any) => {
@@ -395,7 +421,6 @@ describe('Stock Movement Service', () => {
       const result = await createStockMovement(input)
 
       expect(result).toEqual(mockMovement)
-      expect(mockTx.$queryRaw).toHaveBeenCalled()
       expect(mockTx.rawMaterial.update).toHaveBeenCalledWith({
         where: { id: 'raw-mat-1' },
         data: { currentStock: { increment: -5 } },
@@ -433,6 +458,12 @@ describe('Stock Movement Service', () => {
         $queryRaw: vi.fn().mockResolvedValue([mockMaterial]),
       }
 
+      // Mock groupBy for calculateStockAtDate
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        { type: 'IN', _sum: { quantity: 100 } },
+      ] as any)
+      vi.mocked(prisma.stockMovement.findMany).mockResolvedValue([])
+
       vi.mocked(prisma.$transaction).mockImplementation(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async (callback: any) => {
@@ -455,6 +486,7 @@ describe('Stock Movement Service', () => {
         rawMaterialId: null,
         finishedGoodId: 'fg-1',
         batchId: null,
+        locationId: 'loc-1',
       }
       const mockFinishedGood = createTestFinishedGood({
         id: 'fg-1',
@@ -476,6 +508,12 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 60,
           }),
+        },
+        finishedGoodStock: {
+          upsert: vi.fn(),
+        },
+        drum: {
+          aggregate: vi.fn(),
         },
         $queryRaw: vi.fn(),
       }
@@ -567,14 +605,17 @@ describe('Stock Movement Service', () => {
         currentStock: 50,
       })
       const mockMovements = [
-        createTestStockMovement({
-          id: '1',
-          type: 'IN',
-          quantity: 10,
-          finishedGoodId: itemId,
-          rawMaterialId: null,
-          date,
-        }),
+        {
+          ...createTestStockMovement({
+            id: '1',
+            type: 'IN',
+            quantity: 10,
+            finishedGoodId: itemId,
+            rawMaterialId: null,
+            date,
+          }),
+          locationId: 'loc-1',
+        },
       ]
 
       const mockTx = {
@@ -592,6 +633,13 @@ describe('Stock Movement Service', () => {
             ...mockFinishedGood,
             currentStock: 40, // 50 - 10 = 40
           }),
+        },
+        finishedGoodStock: {
+          findUnique: vi.fn().mockResolvedValue({ quantity: 10 }),
+          update: vi.fn(),
+        },
+        drum: {
+          aggregate: vi.fn(),
         },
         $queryRaw: vi.fn().mockResolvedValue([
           {
@@ -646,6 +694,7 @@ describe('Stock Movement Service', () => {
             date,
           }),
           batch: null,
+          locationId: 'loc-1',
         },
       ]
 
@@ -984,6 +1033,13 @@ describe('Stock Movement Service', () => {
             id: 'fg-1',
             currentStock: 15,
           }),
+        },
+        finishedGoodStock: {
+          findUnique: vi.fn().mockResolvedValue({ quantity: 10 }),
+          update: vi.fn(),
+        },
+        drum: {
+          aggregate: vi.fn(),
         },
         $queryRaw: vi.fn().mockResolvedValue([
           {

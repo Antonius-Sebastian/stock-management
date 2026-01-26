@@ -109,8 +109,10 @@ export async function calculateStockAtDate(
           ...(locationId ? { locationId } : {}),
         }
 
-  // Get all movements BEFORE the given date
-  const movementsBefore = await prisma.stockMovement.findMany({
+  // Optimization: Use aggregation for movements strictly BEFORE the date
+  // This replaces fetching potentially thousands of records with a single DB query
+  const aggregations = await prisma.stockMovement.groupBy({
+    by: ['type'],
     where: {
       date: {
         lt: startOfDay, // Before the date (exclusive)
@@ -118,13 +120,25 @@ export async function calculateStockAtDate(
       ...baseWhere,
       ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
     },
-    orderBy: [
-      { date: 'asc' },
-      { createdAt: 'asc' }, // Secondary sort for chronological order on same day
-    ],
+    _sum: {
+      quantity: true,
+    },
   })
 
+  let stock = 0
+  for (const agg of aggregations) {
+    const quantity = agg._sum.quantity || 0
+    if (agg.type === 'IN') {
+      stock += quantity
+    } else if (agg.type === 'OUT') {
+      stock -= quantity
+    } else if (agg.type === 'ADJUSTMENT') {
+      stock += quantity
+    }
+  }
+
   // Get movements ON the same day that were created BEFORE this movement
+  // These are usually few, so we can fetch and iterate
   const sameDayMovements = movementCreatedAt
     ? await prisma.stockMovement.findMany({
         where: {
@@ -140,24 +154,14 @@ export async function calculateStockAtDate(
       })
     : []
 
-  // Combine and sort all movements chronologically
-  const allMovements = [...movementsBefore, ...sameDayMovements].sort(
-    (a, b) => {
-      const dateDiff = a.date.getTime() - b.date.getTime()
-      if (dateDiff !== 0) return dateDiff
-      return a.createdAt.getTime() - b.createdAt.getTime()
-    }
-  )
-
-  // Calculate stock by summing all movements chronologically
-  let stock = 0
-  for (const movement of allMovements) {
+  // Apply same day movements
+  for (const movement of sameDayMovements) {
     if (movement.type === 'IN') {
       stock += movement.quantity
     } else if (movement.type === 'OUT') {
       stock -= movement.quantity
     } else if (movement.type === 'ADJUSTMENT') {
-      stock += movement.quantity // Adjustment quantity is already signed
+      stock += movement.quantity
     }
   }
 

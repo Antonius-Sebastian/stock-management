@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
 import { getLocations, createLocation } from '@/lib/services/location.service'
+import { canManageLocations, getPermissionErrorMessage } from '@/lib/rbac'
 import { z } from 'zod'
 
 const locationSchema = z.object({
@@ -10,6 +12,11 @@ const locationSchema = z.object({
 
 export async function GET() {
   try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const locations = await getLocations()
     return NextResponse.json(locations)
   } catch (error) {
@@ -22,6 +29,23 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!canManageLocations(session.user.role)) {
+      return NextResponse.json(
+        {
+          error: getPermissionErrorMessage(
+            'manage locations',
+            session.user.role
+          ),
+        },
+        { status: 403 }
+      )
+    }
+
     const json = await req.json()
     const body = locationSchema.parse(json)
 

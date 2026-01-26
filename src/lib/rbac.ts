@@ -218,6 +218,26 @@ export function canManageUsers(role: string | undefined): boolean {
 }
 
 /**
+ * Check if user can manage locations
+ * @param role - User's role
+ * @returns true if ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE
+ */
+export function canManageLocations(role: string | undefined): boolean {
+  if (!role) return false
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
+}
+
+/**
+ * Check if user can delete locations
+ * @param role - User's role
+ * @returns true if ADMIN only
+ */
+export function canDeleteLocations(role: string | undefined): boolean {
+  if (!role) return false
+  return role === 'ADMIN'
+}
+
+/**
  * Get user-friendly display name for role
  * @param role - Internal role enum value
  * @returns Display name for UI
@@ -270,8 +290,12 @@ export const PERMISSIONS = {
     canViewReports: true,
     canExportReports: true,
     canManageUsers: true,
+    canManageLocations: true,
+    canDeleteLocations: true,
   },
   OFFICE_PURCHASING: {
+    canManageLocations: true, // ✅ Can create/edit locations
+    canDeleteLocations: false, // ❌ Cannot delete locations
     canManageMaterials: true, // ✅ Can create/edit materials
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products
@@ -288,6 +312,8 @@ export const PERMISSIONS = {
     canManageUsers: false,
   },
   OFFICE_WAREHOUSE: {
+    canManageLocations: true, // ✅ Can create/edit locations
+    canDeleteLocations: false, // ❌ Cannot delete locations
     canManageMaterials: true, // ✅ Can create/edit materials
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products

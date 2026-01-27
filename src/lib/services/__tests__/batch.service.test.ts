@@ -72,6 +72,9 @@ vi.mock('@/lib/db', () => ({
           update: vi.fn(),
         },
         drum: {
+          aggregate: vi
+            .fn()
+            .mockResolvedValue({ _sum: { currentQuantity: 100 } }),
           findUnique: vi.fn(),
           findMany: vi.fn(),
           update: vi.fn(),

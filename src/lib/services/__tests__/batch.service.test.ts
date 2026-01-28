@@ -40,6 +40,7 @@ vi.mock('@/lib/db', () => ({
     stockMovement: {
       create: vi.fn(),
       deleteMany: vi.fn(),
+      groupBy: vi.fn().mockResolvedValue([]),
     },
     rawMaterial: {
       findUnique: vi.fn(),
@@ -66,6 +67,7 @@ vi.mock('@/lib/db', () => ({
         },
         rawMaterial: {
           update: vi.fn(),
+          findUnique: vi.fn(),
         },
         finishedGood: {
           findUnique: vi.fn(),
@@ -75,6 +77,7 @@ vi.mock('@/lib/db', () => ({
           findUnique: vi.fn(),
           findMany: vi.fn(),
           update: vi.fn(),
+          aggregate: vi.fn().mockResolvedValue({ _sum: { currentQuantity: 100 } }),
         },
         $queryRaw: vi.fn(),
       }
@@ -148,6 +151,7 @@ describe('Batch Service', () => {
             id: 'usage-1',
             quantity: 5,
             rawMaterial: createTestRawMaterial({ id: 'rm-1' }),
+            drum: null,
           },
         ],
       }
@@ -186,6 +190,18 @@ describe('Batch Service', () => {
         ],
       }
 
+      // Mock sufficient stock
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 1000 } } as any,
+      ])
+
+      // Mock sufficient stock
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 1000 } } as any,
+      ])
+
       const mockBatch = createTestBatch({ code: 'BATCH-001' })
       const mockRawMaterial = createTestRawMaterial({
         id: 'rm-1',
@@ -213,6 +229,7 @@ describe('Batch Service', () => {
             ...mockRawMaterial,
             currentStock: 90,
           }),
+          findUnique: vi.fn().mockResolvedValue(mockRawMaterial),
         },
         finishedGood: {
           findUnique: vi.fn().mockResolvedValue(mockFinishedGood),
@@ -230,6 +247,7 @@ describe('Batch Service', () => {
         ]),
         drum: {
           findMany: vi.fn().mockResolvedValue([]), // No drums for legacy/auto test
+          aggregate: vi.fn().mockResolvedValue({ _sum: { currentQuantity: 90 } }),
         },
       }
 
@@ -309,7 +327,7 @@ describe('Batch Service', () => {
         batch: { create: vi.fn() },
         batchUsage: { create: vi.fn() },
         stockMovement: { create: vi.fn() },
-        rawMaterial: { update: vi.fn() },
+        rawMaterial: { update: vi.fn(), findUnique: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([]), // No material found
       }
@@ -340,7 +358,7 @@ describe('Batch Service', () => {
         batch: { create: vi.fn() },
         batchUsage: { create: vi.fn() },
         stockMovement: { create: vi.fn() },
-        rawMaterial: { update: vi.fn() },
+        rawMaterial: { update: vi.fn(), findUnique: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([
           {
@@ -371,6 +389,18 @@ describe('Batch Service', () => {
         ],
       }
 
+      // Mock sufficient stock
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 1000 } } as any,
+      ])
+
+      // Mock sufficient stock
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 1000 } } as any,
+      ])
+
       const mockBatch = createTestBatch({ code: 'BATCH-FIFO' })
       const mockRawMaterial = createTestRawMaterial({
         id: 'rm-1',
@@ -398,7 +428,10 @@ describe('Batch Service', () => {
         batch: { create: vi.fn().mockResolvedValue(mockBatch) },
         batchUsage: { create: vi.fn() },
         stockMovement: { create: vi.fn() },
-        rawMaterial: { update: vi.fn() },
+        rawMaterial: {
+          update: vi.fn(),
+          findUnique: vi.fn().mockResolvedValue(mockRawMaterial)
+        },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         drum: {
           findMany: vi.fn().mockResolvedValue(mockDrums),
@@ -408,6 +441,7 @@ describe('Batch Service', () => {
               Promise.resolve(mockDrums.find((d) => d.id === args.where.id))
             ),
           update: vi.fn(),
+          aggregate: vi.fn().mockResolvedValue({ _sum: { currentQuantity: 50 } }), // 200 - 150 = 50
         },
         $queryRaw: vi.fn().mockResolvedValue([mockRawMaterial]),
       }
@@ -473,6 +507,18 @@ describe('Batch Service', () => {
         ],
       }
 
+      // Mock sufficient stock
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 1000 } } as any,
+      ])
+
+      // Mock sufficient stock
+      vi.mocked(prisma.stockMovement.groupBy).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { type: 'IN', _sum: { quantity: 1000 } } as any,
+      ])
+
       const existingBatch = {
         ...createTestBatch({ id: batchId, code: 'BATCH-001' }),
         batchUsages: [
@@ -492,6 +538,7 @@ describe('Batch Service', () => {
             id: 'usage-1',
             quantity: 15,
             rawMaterial: createTestRawMaterial({ id: 'rm-1' }),
+            drum: null,
           },
         ],
       }
@@ -513,6 +560,7 @@ describe('Batch Service', () => {
             id: 'rm-1',
             currentStock: 95,
           }),
+          findUnique: vi.fn().mockResolvedValue({ currentStock: 95 }),
         },
         finishedGood: {
           findUnique: vi.fn().mockResolvedValue(createTestFinishedGood()),
@@ -539,6 +587,7 @@ describe('Batch Service', () => {
           ]),
         drum: {
           findMany: vi.fn().mockResolvedValue([]),
+          aggregate: vi.fn().mockResolvedValue({ _sum: { currentQuantity: 95 } }),
         },
       }
 
@@ -651,7 +700,7 @@ describe('Batch Service', () => {
         batch: { update: vi.fn() },
         batchUsage: { create: vi.fn(), deleteMany: vi.fn() },
         stockMovement: { create: vi.fn(), deleteMany: vi.fn() },
-        rawMaterial: { update: vi.fn() },
+        rawMaterial: { update: vi.fn(), findUnique: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([]), // Not found
       }
@@ -689,7 +738,7 @@ describe('Batch Service', () => {
         batch: { update: vi.fn() },
         batchUsage: { create: vi.fn(), deleteMany: vi.fn() },
         stockMovement: { create: vi.fn(), deleteMany: vi.fn() },
-        rawMaterial: { update: vi.fn() },
+        rawMaterial: { update: vi.fn(), findUnique: vi.fn() },
         finishedGood: { findUnique: vi.fn(), update: vi.fn() },
         $queryRaw: vi.fn().mockResolvedValue([
           {
@@ -744,12 +793,16 @@ describe('Batch Service', () => {
             id: 'rm-1',
             currentStock: 110,
           }),
+          findUnique: vi.fn().mockResolvedValue({ currentStock: 110 }),
         },
         finishedGood: {
           update: vi.fn().mockResolvedValue({
             id: 'fg-1',
             currentStock: 45,
           }),
+        },
+        drum: {
+          aggregate: vi.fn().mockResolvedValue({ _sum: { currentQuantity: 110 } }), // 100 + 10
         },
         $queryRaw: vi.fn(),
       }

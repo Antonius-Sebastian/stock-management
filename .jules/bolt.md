@@ -1,0 +1,3 @@
+## 2024-05-22 - Optimizing Stock Calculation with GroupBy
+**Learning:** Replacing O(N) in-memory aggregation with DB-level `groupBy` requires updating all related mocks, especially in complex transaction scenarios. When mocking `prisma.groupBy`, ensure the return value matches the expected aggregation structure (`_sum`, `type`).
+**Action:** When optimizing data fetching, immediately audit all unit tests that mock the affected model to ensure they simulate the new query method (e.g., `groupBy` instead of `findMany`). Also, be aware of shared mocks in integration tests (like `batch.service.test.ts`) that might be affected by changes in shared utility services.

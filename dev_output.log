@@ -1,0 +1,203 @@
+
+> stock-management@0.1.0 dev /app
+> next dev --turbopack
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+✓ Ready in 6.5s
+○ Compiling /login ...
+ GET /login 200 in 9.9s (compile: 8.7s, proxy.ts: 11ms, render: 1144ms)
+ POST /login 200 in 221ms (compile: 49ms, proxy.ts: 17ms, render: 155ms)
+○ Compiling /api/auth/[...nextauth] ...
+ POST /login 200 in 542ms (compile: 156ms, proxy.ts: 37ms, render: 349ms)
+ POST /login 200 in 159ms (compile: 56ms, proxy.ts: 16ms, render: 87ms)
+ GET /login 200 in 142ms (compile: 12ms, proxy.ts: 15ms, render: 115ms)
+ POST /login 200 in 113ms (compile: 16ms, proxy.ts: 14ms, render: 83ms)
+ GET /api/auth/session 200 in 80ms (compile: 60ms, proxy.ts: 9ms, render: 11ms)
+ GET /api/auth/session 200 in 46ms (compile: 25ms, proxy.ts: 9ms, render: 12ms)
+ GET /api/auth/providers 200 in 39ms (compile: 21ms, proxy.ts: 7ms, render: 10ms)
+ GET /api/auth/csrf 200 in 53ms (compile: 16ms, proxy.ts: 28ms, render: 9ms)
+ POST /api/auth/callback/credentials? 200 in 2.7s (compile: 16ms, proxy.ts: 7ms, render: 2.7s)
+ GET /api/auth/session 200 in 189ms (compile: 89ms, proxy.ts: 7ms, render: 93ms)
+(node:3153) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+○ Compiling / ...
+ GET / 200 in 3.6s (compile: 3.5s, proxy.ts: 21ms, render: 63ms)
+ GET / 200 in 90ms (compile: 31ms, proxy.ts: 10ms, render: 50ms)
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+ GET /verify-tooltip 200 in 3.7s (compile: 3.3s, proxy.ts: 27ms, render: 365ms)
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+ GET /api/auth/session 200 in 233ms (compile: 128ms, proxy.ts: 9ms, render: 96ms)
+ GET /api/auth/session 200 in 89ms (compile: 25ms, proxy.ts: 14ms, render: 50ms)
+ GET /login 200 in 87ms (compile: 18ms, proxy.ts: 6ms, render: 63ms)
+ POST /login 200 in 82ms (compile: 12ms, proxy.ts: 7ms, render: 62ms)
+ GET /api/auth/session 200 in 115ms (compile: 90ms, proxy.ts: 13ms, render: 12ms)
+ GET /api/auth/session 200 in 52ms (compile: 32ms, proxy.ts: 12ms, render: 8ms)
+ GET /api/auth/providers 200 in 54ms (compile: 36ms, proxy.ts: 11ms, render: 6ms)
+ GET /api/auth/csrf 200 in 36ms (compile: 16ms, proxy.ts: 10ms, render: 9ms)
+ POST /api/auth/callback/credentials? 200 in 1519ms (compile: 24ms, proxy.ts: 9ms, render: 1486ms)
+ GET /api/auth/session 200 in 117ms (compile: 95ms, proxy.ts: 6ms, render: 17ms)
+ GET / 200 in 87ms (compile: 17ms, proxy.ts: 6ms, render: 63ms)
+ GET / 200 in 63ms (compile: 18ms, proxy.ts: 11ms, render: 34ms)
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+ GET /raw-materials 200 in 292ms (compile: 167ms, proxy.ts: 32ms, render: 92ms)
+Error: aborted
+    at ignore-listed frames {
+  code: 'ECONNRESET'
+}
+⨯ uncaughtException: Error: aborted
+    at ignore-listed frames {
+  code: 'ECONNRESET'
+}
+⨯ uncaughtException:  Error: aborted
+    at ignore-listed frames {
+  code: 'ECONNRESET'
+}
+ GET /verify-tooltip 200 in 628ms (compile: 54ms, proxy.ts: 39ms, render: 535ms)
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+Failed to proxy https://o4510643961856000.ingest.us.sentry.io/api/4510643963559936/envelope/?o=4510643961856000&p=4510643963559936&r=us&hsts=0 AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+AggregateError:
+    at ignore-listed frames {
+  code: 'ETIMEDOUT'
+}
+ GET /api/auth/session 200 in 168ms (compile: 105ms, proxy.ts: 6ms, render: 57ms)
+ GET /api/auth/session 200 in 50ms (compile: 16ms, proxy.ts: 12ms, render: 21ms)
+ ELIFECYCLE  Command failed.
+[?25h

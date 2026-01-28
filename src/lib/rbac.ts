@@ -56,6 +56,26 @@ export function canDeleteFinishedGoods(role: string | undefined): boolean {
 }
 
 /**
+ * Check if user can create/edit locations
+ * @param role - User's role
+ * @returns true if ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE
+ */
+export function canManageLocations(role: string | undefined): boolean {
+  if (!role) return false
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
+}
+
+/**
+ * Check if user can delete locations
+ * @param role - User's role
+ * @returns true if ADMIN only
+ */
+export function canDeleteLocations(role: string | undefined): boolean {
+  if (!role) return false
+  return role === 'ADMIN'
+}
+
+/**
  * Check if user can create batches
  * @param role - User's role
  * @returns true if ADMIN or OFFICE_WAREHOUSE only (batch = raw material OUT movement)
@@ -260,6 +280,8 @@ export const PERMISSIONS = {
     canDeleteMaterials: true, // Delete materials
     canManageFinishedGoods: true, // Create/edit product metadata
     canDeleteFinishedGoods: true, // Delete products
+    canManageLocations: true, // Create/edit locations
+    canDeleteLocations: true, // Delete locations
     canCreateBatches: true,
     canEditBatches: true,
     canDeleteBatches: true,
@@ -276,6 +298,8 @@ export const PERMISSIONS = {
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products
     canDeleteFinishedGoods: false, // ❌ Cannot delete products
+    canManageLocations: true, // ✅ Can create/edit locations
+    canDeleteLocations: false, // ❌ Cannot delete locations
     canCreateBatches: false, // ❌ Cannot create batches (batch = raw material OUT, only WAREHOUSE)
     canEditBatches: false, // ❌ Cannot edit batches
     canDeleteBatches: false, // ❌ Cannot delete batches
@@ -292,6 +316,8 @@ export const PERMISSIONS = {
     canDeleteMaterials: false, // ❌ Cannot delete materials
     canManageFinishedGoods: true, // ✅ Can create/edit products
     canDeleteFinishedGoods: false, // ❌ Cannot delete products
+    canManageLocations: true, // ✅ Can create/edit locations
+    canDeleteLocations: false, // ❌ Cannot delete locations
     canCreateBatches: true, // ✅ Can create batches
     canEditBatches: false, // ❌ Cannot edit batches
     canDeleteBatches: false, // ❌ Cannot delete batches

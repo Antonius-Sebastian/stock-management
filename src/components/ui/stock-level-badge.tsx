@@ -1,4 +1,9 @@
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface StockLevelBadgeProps {
   stock: number
@@ -6,34 +11,53 @@ interface StockLevelBadgeProps {
 }
 
 export function StockLevelBadge({ stock, moq }: StockLevelBadgeProps) {
-  // Handle edge case where MOQ is 0 to prevent division by zero
+  const percentage = moq > 0 ? Math.round((stock / moq) * 100) : 0
+
+  let statusText = ''
+  let variant: 'outline' | 'success' | 'warning' | 'destructive' = 'outline'
+  let className = ''
+
   if (moq === 0) {
-    return (
-      <Badge variant="outline" className="text-muted-foreground">
-        Tidak Ada MOQ
-      </Badge>
-    )
-  }
-
-  const ratio = stock / moq
-
-  if (ratio >= 1) {
-    return (
-      <Badge variant="success" className="font-semibold">
-        Baik
-      </Badge>
-    )
-  } else if (ratio >= 0.5) {
-    return (
-      <Badge variant="warning" className="font-semibold">
-        Rendah
-      </Badge>
-    )
+    statusText = 'Tidak Ada MOQ'
+    variant = 'outline'
+    className = 'text-muted-foreground'
   } else {
-    return (
-      <Badge variant="destructive" className="font-semibold">
-        Kritis
-      </Badge>
-    )
+    const ratio = stock / moq
+    if (ratio >= 1) {
+      statusText = 'Baik'
+      variant = 'success'
+      className = 'font-semibold'
+    } else if (ratio >= 0.5) {
+      statusText = 'Rendah'
+      variant = 'warning'
+      className = 'font-semibold'
+    } else {
+      statusText = 'Kritis'
+      variant = 'destructive'
+      className = 'font-semibold'
+    }
   }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex cursor-help items-center gap-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          tabIndex={0}
+          role="status"
+          aria-label={`Status stok: ${statusText}. Stok: ${stock}, Minimum: ${moq} (${percentage}%)`}
+        >
+          <Badge variant={variant} className={className}>
+            {statusText}
+          </Badge>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>
+          Stok: {stock.toLocaleString('id-ID')} / MOQ:{' '}
+          {moq.toLocaleString('id-ID')} ({percentage}%)
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  )
 }

@@ -15,6 +15,11 @@ import { logger } from '@/lib/logger'
 import { AuditHelpers } from '@/lib/audit'
 import { getBatches, createBatch, BatchInput } from '@/lib/services'
 import { batchSchemaAPI } from '@/lib/validations'
+import {
+  checkRateLimit,
+  RateLimits,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit'
 
 /**
  * GET /api/batches
@@ -98,6 +103,22 @@ export async function POST(request: NextRequest) {
           error: getPermissionErrorMessage('create batches', session.user.role),
         },
         { status: 403 }
+      )
+    }
+
+    // Rate limit: Check if user has exceeded batch creation limit
+    const rateLimit = await checkRateLimit(
+      session.user.id,
+      RateLimits.BATCH_CREATION
+    )
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many batches created. Please try again later.' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
       )
     }
 

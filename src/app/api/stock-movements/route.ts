@@ -17,6 +17,23 @@ import {
   stockMovementSchemaAPI,
   stockMovementQuerySchema,
 } from '@/lib/validations'
+// Debug logging helper - uses fetch (works in server-side Next.js)
+function debugLog(location: string, message: string, data: unknown) {
+  const logEntry = {
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+    sessionId: 'debug-session',
+    runId: 'phase1',
+    hypothesisId: 'C',
+  }
+  fetch('http://127.0.0.1:7242/ingest/d8baa842-95ab-4bfd-967a-af7151fa0e4e', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(logEntry),
+  }).catch(() => {})
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -217,8 +234,27 @@ export async function POST(request: NextRequest) {
       drumId: validatedData.drumId || null,
     }
 
+    // #region agent log
+    debugLog('stock-movements/route.ts:208', 'API route BEFORE createStockMovement', {
+      originalDateString: body.date,
+      parsedDate: validatedData.date.toISOString(),
+      serviceInputDate: serviceInput.date.toISOString(),
+      type: serviceInput.type,
+      quantity: serviceInput.quantity,
+      drumId: serviceInput.drumId,
+    })
+    // #endregion
+
     // Create stock movement using service
     const result = await createStockMovement(serviceInput)
+
+    // #region agent log
+    debugLog('stock-movements/route.ts:221', 'API route AFTER createStockMovement', {
+      movementId: result.id,
+      movementDate: result.date.toISOString(),
+      createdAt: result.createdAt.toISOString(),
+    })
+    // #endregion
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {

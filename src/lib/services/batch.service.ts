@@ -14,6 +14,25 @@ import {
   calculateStockAtDate,
   validateRawMaterialStockConsistency,
 } from './stock-movement.service'
+import { wibCalendarDateToUTCStartOfDay } from '@/lib/timezone'
+
+// Debug logging helper - uses fetch (works in server-side Next.js)
+function debugLog(location: string, message: string, data: unknown) {
+  const logEntry = {
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+    sessionId: 'debug-session',
+    runId: 'phase2',
+    hypothesisId: 'C',
+  }
+  fetch('http://127.0.0.1:7242/ingest/d8baa842-95ab-4bfd-967a-af7151fa0e4e', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(logEntry),
+  }).catch(() => {})
+}
 
 /**
  * Batch input type for service layer
@@ -241,6 +260,11 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
   // Set timeout to 30 seconds to handle large batches
   return await prisma.$transaction(
     async (tx) => {
+      // Normalize batch date to start-of-day WIB before storing
+      // This ensures all dates represent calendar dates (00:00:00 WIB) rather than arbitrary timestamps
+      // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+      const normalizedBatchDate = wibCalendarDateToUTCStartOfDay(data.date)
+
       // Step 1: Validate all raw materials exist and calculate total quantities
       for (const material of data.materials) {
         const totalQuantity = material.drums.reduce(
@@ -274,9 +298,19 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
       // For each material/drum combination, ensure stock existed BEFORE the batch date
       for (const material of data.materials) {
         for (const drumEntry of material.drums) {
-          // Calculate stock at batch date (before the batch)
-          // For batch validation, we check stock BEFORE the batch date
-          // Same-day movements aren't relevant here since batch movements will be created on that date
+          // #region agent log
+          debugLog('batch.service.ts:277', 'batch stock validation BEFORE calculateStockAtDate', {
+            rawMaterialId: material.rawMaterialId,
+            drumId: drumEntry.drumId,
+            batchDate: data.date.toISOString(),
+            requiredQuantity: drumEntry.quantity,
+          })
+          // #endregion
+
+          // Calculate stock at batch date (includes all movements on that day)
+          // For batch validation, we check stock available at the batch date
+          // This includes all movements created on the same day (before batch creation)
+          // movementCreatedAt is null, so calculateStockAtDate includes ALL same-day movements
           const stockAtDate = await calculateStockAtDate(
             material.rawMaterialId,
             'raw-material',
@@ -284,8 +318,17 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             null, // No location for raw materials
             drumEntry.drumId || null,
             null, // excludeMovementId (not needed for batch validation)
-            null // movementCreatedAt (not needed - checking stock before date)
+            null // movementCreatedAt (null = include all same-day movements)
           )
+
+          // #region agent log
+          debugLog('batch.service.ts:290', 'batch stock validation result', {
+            stockAtDate,
+            requiredQuantity: drumEntry.quantity,
+            isValid: stockAtDate >= drumEntry.quantity,
+            drumId: drumEntry.drumId,
+          })
+          // #endregion
 
           if (stockAtDate < drumEntry.quantity) {
             const rawMaterial = await tx.rawMaterial.findUnique({
@@ -305,6 +348,15 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
               ? `${materialName} (Drum ${drumLabel})`
               : materialName
 
+            // #region agent log
+            debugLog('batch.service.ts:308', 'batch stock validation FAILED', {
+              stockAtDate,
+              requiredQuantity: drumEntry.quantity,
+              itemLabel,
+              batchDate: data.date.toISOString(),
+            })
+            // #endregion
+
             throw new Error(
               `Insufficient stock on ${data.date.toLocaleDateString()}. Available: ${stockAtDate.toFixed(2)}, Required: ${drumEntry.quantity.toFixed(2)} for ${itemLabel}`
             )
@@ -312,11 +364,11 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
         }
       }
 
-      // Step 2: Create the batch
+      // Step 2: Create the batch with normalized date
       const batch = await tx.batch.create({
         data: {
           code: data.code,
-          date: data.date,
+          date: normalizedBatchDate,
           description: data.description,
         },
       })
@@ -349,6 +401,21 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             `Insufficient stock for ${rawMaterial.name}. Available: ${rawMaterial.currentStock}, Required: ${totalQuantity}`
           )
         }
+
+        // #region agent log
+        const rawMaterialBefore = await tx.rawMaterial.findUnique({
+          where: { id: material.rawMaterialId },
+          select: { currentStock: true },
+        })
+        const aggregateBeforeStock = rawMaterialBefore?.currentStock ?? null
+        
+        // Get all drums for this material before update
+        const drumsBefore = await tx.drum.findMany({
+          where: { rawMaterialId: material.rawMaterialId },
+          select: { id: true, label: true, currentQuantity: true },
+        })
+        const drumsBeforeMap = new Map(drumsBefore.map(d => [d.id, d.currentQuantity]))
+        // #endregion
 
         // Process each drum for this material
         for (const drumEntry of material.drums) {
@@ -383,12 +450,12 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             },
           })
 
-          // Create stock OUT movement
+          // Create stock OUT movement with normalized date
           await tx.stockMovement.create({
             data: {
               type: 'OUT',
               quantity: drumEntry.quantity,
-              date: data.date,
+              date: normalizedBatchDate,
               description: `Batch production: ${data.code}`,
               rawMaterialId: material.rawMaterialId,
               batchId: batch.id,
@@ -419,6 +486,42 @@ export async function createBatch(data: BatchInput): Promise<Batch> {
             },
           },
         })
+
+        // #region agent log
+        const rawMaterialAfter = await tx.rawMaterial.findUnique({
+          where: { id: material.rawMaterialId },
+          select: { currentStock: true },
+        })
+        const aggregateAfterStock = rawMaterialAfter?.currentStock ?? null
+        
+        // Get all drums for this material after update
+        const drumsAfter = await tx.drum.findMany({
+          where: { rawMaterialId: material.rawMaterialId },
+          select: { id: true, label: true, currentQuantity: true },
+        })
+        const drumsAfterMap = new Map(drumsAfter.map(d => [d.id, d.currentQuantity]))
+        
+        const sumOfDrumsBefore = drumsBefore.reduce((sum, d) => sum + d.currentQuantity, 0)
+        const sumOfDrumsAfter = drumsAfter.reduce((sum, d) => sum + d.currentQuantity, 0)
+        
+        const drumChanges = material.drums.map(d => ({
+          drumId: d.drumId,
+          quantity: d.quantity,
+          drumBefore: d.drumId ? drumsBeforeMap.get(d.drumId) : null,
+          drumAfter: d.drumId ? drumsAfterMap.get(d.drumId) : null,
+        }))
+        
+        debugLog('batch.service.ts:465', 'createBatch stock updates', {
+          rawMaterialId: material.rawMaterialId,
+          batchId: batch.id,
+          totalQuantity,
+          aggregateBeforeStock,
+          aggregateAfterStock,
+          sumOfDrumsBefore,
+          sumOfDrumsAfter,
+          drumChanges,
+        })
+        // #endregion
 
         // Validate consistency: aggregate stock should equal sum of drums
         await validateRawMaterialStockConsistency(material.rawMaterialId, tx)
@@ -508,6 +611,11 @@ export async function updateBatch(
   // Set timeout to 30 seconds to handle large batches
   return await prisma.$transaction(
     async (tx) => {
+      // Normalize batch date to start-of-day WIB before storing
+      // This ensures all dates represent calendar dates (00:00:00 WIB) rather than arbitrary timestamps
+      // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+      const normalizedBatchDate = wibCalendarDateToUTCStartOfDay(data.date)
+
       // Step 1: Restore stock for all old materials and drums
       // Track which materials we've restored to validate once per material
       const restoredMaterials = new Set<string>()
@@ -617,12 +725,12 @@ export async function updateBatch(
             },
           })
 
-          // Create stock movement (OUT)
+          // Create stock movement (OUT) with normalized date
           await tx.stockMovement.create({
             data: {
               type: 'OUT',
               quantity: drumEntry.quantity,
-              date: data.date,
+              date: normalizedBatchDate,
               rawMaterialId: material.rawMaterialId,
               batchId: id,
               description: `Batch ${data.code} production`,
@@ -658,12 +766,12 @@ export async function updateBatch(
         await validateRawMaterialStockConsistency(material.rawMaterialId, tx)
       }
 
-      // Step 4: Update batch info
+      // Step 4: Update batch info with normalized date
       const updatedBatch = await tx.batch.update({
         where: { id },
         data: {
           code: data.code,
-          date: data.date,
+          date: normalizedBatchDate,
           description: data.description,
         },
         include: {

@@ -7,13 +7,28 @@
 
 import { prisma } from '@/lib/db'
 import { StockMovement } from '@prisma/client'
-import {
-  parseToWIB,
-  startOfDayWIB,
-  endOfDayWIB,
-  toWIBISOString,
-} from '@/lib/timezone'
+import { wibCalendarDateToUTCStartOfDay } from '@/lib/timezone'
 
+// Debug logging helper - uses fetch (works in server-side Next.js)
+function debugLog(location: string, message: string, data: unknown) {
+  const logEntry = {
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+    sessionId: 'debug-session',
+    runId: 'phase2',
+    hypothesisId: 'A',
+  }
+  // Use fetch to send to debug server (non-blocking)
+  fetch('http://127.0.0.1:7242/ingest/d8baa842-95ab-4bfd-967a-af7151fa0e4e', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(logEntry),
+  }).catch(() => {
+    // Silently fail - debug logging should never break the app
+  })
+}
 /**
  * Stock movement input type for service layer
  * Includes ADJUSTMENT type support
@@ -47,16 +62,14 @@ export async function getStockMovementsByDate(
   itemType: 'raw-material' | 'finished-good',
   date: Date
 ): Promise<StockMovement[]> {
-  const queryDate = parseToWIB(toWIBISOString(date))
-  const startOfDay = startOfDayWIB(queryDate)
-  const endOfDay = endOfDayWIB(queryDate)
+  // Convert WIB calendar date to UTC start-of-day for database queries
+  // Since dates are normalized to start-of-day, same-day movements have date === utcStartOfDay
+  // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+  const utcStartOfDay = wibCalendarDateToUTCStartOfDay(date)
 
   return await prisma.stockMovement.findMany({
     where: {
-      date: {
-        gte: startOfDay,
-        lte: endOfDay,
-      },
+      date: utcStartOfDay, // Exact match since dates are normalized
       ...(itemType === 'raw-material'
         ? { rawMaterialId: itemId }
         : { finishedGoodId: itemId }),
@@ -93,9 +106,25 @@ export async function calculateStockAtDate(
   excludeMovementId?: string | null,
   movementCreatedAt?: Date | null
 ): Promise<number> {
-  const queryDate = parseToWIB(toWIBISOString(date))
-  const startOfDay = startOfDayWIB(queryDate)
-  const endOfDay = endOfDayWIB(queryDate)
+  // #region agent log
+  debugLog('stock-movement.service.ts:87', 'calculateStockAtDate ENTRY', {
+    itemId,
+    itemType,
+    date: date.toISOString(),
+    locationId,
+    drumId,
+    excludeMovementId,
+    movementCreatedAt: movementCreatedAt?.toISOString(),
+  })
+  // #endregion
+
+  // Convert WIB calendar date to UTC start-of-day for database queries
+  // Movements are stored as UTC dates representing WIB 00:00:00
+  // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+  const utcStartOfDay = wibCalendarDateToUTCStartOfDay(date)
+
+  // Since all dates are normalized to start-of-day, same-day movements will have date === utcStartOfDay
+  // We use createdAt for chronological ordering within the same day
 
   // Base where clause
   const baseWhere =
@@ -109,11 +138,11 @@ export async function calculateStockAtDate(
           ...(locationId ? { locationId } : {}),
         }
 
-  // Get all movements BEFORE the given date
+  // Get all movements BEFORE the given date (using UTC dates for comparison)
   const movementsBefore = await prisma.stockMovement.findMany({
     where: {
       date: {
-        lt: startOfDay, // Before the date (exclusive)
+        lt: utcStartOfDay, // Before the date (exclusive) - using UTC date
       },
       ...baseWhere,
       ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
@@ -124,21 +153,48 @@ export async function calculateStockAtDate(
     ],
   })
 
-  // Get movements ON the same day that were created BEFORE this movement
-  const sameDayMovements = movementCreatedAt
-    ? await prisma.stockMovement.findMany({
-        where: {
-          date: {
-            gte: startOfDay,
-            lte: endOfDay,
-          },
-          createdAt: { lt: movementCreatedAt },
-          ...baseWhere,
-          ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
-        },
-        orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
-      })
-    : []
+  // #region agent log
+  debugLog('stock-movement.service.ts:113', 'movementsBefore query result', {
+    count: movementsBefore.length,
+    movements: movementsBefore.map((m) => ({
+      id: m.id,
+      type: m.type,
+      quantity: m.quantity,
+      date: m.date.toISOString(),
+      createdAt: m.createdAt.toISOString(),
+    })),
+    utcStartOfDay: utcStartOfDay.toISOString(),
+  })
+  // #endregion
+
+  // Get movements ON the same day
+  // Since dates are normalized to start-of-day, same-day movements have date === utcStartOfDay
+  // If movementCreatedAt is provided, only include movements created before that time
+  // If movementCreatedAt is null, include ALL same-day movements (for batch validation, etc.)
+  const sameDayMovements = await prisma.stockMovement.findMany({
+    where: {
+      date: utcStartOfDay, // Exact match since dates are normalized
+      ...(movementCreatedAt ? { createdAt: { lt: movementCreatedAt } } : {}),
+      ...baseWhere,
+      ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
+    },
+    orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
+  })
+
+  // #region agent log
+  debugLog('stock-movement.service.ts:128', 'sameDayMovements query result', {
+    count: sameDayMovements.length,
+    movements: sameDayMovements.map((m) => ({
+      id: m.id,
+      type: m.type,
+      quantity: m.quantity,
+      date: m.date.toISOString(),
+      createdAt: m.createdAt.toISOString(),
+    })),
+    movementCreatedAt: movementCreatedAt?.toISOString(),
+    utcStartOfDay: utcStartOfDay.toISOString(),
+  })
+  // #endregion
 
   // Combine and sort all movements chronologically
   const allMovements = [...movementsBefore, ...sameDayMovements].sort(
@@ -149,9 +205,23 @@ export async function calculateStockAtDate(
     }
   )
 
+  // #region agent log
+  debugLog('stock-movement.service.ts:144', 'allMovements after sort', {
+    count: allMovements.length,
+    orderedMovements: allMovements.map((m) => ({
+      id: m.id,
+      type: m.type,
+      quantity: m.quantity,
+      date: m.date.toISOString(),
+      createdAt: m.createdAt.toISOString(),
+    })),
+  })
+  // #endregion
+
   // Calculate stock by summing all movements chronologically
   let stock = 0
   for (const movement of allMovements) {
+    const beforeStock = stock
     if (movement.type === 'IN') {
       stock += movement.quantity
     } else if (movement.type === 'OUT') {
@@ -159,9 +229,28 @@ export async function calculateStockAtDate(
     } else if (movement.type === 'ADJUSTMENT') {
       stock += movement.quantity // Adjustment quantity is already signed
     }
+    // #region agent log
+    debugLog('stock-movement.service.ts:154', 'stock calculation step', {
+      movementId: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      beforeStock,
+      afterStock: stock,
+    })
+    // #endregion
   }
 
-  return Math.max(0, stock) // Never return negative
+  const finalStock = Math.max(0, stock) // Never return negative
+
+  // #region agent log
+  debugLog('stock-movement.service.ts:164', 'calculateStockAtDate EXIT', {
+    calculatedStock: finalStock,
+    rawStock: stock,
+    totalMovements: allMovements.length,
+  })
+  // #endregion
+
+  return finalStock
 }
 
 /**
@@ -202,6 +291,16 @@ export async function validateRawMaterialStockConsistency(
     select: { currentStock: true },
   })
 
+  // #region agent log
+  debugLog('stock-movement.service.ts:294', 'validateRawMaterialStockConsistency', {
+    rawMaterialId,
+    aggregateStock: rawMaterial?.currentStock,
+    sumOfDrums: totalDrumStock,
+    difference: rawMaterial ? Math.abs(rawMaterial.currentStock - totalDrumStock) : null,
+    isConsistent: rawMaterial ? Math.abs(rawMaterial.currentStock - totalDrumStock) <= 0.01 : true,
+  })
+  // #endregion
+
   if (
     rawMaterial &&
     Math.abs(rawMaterial.currentStock - totalDrumStock) > 0.01
@@ -216,6 +315,18 @@ export async function validateRawMaterialStockConsistency(
 export async function createStockMovement(
   data: StockMovementInput
 ): Promise<StockMovement> {
+  // #region agent log
+  debugLog('stock-movement.service.ts:216', 'createStockMovement ENTRY', {
+    type: data.type,
+    quantity: data.quantity,
+    date: data.date.toISOString(),
+    rawMaterialId: data.rawMaterialId,
+    finishedGoodId: data.finishedGoodId,
+    drumId: data.drumId,
+    locationId: data.locationId,
+  })
+  // #endregion
+
   return await prisma.$transaction(async (tx) => {
     // Date validation: For OUT or negative ADJUSTMENT, check stock BEFORE the movement date
     // Use chronological calculation to handle same-day movements correctly
@@ -230,6 +341,15 @@ export async function createStockMovement(
       // This movement will be created now, so we compare against current time
       const now = new Date()
 
+      // #region agent log
+      debugLog('stock-movement.service.ts:233', 'stock validation BEFORE calculateStockAtDate', {
+        itemId,
+        itemType,
+        now: now.toISOString(),
+        movementDate: data.date.toISOString(),
+      })
+      // #endregion
+
       // Calculate stock at the movement date (before the movement) chronologically
       const stockAtDate = await calculateStockAtDate(
         itemId,
@@ -243,6 +363,14 @@ export async function createStockMovement(
 
       const quantityToCheck =
         data.type === 'ADJUSTMENT' ? Math.abs(data.quantity) : data.quantity
+
+      // #region agent log
+      debugLog('stock-movement.service.ts:244', 'stock validation result', {
+        stockAtDate,
+        quantityToCheck,
+        isValid: stockAtDate >= quantityToCheck,
+      })
+      // #endregion
 
       if (stockAtDate < quantityToCheck) {
         const itemName = data.rawMaterialId
@@ -265,10 +393,37 @@ export async function createStockMovement(
       }
     }
 
-    // Create the stock movement
-    const stockMovement = await tx.stockMovement.create({
-      data,
+    // Normalize date to start-of-day WIB before storing
+    // This ensures all dates represent calendar dates (00:00:00 WIB) rather than arbitrary timestamps
+    // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+    const normalizedDate = wibCalendarDateToUTCStartOfDay(data.date)
+
+    // #region agent log
+    debugLog('stock-movement.service.ts:386', 'date normalization', {
+      inputDate: data.date.toISOString(),
+      normalizedDate: normalizedDate.toISOString(),
     })
+    // #endregion
+
+    // Create the stock movement with normalized date
+    const stockMovement = await tx.stockMovement.create({
+      data: {
+        ...data,
+        date: normalizedDate,
+      },
+    })
+
+    // #region agent log
+    debugLog('stock-movement.service.ts:269', 'stockMovement created', {
+      id: stockMovement.id,
+      type: stockMovement.type,
+      quantity: stockMovement.quantity,
+      date: stockMovement.date.toISOString(),
+      createdAt: stockMovement.createdAt.toISOString(),
+      normalizedDate: normalizedDate.toISOString(),
+      dateMatches: stockMovement.date.getTime() === normalizedDate.getTime(),
+    })
+    // #endregion
 
     // Calculate quantity change
     const quantityChange =
@@ -278,7 +433,17 @@ export async function createStockMovement(
           ? data.quantity
           : -data.quantity
 
+    // #region agent log
+    debugLog('stock-movement.service.ts:273', 'quantityChange calculated', {
+      quantityChange,
+      type: data.type,
+      originalQuantity: data.quantity,
+    })
+    // #endregion
+
     // Update Drum Stock (Raw Material)
+    let drumBeforeQuantity: number | null = null
+    let drumAfterQuantity: number | null = null
     if (data.drumId) {
       // ... existing drum update ...
       const drum = await tx.drum.findUnique({
@@ -286,7 +451,9 @@ export async function createStockMovement(
         select: { currentQuantity: true },
       })
       if (!drum) throw new Error('Drum not found')
+      drumBeforeQuantity = drum.currentQuantity
       const newQuantity = drum.currentQuantity + quantityChange
+      drumAfterQuantity = newQuantity
       await tx.drum.update({
         where: { id: data.drumId },
         data: {
@@ -297,7 +464,15 @@ export async function createStockMovement(
     }
 
     // Update Raw Material Global Stock
+    let aggregateBeforeStock: number | null = null
+    let aggregateAfterStock: number | null = null
     if (data.rawMaterialId) {
+      const rawMaterialBefore = await tx.rawMaterial.findUnique({
+        where: { id: data.rawMaterialId },
+        select: { currentStock: true },
+      })
+      aggregateBeforeStock = rawMaterialBefore?.currentStock ?? null
+
       await tx.rawMaterial.update({
         where: { id: data.rawMaterialId },
         data: {
@@ -306,6 +481,24 @@ export async function createStockMovement(
           },
         },
       })
+
+      const rawMaterialAfter = await tx.rawMaterial.findUnique({
+        where: { id: data.rawMaterialId },
+        select: { currentStock: true },
+      })
+      aggregateAfterStock = rawMaterialAfter?.currentStock ?? null
+
+      // #region agent log
+      debugLog('stock-movement.service.ts:452', 'createStockMovement stock updates', {
+        rawMaterialId: data.rawMaterialId,
+        drumId: data.drumId,
+        quantityChange,
+        drumBeforeQuantity,
+        drumAfterQuantity,
+        aggregateBeforeStock,
+        aggregateAfterStock,
+      })
+      // #endregion
 
       // Validate consistency: aggregate stock should equal sum of drums
       await validateRawMaterialStockConsistency(data.rawMaterialId, tx)
@@ -366,18 +559,16 @@ export async function deleteStockMovementsByDate(
   date: Date,
   movementType: 'IN' | 'OUT'
 ): Promise<void> {
-  const queryDate = parseToWIB(toWIBISOString(date))
-  const startOfDay = startOfDayWIB(queryDate)
-  const endOfDay = endOfDayWIB(queryDate)
+  // Convert WIB calendar date to UTC start-of-day for database queries
+  // Since dates are normalized to start-of-day, same-day movements have date === utcStartOfDay
+  // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+  const utcStartOfDay = wibCalendarDateToUTCStartOfDay(date)
 
   await prisma.$transaction(async (tx) => {
     // Find movements to delete
     const movements = await tx.stockMovement.findMany({
       where: {
-        date: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        date: utcStartOfDay, // Exact match since dates are normalized
         type: movementType,
         ...(itemType === 'raw-material'
           ? { rawMaterialId: itemId }
@@ -550,18 +741,16 @@ export async function updateStockMovementsByDate(
   movementType: 'IN' | 'OUT',
   quantity: number
 ): Promise<{ oldTotal: number; newTotal: number; difference: number }> {
-  const queryDate = parseToWIB(toWIBISOString(date))
-  const startOfDay = startOfDayWIB(queryDate)
-  const endOfDay = endOfDayWIB(queryDate)
+  // Convert WIB calendar date to UTC start-of-day for database queries
+  // Since dates are normalized to start-of-day, same-day movements have date === utcStartOfDay
+  // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+  const utcStartOfDay = wibCalendarDateToUTCStartOfDay(date)
 
   return await prisma.$transaction(async (tx) => {
     // Find existing movements for this day and type
     const existingMovements = await tx.stockMovement.findMany({
       where: {
-        date: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        date: utcStartOfDay, // Exact match since dates are normalized
         type: movementType,
         ...(itemType === 'raw-material'
           ? { rawMaterialId: itemId }
@@ -622,11 +811,12 @@ export async function updateStockMovementsByDate(
         }
 
         // Create a single new movement with the new quantity and locationId
+        // Use normalized date (already normalized to UTC start-of-day)
         await tx.stockMovement.create({
           data: {
             type: movementType,
             quantity,
-            date: startOfDay,
+            date: utcStartOfDay,
             description: `Updated via report (${movementType})`,
             finishedGoodId: itemId,
             locationId,
@@ -634,11 +824,12 @@ export async function updateStockMovementsByDate(
         })
       } else {
         // Create a single new movement with the new quantity
+        // Use normalized date (already normalized to UTC start-of-day)
         await tx.stockMovement.create({
           data: {
             type: movementType,
             quantity,
-            date: startOfDay,
+            date: utcStartOfDay,
             description: `Updated via report (${movementType})`,
             rawMaterialId: itemId,
           },
@@ -813,7 +1004,11 @@ export async function updateStockMovement(
     const oldDate = existingMovement.date
     const oldLocationId = existingMovement.locationId
     const newQuantity = data.quantity ?? oldQuantity
-    const newDate = data.date ? parseToWIB(toWIBISOString(data.date)) : oldDate
+    // Normalize date to start-of-day WIB if provided, otherwise use existing date
+    // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+    const newDate = data.date
+      ? wibCalendarDateToUTCStartOfDay(data.date)
+      : oldDate
     const newLocationId = data.locationId ?? oldLocationId
 
     // Calculate quantity change
@@ -1235,6 +1430,15 @@ export interface DrumStockInInput {
 export async function createDrumStockIn(
   input: DrumStockInInput
 ): Promise<void> {
+  // #region agent log
+  debugLog('stock-movement.service.ts:1376', 'createDrumStockIn ENTRY', {
+    rawMaterialId: input.rawMaterialId,
+    date: input.date.toISOString(),
+    drumsCount: input.drums.length,
+    drums: input.drums.map((d) => ({ label: d.label, quantity: d.quantity })),
+  })
+  // #endregion
+
   const { rawMaterialId, date, description, drums } = input
 
   await prisma.$transaction(async (tx) => {
@@ -1253,6 +1457,18 @@ export async function createDrumStockIn(
       }
     }
 
+    // Normalize date to start-of-day WIB before storing
+    // This ensures all dates represent calendar dates (00:00:00 WIB) rather than arbitrary timestamps
+    // wibCalendarDateToUTCStartOfDay extracts the calendar date in WIB and creates UTC Date for WIB 00:00:00
+    const normalizedDate = wibCalendarDateToUTCStartOfDay(date)
+
+    // #region agent log
+    debugLog('stock-movement.service.ts:1411', 'createDrumStockIn date normalization', {
+      inputDate: date.toISOString(),
+      normalizedDate: normalizedDate.toISOString(),
+    })
+    // #endregion
+
     // Process each drum
     for (const drum of drums) {
       // Create Drum
@@ -1262,25 +1478,44 @@ export async function createDrumStockIn(
           currentQuantity: drum.quantity,
           rawMaterialId,
           isActive: true,
-          createdAt: date,
+          createdAt: normalizedDate,
         },
       })
 
-      // Create Movement tied to Drum
-      await tx.stockMovement.create({
+      // Create Movement tied to Drum with normalized date
+      const movement = await tx.stockMovement.create({
         data: {
           type: 'IN',
           quantity: drum.quantity,
-          date,
+          date: normalizedDate,
           description: description || 'Stock In (Drum)',
           rawMaterialId,
           drumId: newDrum.id,
         },
       })
+
+      // #region agent log
+      debugLog('stock-movement.service.ts:1429', 'drum movement created', {
+        movementId: movement.id,
+        inputDate: date.toISOString(),
+        normalizedDate: normalizedDate.toISOString(),
+        storedDate: movement.date.toISOString(),
+        dateMatches: movement.date.getTime() === normalizedDate.getTime(),
+      })
+      // #endregion
     }
 
     // Update Raw Material Total Stock
     const totalQuantity = drums.reduce((sum, d) => sum + d.quantity, 0)
+
+    // #region agent log
+    const rawMaterialBefore = await tx.rawMaterial.findUnique({
+      where: { id: rawMaterialId },
+      select: { currentStock: true },
+    })
+    const aggregateBeforeStock = rawMaterialBefore?.currentStock ?? null
+    // #endregion
+
     await tx.rawMaterial.update({
       where: { id: rawMaterialId },
       data: {
@@ -1289,6 +1524,31 @@ export async function createDrumStockIn(
         },
       },
     })
+
+    // #region agent log
+    const rawMaterialAfter = await tx.rawMaterial.findUnique({
+      where: { id: rawMaterialId },
+      select: { currentStock: true },
+    })
+    const aggregateAfterStock = rawMaterialAfter?.currentStock ?? null
+
+    // Get sum of drums after creation
+    const drumSum = await tx.drum.aggregate({
+      where: { rawMaterialId },
+      _sum: { currentQuantity: true },
+    })
+    const sumOfDrums = drumSum._sum.currentQuantity || 0
+
+    debugLog('stock-movement.service.ts:1468', 'createDrumStockIn stock updates', {
+      rawMaterialId,
+      totalQuantity,
+      aggregateBeforeStock,
+      aggregateAfterStock,
+      sumOfDrums,
+      drumsCreated: drums.length,
+      drumQuantities: drums.map(d => ({ label: d.label, quantity: d.quantity })),
+    })
+    // #endregion
 
     // Validate consistency: aggregate stock should equal sum of drums
     await validateRawMaterialStockConsistency(rawMaterialId, tx)

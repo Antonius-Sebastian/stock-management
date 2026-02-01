@@ -1,0 +1,100 @@
+,,,Dasboard,
+1,200HP01,HPMC,,Thikener
+2,200TR01,Trimak HC-T/12,Tritungal Arta Makmur,Thikener Acid
+3,200TE01,Tetrasodium EDTA,,
+4,200SC01,Sodium Chloride/Garam Bening Cirebon,Garam Bening Cirebon,Thikener
+5,200PG01,Propylene Glycol USP,,Humectant
+6,200HE01,HEC,Sinar Multi Chemindo ,Thikener
+7,200RE01,Rheosolve T637,Mahakem,Acrylic thickener
+8,200KR01,THK R417/Ultrathik R,Mahakem,Anionic Polymer/Thikener Semir
+9,200SO01,Resoft 909/Acrylamine/Acryloyloxyethyl Trimethyl Amonium Chloride ,Sinar Multi Kemindo ,Thikener Softener
+10,200CL01,Cellosize Hydroxyethyl Clulose QP 100 MH,Cornell Caldic,Thikener Softener
+11,200TM01,Trilon M Powder ,Wika,Chelating Noda Darah
+12,300SL01,Sodium Lauret Sulfate/SLES/Uroce SLES 70,Mahakem ,Anionic Surfactant 
+13,300CD01,Cocamide DEA/Comperlan PKOD,,Non-ionic
+14,300TO01,Sodium Lauryl Sulfate/Texapon OCN/SLS,Bahtera Adi Jaya ,Anionic Surfactant
+15,300CB01,Supersurf CAB 35/CAPB/Dehyton KE-AS,Mahakem ,Ampoteric Surfactant
+16,300LB01,Econat LAS/Linear Alkyl Benzene Sulfonic Acid 96%,Indokemika Jaya tama ,Anionic Surfactant
+17,300FS01,Econat LASNA 65,,
+18,300BR01,Berol 611,Graha Esa,Nonionik Surfactan
+19,300AM01,Amphytol 20N,Graha Obor,Ampoteric Surfactant
+20,300AU01,Wikasoft AU 56/Cationic Quartenary Surfactant,Wika ,Nonionik Surfactan
+21,300GS01,Gesoft S 600/Mixture,Graha Esa,Cationic Surfactant
+22,300LG01,Lauryl Glucoside/MAHA 1200 LG,Mahakem ,Nonionik Surfactan
+23,300TE01,Tergitol NP 10,Mata Pelangi ,Nonionik Surfactan
+24,300ME01,ME-507/Amino Silicone Softener,Topco Trading Indonesia,Non-ionic / Weak cationic
+25,300EQ01,Requat EQ90/Dialkylester Ammonium Methosulfate,Sinar Multi Kemindo,Cationic Surfactant
+26,400HC01,Metpers HP 382/HCO 40/Hidrogenated Castrol Oil,Mahakem,Emulsifire
+27,400OP01,ACUSOL™ OP301 OPACIFIER ,Cornel/DOW,OPACIFIER 
+28,400RE01,Resperse 808N/Sodium Polyacrylate,,Antiredoposisi
+29,400XE01,XIAMETER™ OFX-0193 Fluid/PEG-12 Dimethicone,Cornel/DOW,Emulsifire warna putih
+30,500KO01,"KOH / Potasium Hidroxide 40,9 %",Tolo kimia,PH Adjuster
+31,500NO01,NaOH 48%,,PH Adjuster
+32,500SB01,Sodium Bicarbonate ,,PH Adjuster
+33,500SC01,Sodium Carbonate (SAD),,
+34,500CA01,Citric Acid Anhydrous,Indokemika,PH Adjuster
+35,500GL01,Glycerin USP,SMK,Humectant
+36,500AL01,Alkohol,SMK,Pelarut/Desinfectant
+37,500IP01,Isopropyl Alcohol/IPA,SMK,
+38,500ME01,Metanol,SMK,Pelarut
+39,500MB01,MMB,Panca Sakti Putra Kencana,Pelarut/Fast Evaforated
+40,500OX01,Asam Oksalat / Oxalic Acid,,PH Adjuster
+41,500CL01,HCl 22%,,
+42,500HF01,HF 55%,JIC 89,
+43,500SP01,Sodium Percarbonate,Graha Esa ,Oxy Bleach
+44,500TP01,Sodium Tripoli Posphate STPP,,
+45,500SA01,Sulfamidic Acid,,
+46,600BC01,BKC 50%/Sanisol/Benzalkromium Chloride,Mahakem,Anti Bakteri
+47,600EV01,Enzycold Five-L,Cornel ,Enzyme
+48,600TT01,Canguard TT,Graha Esa ,Anti Oksidan
+49,600CW01,Canwhite CBS-X,Graga Esa,Optical Brightener
+50,600PV01,CMIT & MIT/Preventol D 7,LanXess,Preserpative
+51,600DM01,Reachin DMDMH,Reachin,
+52,700CO01,Citronela Oil/ Sereh Oil,Sentrum,
+53,700PO01,Pine Oil,Bantu Temen,
+54,700SK01,Silikon Oil,Topco Trading ,Silikon Semir Ban
+55,700NC01,Nano Coating/KR 400,Topco Trading ,Nano Coating
+56,800RE01,Sunsea Strawberry Red Extra,Roha,Merah Strawberry
+57,800BL01,Sunsea Brill Blue Light 2129,Roha,Biru Detergent & Softener
+58,800LG01,Sunsea Light Green H/C 2174,Roha,Hujau Cuci Piring
+59,800YL01,Simacid Yellow 73 (AY73),Roha,Acid Cleaner
+60,800MV01,Medium Violet Q,Mata Pelangi,Warna Ungu Lantai
+61,800EQ01,Red Q 26 SC,Mata Pelangi,Warna Pink Shampo Mobil
+62,800ME01,Merah Karpet,Mata Pelangi,Warna Merah/Hand Siap
+63,800LG01,UNIQUA GREEN Q 14,Mata Pelangi,Warna Hijau Pencuci Piring
+64,800BQ01,Blue Q 1530,Mata Pelangi,Biru Detergent Cair/Softener
+65,800RP01,Simblend Rose Pink 2120,Roha,Shampo Mobil
+66,800VG01,Sunsea Violet Grape ,Roha,Flour Cleaner Lavender
+67,800AG01,Sunsea Apple Green Extra 2093,Roha,
+68,800YW01,Yellow,Mata Pelangi,Flour Cleaner Pine Oil
+69,800LE01,Sunsea Lemon Egg Yellow 2112,Roha,
+70,800AB01,Simacid Blue 80 (ABL80),Roha,
+71,900PK01,Parfum Kaca / Orange,,Pembersih Kaca Orange
+72,900HS01,Parf Hand Soap / Strawberry,,HS Strawberry
+73,900HL01,PRX051203 HAPPY LIME LV ,,Pencuci Piring
+74,900PM01,LAVENDER POWER MOD FL SP154492 ,,Pembersih Lantai Violet
+75,900SB01,SO BLUE ECOBOOST FC SP159426,,Detergent 
+76,900PF01,PURPLE FABRIC FC SP140826/White Lily,,Parfum Clean Art
+77,900PP01,PEACH PASSION FC SP15086,,Parfum Laundry/Softener
+78,900LG01,PRX051288 HAPPY LEMONGRASS LV,,Karbol Sereh
+79,900TA01,TAS 28572 X,Tirta Aroma Sari,
+80,900TV01,TAS 26085 V,Tirta Aroma Sari,
+81,900TS01,TAS 26026 V,Tirta Aroma Sari,
+82,900TU01,TAS 25908 V,Tirta Aroma Sari,
+83,900TN01,TAS 25901 V,Tirta Aroma Sari,
+84,900TD01,TAS 25846 V / Bacarat,Tirta Aroma Sari,Parfum Laundry
+85,900TT01,TAS 24599 T,Tirta Aroma Sari,
+86,900DW01,TAS 22268 R / Downny,Tirta Aroma Sari,Parfum Laundry
+87,900BK01,TAS 22259 R / Sakura / New Akasia,Tirta Aroma Sari,Parfum Laundry
+88,900ST01,TAS 22258 R / Parf Sweety,Tirta Aroma Sari,Parfum Laundry
+89,900GO01,GALAXOLIDE 50,Tirta Aroma Sari,
+90,900RE01,Radiance Encap FC,CPL Aroma ,Encapsulated
+91,900FX01,Fixactive 20,CPL Aroma ,Fixactive
+92,900OR01,Orcid Fresh,CPL Aroma ,Pelicin Pakaian
+93,900OF01,Ocean Fresh/TAS 25908 V,CPL Aroma ,Pelicin Pakaian
+94,900FR01,Floral ,CPL Aroma ,
+95,900LT01,Lemon Touch WL,CPL Aroma ,Pencuci Piring
+96,900FU01,Fusion FC,CPL Aroma ,
+97,900GD01,Pal Gold FL SP 149726,CPL Aroma ,Lantai Lavender
+98,900YC01,Yellow Care FC (Sakura),CPL Aroma ,Sakura
+99,900DR01,Darling Red,CPL Aroma ,Detergent 

@@ -17,7 +17,7 @@ function debugLog(location: string, message: string, data: unknown) {
     data,
     timestamp: Date.now(),
     sessionId: 'debug-session',
-    runId: 'phase2',
+    runId: 'phase3',
     hypothesisId: 'A',
   }
   // Use fetch to send to debug server (non-blocking)
@@ -508,6 +508,25 @@ export async function createStockMovement(
     if (data.finishedGoodId) {
       if (!data.locationId) throw new Error('Location required')
 
+      // #region agent log
+      const finishedGoodBefore = await tx.finishedGood.findUnique({
+        where: { id: data.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockBefore = finishedGoodBefore?.currentStock ?? null
+      
+      const locationStockBefore = await tx.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: data.finishedGoodId,
+            locationId: data.locationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      const locationStockBeforeValue = locationStockBefore?.quantity ?? null
+      // #endregion
+
       // Update upsert: Create if not exists (for IN), update if exists
       await tx.finishedGoodStock.upsert({
         where: {
@@ -528,6 +547,36 @@ export async function createStockMovement(
           quantity: quantityChange < 0 ? 0 : quantityChange,
         },
       })
+
+      // #region agent log
+      const finishedGoodAfter = await tx.finishedGood.findUnique({
+        where: { id: data.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockAfter = finishedGoodAfter?.currentStock ?? null
+      
+      const locationStockAfter = await tx.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: data.finishedGoodId,
+            locationId: data.locationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      const locationStockAfterValue = locationStockAfter?.quantity ?? null
+      
+      debugLog('stock-movement.service.ts:507', 'createStockMovement finished good stock updates', {
+        finishedGoodId: data.finishedGoodId,
+        locationId: data.locationId,
+        quantityChange,
+        locationStockBefore: locationStockBeforeValue,
+        locationStockAfter: locationStockAfterValue,
+        globalStockBefore,
+        globalStockAfter,
+        globalStockChanged: globalStockBefore !== globalStockAfter,
+      })
+      // #endregion
 
       // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }
@@ -1085,7 +1134,15 @@ export async function updateStockMovement(
 
     // Reverse old movement effect
     // Update Drum Stock (if applicable)
+    let drumBeforeReverse: number | null = null
+    let drumAfterReverse: number | null = null
     if (existingMovement.drumId) {
+      const drumBefore = await tx.drum.findUnique({
+        where: { id: existingMovement.drumId },
+        select: { currentQuantity: true },
+      })
+      drumBeforeReverse = drumBefore?.currentQuantity ?? null
+      
       await tx.drum.update({
         where: { id: existingMovement.drumId },
         data: {
@@ -1093,16 +1150,49 @@ export async function updateStockMovement(
           isActive: { set: true }, // Will be updated below
         },
       })
+      
+      const drumAfter = await tx.drum.findUnique({
+        where: { id: existingMovement.drumId },
+        select: { currentQuantity: true },
+      })
+      drumAfterReverse = drumAfter?.currentQuantity ?? null
     }
 
     // Update Raw Material Global Stock
+    let aggregateBeforeReverse: number | null = null
+    let aggregateAfterReverse: number | null = null
     if (existingMovement.rawMaterialId) {
+      const rawMaterialBefore = await tx.rawMaterial.findUnique({
+        where: { id: existingMovement.rawMaterialId },
+        select: { currentStock: true },
+      })
+      aggregateBeforeReverse = rawMaterialBefore?.currentStock ?? null
+      
       await tx.rawMaterial.update({
         where: { id: existingMovement.rawMaterialId },
         data: {
           currentStock: { increment: -oldQuantityChange },
         },
       })
+      
+      const rawMaterialAfter = await tx.rawMaterial.findUnique({
+        where: { id: existingMovement.rawMaterialId },
+        select: { currentStock: true },
+      })
+      aggregateAfterReverse = rawMaterialAfter?.currentStock ?? null
+
+      // #region agent log
+      debugLog('stock-movement.service.ts:1086', 'updateStockMovement reverse old effect', {
+        movementId,
+        rawMaterialId: existingMovement.rawMaterialId,
+        drumId: existingMovement.drumId,
+        oldQuantityChange: -oldQuantityChange,
+        drumBeforeReverse,
+        drumAfterReverse,
+        aggregateBeforeReverse,
+        aggregateAfterReverse,
+      })
+      // #endregion
 
       // Validate consistency: aggregate stock should equal sum of drums
       await validateRawMaterialStockConsistency(
@@ -1113,8 +1203,30 @@ export async function updateStockMovement(
 
     // Update Finished Good Stock (Location Aware)
     if (existingMovement.finishedGoodId) {
+      // #region agent log
+      const finishedGoodBeforeReverse = await tx.finishedGood.findUnique({
+        where: { id: existingMovement.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockBeforeReverse = finishedGoodBeforeReverse?.currentStock ?? null
+      
+      let oldLocationStockBefore: number | null = null
+      let oldLocationStockAfter: number | null = null
+      // #endregion
+      
       // Reverse old location stock
       if (oldLocationId) {
+        const oldLocationStockBeforeQuery = await tx.finishedGoodStock.findUnique({
+          where: {
+            finishedGoodId_locationId: {
+              finishedGoodId: existingMovement.finishedGoodId,
+              locationId: oldLocationId,
+            },
+          },
+          select: { quantity: true },
+        })
+        oldLocationStockBefore = oldLocationStockBeforeQuery?.quantity ?? null
+        
         await tx.finishedGoodStock
           .update({
             where: {
@@ -1130,20 +1242,55 @@ export async function updateStockMovement(
           .catch(() => {
             // If stock doesn't exist, ignore (shouldn't happen, but safe)
           })
+        
+        const oldLocationStockAfterQuery = await tx.finishedGoodStock.findUnique({
+          where: {
+            finishedGoodId_locationId: {
+              finishedGoodId: existingMovement.finishedGoodId,
+              locationId: oldLocationId,
+            },
+          },
+          select: { quantity: true },
+        })
+        oldLocationStockAfter = oldLocationStockAfterQuery?.quantity ?? null
       }
+      
+      // #region agent log
+      const finishedGoodAfterReverse = await tx.finishedGood.findUnique({
+        where: { id: existingMovement.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockAfterReverse = finishedGoodAfterReverse?.currentStock ?? null
+      
+      debugLog('stock-movement.service.ts:1155', 'updateStockMovement finished good reverse old effect', {
+        movementId,
+        finishedGoodId: existingMovement.finishedGoodId,
+        oldLocationId,
+        oldQuantityChange: -oldQuantityChange,
+        oldLocationStockBefore,
+        oldLocationStockAfter,
+        globalStockBefore: globalStockBeforeReverse,
+        globalStockAfter: globalStockAfterReverse,
+        globalStockChanged: globalStockBeforeReverse !== globalStockAfterReverse,
+      })
+      // #endregion
 
       // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }
 
     // Apply new movement effect
     // Update Drum Stock (if applicable)
+    let drumBeforeApply: number | null = null
+    let drumAfterApply: number | null = null
     if (existingMovement.drumId) {
       const drum = await tx.drum.findUnique({
         where: { id: existingMovement.drumId },
         select: { currentQuantity: true },
       })
       if (!drum) throw new Error('Drum not found')
+      drumBeforeApply = drum.currentQuantity
       const newQuantity = drum.currentQuantity + newQuantityChange
+      drumAfterApply = newQuantity
 
       await tx.drum.update({
         where: { id: existingMovement.drumId },
@@ -1155,13 +1302,40 @@ export async function updateStockMovement(
     }
 
     // Update Raw Material Global Stock
+    let aggregateBeforeApply: number | null = null
+    let aggregateAfterApply: number | null = null
     if (existingMovement.rawMaterialId) {
+      const rawMaterialBefore = await tx.rawMaterial.findUnique({
+        where: { id: existingMovement.rawMaterialId },
+        select: { currentStock: true },
+      })
+      aggregateBeforeApply = rawMaterialBefore?.currentStock ?? null
+      
       await tx.rawMaterial.update({
         where: { id: existingMovement.rawMaterialId },
         data: {
           currentStock: { increment: newQuantityChange },
         },
       })
+      
+      const rawMaterialAfter = await tx.rawMaterial.findUnique({
+        where: { id: existingMovement.rawMaterialId },
+        select: { currentStock: true },
+      })
+      aggregateAfterApply = rawMaterialAfter?.currentStock ?? null
+
+      // #region agent log
+      debugLog('stock-movement.service.ts:1138', 'updateStockMovement apply new effect', {
+        movementId,
+        rawMaterialId: existingMovement.rawMaterialId,
+        drumId: existingMovement.drumId,
+        newQuantityChange,
+        drumBeforeApply,
+        drumAfterApply,
+        aggregateBeforeApply,
+        aggregateAfterApply,
+      })
+      // #endregion
 
       // Validate consistency: aggregate stock should equal sum of drums
       await validateRawMaterialStockConsistency(
@@ -1175,6 +1349,25 @@ export async function updateStockMovement(
       if (!newLocationId) {
         throw new Error('Location is required for finished good movements')
       }
+
+      // #region agent log
+      const finishedGoodBeforeApply = await tx.finishedGood.findUnique({
+        where: { id: existingMovement.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockBeforeApply = finishedGoodBeforeApply?.currentStock ?? null
+      
+      const newLocationStockBefore = await tx.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: existingMovement.finishedGoodId,
+            locationId: newLocationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      const newLocationStockBeforeValue = newLocationStockBefore?.quantity ?? null
+      // #endregion
 
       // Update new location stock
       await tx.finishedGoodStock.upsert({
@@ -1193,6 +1386,37 @@ export async function updateStockMovement(
           quantity: newQuantityChange > 0 ? newQuantityChange : 0,
         },
       })
+
+      // #region agent log
+      const finishedGoodAfterApply = await tx.finishedGood.findUnique({
+        where: { id: existingMovement.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockAfterApply = finishedGoodAfterApply?.currentStock ?? null
+      
+      const newLocationStockAfter = await tx.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: existingMovement.finishedGoodId,
+            locationId: newLocationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      const newLocationStockAfterValue = newLocationStockAfter?.quantity ?? null
+      
+      debugLog('stock-movement.service.ts:1347', 'updateStockMovement finished good apply new effect', {
+        movementId,
+        finishedGoodId: existingMovement.finishedGoodId,
+        newLocationId,
+        newQuantityChange,
+        newLocationStockBefore: newLocationStockBeforeValue,
+        newLocationStockAfter: newLocationStockAfterValue,
+        globalStockBefore: globalStockBeforeApply,
+        globalStockAfter: globalStockAfterApply,
+        globalStockChanged: globalStockBeforeApply !== globalStockAfterApply,
+      })
+      // #endregion
 
       // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }
@@ -1272,6 +1496,8 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
     const reverseChange = -quantityChange
 
     // Update Drum Stock (if applicable)
+    let drumBeforeDelete: number | null = null
+    let drumAfterDelete: number | null = null
     if (existingMovement.drumId) {
       const drum = await tx.$queryRaw<
         Array<{ id: string; currentQuantity: number }>
@@ -1286,7 +1512,10 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
         throw new Error('Drum not found')
       }
 
+      drumBeforeDelete = drum[0].currentQuantity
       const newQuantity = drum[0].currentQuantity + reverseChange
+      drumAfterDelete = newQuantity
+      
       if (newQuantity < 0) {
         throw new Error(
           `Cannot delete movement: would result in negative drum stock. Current: ${drum[0].currentQuantity}, Change: ${reverseChange}`
@@ -1303,6 +1532,8 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
     }
 
     // Update Raw Material Global Stock
+    let aggregateBeforeDelete: number | null = null
+    let aggregateAfterDelete: number | null = null
     if (existingMovement.rawMaterialId) {
       const items = await tx.$queryRaw<
         Array<{ id: string; name: string; currentStock: number }>
@@ -1318,7 +1549,9 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
       }
 
       const item = items[0]
+      aggregateBeforeDelete = item.currentStock
       const newStock = item.currentStock + reverseChange
+      aggregateAfterDelete = newStock
 
       if (newStock < 0) {
         throw new Error(
@@ -1333,6 +1566,19 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
         },
       })
 
+      // #region agent log
+      debugLog('stock-movement.service.ts:1274', 'deleteStockMovement stock restoration', {
+        movementId,
+        rawMaterialId: existingMovement.rawMaterialId,
+        drumId: existingMovement.drumId,
+        reverseChange,
+        drumBeforeDelete,
+        drumAfterDelete,
+        aggregateBeforeDelete,
+        aggregateAfterDelete,
+      })
+      // #endregion
+
       // Validate consistency: aggregate stock should equal sum of drums
       await validateRawMaterialStockConsistency(
         existingMovement.rawMaterialId,
@@ -1345,6 +1591,25 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
       if (!existingMovement.locationId) {
         throw new Error('Location is required for finished good movements')
       }
+
+      // #region agent log
+      const finishedGoodBeforeDelete = await tx.finishedGood.findUnique({
+        where: { id: existingMovement.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockBeforeDelete = finishedGoodBeforeDelete?.currentStock ?? null
+      
+      const locationStockBeforeDelete = await tx.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: existingMovement.finishedGoodId,
+            locationId: existingMovement.locationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      const locationStockBeforeDeleteValue = locationStockBeforeDelete?.quantity ?? null
+      // #endregion
 
       const stocks = await tx.$queryRaw<Array<{ quantity: number }>>`
         SELECT quantity
@@ -1379,6 +1644,37 @@ export async function deleteStockMovement(movementId: string): Promise<void> {
           },
         })
       }
+
+      // #region agent log
+      const finishedGoodAfterDelete = await tx.finishedGood.findUnique({
+        where: { id: existingMovement.finishedGoodId },
+        select: { currentStock: true },
+      })
+      const globalStockAfterDelete = finishedGoodAfterDelete?.currentStock ?? null
+      
+      const locationStockAfterDelete = await tx.finishedGoodStock.findUnique({
+        where: {
+          finishedGoodId_locationId: {
+            finishedGoodId: existingMovement.finishedGoodId,
+            locationId: existingMovement.locationId,
+          },
+        },
+        select: { quantity: true },
+      })
+      const locationStockAfterDeleteValue = locationStockAfterDelete?.quantity ?? null
+      
+      debugLog('stock-movement.service.ts:1589', 'deleteStockMovement finished good stock restoration', {
+        movementId,
+        finishedGoodId: existingMovement.finishedGoodId,
+        locationId: existingMovement.locationId,
+        reverseChange,
+        locationStockBefore: locationStockBeforeDeleteValue,
+        locationStockAfter: locationStockAfterDeleteValue,
+        globalStockBefore: globalStockBeforeDelete,
+        globalStockAfter: globalStockAfterDelete,
+        globalStockChanged: globalStockBeforeDelete !== globalStockAfterDelete,
+      })
+      // #endregion
 
       // REMOVED: Update global aggregate (no longer needed - finished goods are location-only)
     }

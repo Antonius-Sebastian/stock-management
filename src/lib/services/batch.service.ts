@@ -619,7 +619,38 @@ export async function updateBatch(
       // Step 1: Restore stock for all old materials and drums
       // Track which materials we've restored to validate once per material
       const restoredMaterials = new Set<string>()
+      
+      // #region agent log - Track restoration phase
+      const restorationLogs: Array<{
+        rawMaterialId: string
+        oldUsageQuantity: number
+        drumId: string | null
+        aggregateBefore: number | null
+        aggregateAfter: number | null
+        drumBefore: number | null
+        drumAfter: number | null
+      }> = []
+      // #endregion
+      
       for (const oldUsage of existingBatch.batchUsages) {
+        // #region agent log
+        const rawMaterialBeforeRestore = await tx.rawMaterial.findUnique({
+          where: { id: oldUsage.rawMaterialId },
+          select: { currentStock: true },
+        })
+        const aggregateBeforeRestore = rawMaterialBeforeRestore?.currentStock ?? null
+        
+        let drumBeforeRestore: number | null = null
+        let drumAfterRestore: number | null = null
+        if (oldUsage.drumId) {
+          const drumBefore = await tx.drum.findUnique({
+            where: { id: oldUsage.drumId },
+            select: { currentQuantity: true },
+          })
+          drumBeforeRestore = drumBefore?.currentQuantity ?? null
+        }
+        // #endregion
+        
         // Restore raw material stock
         await tx.rawMaterial.update({
           where: { id: oldUsage.rawMaterialId },
@@ -641,6 +672,14 @@ export async function updateBatch(
               isActive: true, // Reactivate if it was deactivated
             },
           })
+          
+          // #region agent log
+          const drumAfter = await tx.drum.findUnique({
+            where: { id: oldUsage.drumId },
+            select: { currentQuantity: true },
+          })
+          drumAfterRestore = drumAfter?.currentQuantity ?? null
+          // #endregion
         }
 
         // Delete old stock movement
@@ -651,12 +690,37 @@ export async function updateBatch(
           },
         })
 
+        // #region agent log
+        const rawMaterialAfterRestore = await tx.rawMaterial.findUnique({
+          where: { id: oldUsage.rawMaterialId },
+          select: { currentStock: true },
+        })
+        const aggregateAfterRestore = rawMaterialAfterRestore?.currentStock ?? null
+        
+        restorationLogs.push({
+          rawMaterialId: oldUsage.rawMaterialId,
+          oldUsageQuantity: oldUsage.quantity,
+          drumId: oldUsage.drumId,
+          aggregateBefore: aggregateBeforeRestore,
+          aggregateAfter: aggregateAfterRestore,
+          drumBefore: drumBeforeRestore,
+          drumAfter: drumAfterRestore,
+        })
+        // #endregion
+
         // Validate consistency after restoring this material (once per material)
         if (!restoredMaterials.has(oldUsage.rawMaterialId)) {
           await validateRawMaterialStockConsistency(oldUsage.rawMaterialId, tx)
           restoredMaterials.add(oldUsage.rawMaterialId)
         }
       }
+      
+      // #region agent log
+      debugLog('batch.service.ts:619', 'updateBatch stock restoration', {
+        batchId: id,
+        restorationLogs,
+      })
+      // #endregion
 
       // Step 2: Delete all old batch usages
       await tx.batchUsage.deleteMany({
@@ -669,6 +733,21 @@ export async function updateBatch(
           (sum, drum) => sum + drum.quantity,
           0
         )
+
+        // #region agent log
+        const rawMaterialBeforeApply = await tx.rawMaterial.findUnique({
+          where: { id: material.rawMaterialId },
+          select: { currentStock: true },
+        })
+        const aggregateBeforeApply = rawMaterialBeforeApply?.currentStock ?? null
+        
+        // Get all drums for this material before update
+        const drumsBeforeApply = await tx.drum.findMany({
+          where: { rawMaterialId: material.rawMaterialId },
+          select: { id: true, label: true, currentQuantity: true },
+        })
+        const drumsBeforeApplyMap = new Map(drumsBeforeApply.map(d => [d.id, d.currentQuantity]))
+        // #endregion
 
         // Check if raw material has enough stock with row locking
         const rawMaterials = await tx.$queryRaw<
@@ -761,6 +840,42 @@ export async function updateBatch(
             },
           },
         })
+
+        // #region agent log
+        const rawMaterialAfterApply = await tx.rawMaterial.findUnique({
+          where: { id: material.rawMaterialId },
+          select: { currentStock: true },
+        })
+        const aggregateAfterApply = rawMaterialAfterApply?.currentStock ?? null
+        
+        // Get all drums for this material after update
+        const drumsAfterApply = await tx.drum.findMany({
+          where: { rawMaterialId: material.rawMaterialId },
+          select: { id: true, label: true, currentQuantity: true },
+        })
+        const drumsAfterApplyMap = new Map(drumsAfterApply.map(d => [d.id, d.currentQuantity]))
+        
+        const sumOfDrumsBeforeApply = drumsBeforeApply.reduce((sum, d) => sum + d.currentQuantity, 0)
+        const sumOfDrumsAfterApply = drumsAfterApply.reduce((sum, d) => sum + d.currentQuantity, 0)
+        
+        const drumChanges = material.drums.map(d => ({
+          drumId: d.drumId,
+          quantity: d.quantity,
+          drumBefore: d.drumId ? drumsBeforeApplyMap.get(d.drumId) : null,
+          drumAfter: d.drumId ? drumsAfterApplyMap.get(d.drumId) : null,
+        }))
+        
+        debugLog('batch.service.ts:667', 'updateBatch stock application', {
+          batchId: id,
+          rawMaterialId: material.rawMaterialId,
+          totalQuantity,
+          aggregateBeforeApply,
+          aggregateAfterApply,
+          sumOfDrumsBeforeApply,
+          sumOfDrumsAfterApply,
+          drumChanges,
+        })
+        // #endregion
 
         // Validate consistency: aggregate stock should equal sum of drums
         await validateRawMaterialStockConsistency(material.rawMaterialId, tx)

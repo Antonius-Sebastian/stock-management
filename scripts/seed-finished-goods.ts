@@ -25,9 +25,7 @@ async function parseCSV(
     const products: Array<{ name: string; size: string }> = []
     let currentSize = ''
 
-    const stream = fs
-      .createReadStream(filePath)
-      .pipe(parse({ headers: false }))
+    const stream = fs.createReadStream(filePath).pipe(parse({ headers: false }))
 
     stream.on('data', (row: string[]) => {
       // Skip completely empty rows

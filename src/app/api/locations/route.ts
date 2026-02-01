@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getLocations, createLocation } from '@/lib/services/location.service'
 import { z } from 'zod'
+import { auth } from '@/auth'
+import { canManageLocations, getPermissionErrorMessage } from '@/lib/rbac'
 
 const locationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -10,9 +12,14 @@ const locationSchema = z.object({
 
 export async function GET() {
   try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const locations = await getLocations()
     return NextResponse.json(locations)
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: 'Failed to fetch locations' },
       { status: 500 }
@@ -22,6 +29,23 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!canManageLocations(session.user.role)) {
+      return NextResponse.json(
+        {
+          error: getPermissionErrorMessage(
+            'create locations',
+            session.user.role
+          ),
+        },
+        { status: 403 }
+      )
+    }
+
     const json = await req.json()
     const body = locationSchema.parse(json)
 

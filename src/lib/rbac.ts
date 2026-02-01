@@ -208,6 +208,26 @@ export function canExportReports(role: string | undefined): boolean {
 }
 
 /**
+ * Check if user can manage locations (create/edit)
+ * @param role - User's role
+ * @returns true if ADMIN, OFFICE_PURCHASING, or OFFICE_WAREHOUSE
+ */
+export function canManageLocations(role: string | undefined): boolean {
+  if (!role) return false
+  return ['ADMIN', 'OFFICE_PURCHASING', 'OFFICE_WAREHOUSE'].includes(role)
+}
+
+/**
+ * Check if user can delete locations
+ * @param role - User's role
+ * @returns true if ADMIN only
+ */
+export function canDeleteLocations(role: string | undefined): boolean {
+  if (!role) return false
+  return role === 'ADMIN'
+}
+
+/**
  * Check if user can manage other users
  * @param role - User's role
  * @returns true if ADMIN only
@@ -270,6 +290,8 @@ export const PERMISSIONS = {
     canViewReports: true,
     canExportReports: true,
     canManageUsers: true,
+    canManageLocations: true,
+    canDeleteLocations: true,
   },
   OFFICE_PURCHASING: {
     canManageMaterials: true, // ✅ Can create/edit materials
@@ -286,6 +308,8 @@ export const PERMISSIONS = {
     canViewReports: true,
     canExportReports: true,
     canManageUsers: false,
+    canManageLocations: true,
+    canDeleteLocations: false,
   },
   OFFICE_WAREHOUSE: {
     canManageMaterials: true, // ✅ Can create/edit materials
@@ -302,5 +326,7 @@ export const PERMISSIONS = {
     canViewReports: true,
     canExportReports: true,
     canManageUsers: false,
+    canManageLocations: true,
+    canDeleteLocations: false,
   },
 } as const

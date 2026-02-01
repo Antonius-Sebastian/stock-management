@@ -30,9 +30,7 @@ async function parseCSV(
     const materials: Array<{ kode: string; name: string; moq: number }> = []
     let isFirstRow = true
 
-    const stream = fs
-      .createReadStream(filePath)
-      .pipe(parse({ headers: false }))
+    const stream = fs.createReadStream(filePath).pipe(parse({ headers: false }))
 
     stream.on('data', (row: string[]) => {
       // Skip completely empty rows

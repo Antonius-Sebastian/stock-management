@@ -1,0 +1,4 @@
+## 2025-02-27 - Unprotected Locations API
+**Vulnerability:** The `/api/locations` and `/api/locations/[id]` endpoints were completely publicly accessible. No authentication or authorization checks were present, allowing anyone to CREATE, UPDATE, DELETE, or VIEW all warehouse locations.
+**Learning:** API routes in Next.js App Router are public by default. Developers must explicitly add authentication checks (`await auth()`) to every route handler. Unlike some frameworks with global middleware defaults for routes, here security is opt-in per route unless configured globally (which it wasn't for this path).
+**Prevention:** Always verify API route security during code review. Consider using a middleware approach to default-deny access to `/api/*` unless explicitly allowed, or use a linter rule to enforce `auth()` calls in route handlers.

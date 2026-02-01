@@ -109,8 +109,9 @@ export async function calculateStockAtDate(
           ...(locationId ? { locationId } : {}),
         }
 
-  // Get all movements BEFORE the given date
-  const movementsBefore = await prisma.stockMovement.findMany({
+  // Sum movements BEFORE the given date
+  const movementsBeforeAgg = await prisma.stockMovement.groupBy({
+    by: ['type'],
     where: {
       date: {
         lt: startOfDay, // Before the date (exclusive)
@@ -118,15 +119,15 @@ export async function calculateStockAtDate(
       ...baseWhere,
       ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
     },
-    orderBy: [
-      { date: 'asc' },
-      { createdAt: 'asc' }, // Secondary sort for chronological order on same day
-    ],
+    _sum: {
+      quantity: true,
+    },
   })
 
-  // Get movements ON the same day that were created BEFORE this movement
-  const sameDayMovements = movementCreatedAt
-    ? await prisma.stockMovement.findMany({
+  // Sum movements ON the same day that were created BEFORE this movement
+  const sameDayAgg = movementCreatedAt
+    ? await prisma.stockMovement.groupBy({
+        by: ['type'],
         where: {
           date: {
             gte: startOfDay,
@@ -136,32 +137,38 @@ export async function calculateStockAtDate(
           ...baseWhere,
           ...(excludeMovementId ? { id: { not: excludeMovementId } } : {}),
         },
-        orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
+        _sum: {
+          quantity: true,
+        },
       })
     : []
 
-  // Combine and sort all movements chronologically
-  const allMovements = [...movementsBefore, ...sameDayMovements].sort(
-    (a, b) => {
-      const dateDiff = a.date.getTime() - b.date.getTime()
-      if (dateDiff !== 0) return dateDiff
-      return a.createdAt.getTime() - b.createdAt.getTime()
+  // Helper to calculate stock from aggregates
+  const calculateFromAggregates = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    aggregates: Array<{
+      type: 'IN' | 'OUT' | 'ADJUSTMENT'
+      _sum: { quantity: number | null }
+    }>
+  ) => {
+    let stock = 0
+    for (const agg of aggregates) {
+      const qty = agg._sum.quantity || 0
+      if (agg.type === 'IN') {
+        stock += qty
+      } else if (agg.type === 'OUT') {
+        stock -= qty
+      } else if (agg.type === 'ADJUSTMENT') {
+        stock += qty // Adjustment quantity is already signed
+      }
     }
-  )
-
-  // Calculate stock by summing all movements chronologically
-  let stock = 0
-  for (const movement of allMovements) {
-    if (movement.type === 'IN') {
-      stock += movement.quantity
-    } else if (movement.type === 'OUT') {
-      stock -= movement.quantity
-    } else if (movement.type === 'ADJUSTMENT') {
-      stock += movement.quantity // Adjustment quantity is already signed
-    }
+    return stock
   }
 
-  return Math.max(0, stock) // Never return negative
+  const stockBefore = calculateFromAggregates(movementsBeforeAgg)
+  const stockSameDay = calculateFromAggregates(sameDayAgg)
+
+  return Math.max(0, stockBefore + stockSameDay) // Never return negative
 }
 
 /**
